@@ -37,11 +37,29 @@ export interface WorkHeaderPageRenderReviewResult {
     candidateDesktopSha256: string;
     currentMobileSha256: string;
     candidateMobileSha256: string;
+    desktopViewport: Readonly<{
+      currentWidth: number;
+      currentHeight: number;
+      candidateWidth: number;
+      candidateHeight: number;
+      dimensionsMatch: boolean;
+      screenshotsDiffer: boolean;
+    }>;
+    mobileViewport: Readonly<{
+      currentWidth: number;
+      currentHeight: number;
+      candidateWidth: number;
+      candidateHeight: number;
+      dimensionsMatch: boolean;
+      screenshotsDiffer: boolean;
+    }>;
     visualScore: number;
     disqualifiers: readonly string[];
     verdict: "reject" | "rework" | "page-shortlist";
     pageRenderReviewPerformed: true;
     exactScreenshotHashesBound: true;
+    comparableViewportGeometryVerified: boolean;
+    candidateRenderDifferenceVerified: boolean;
     automaticPublicationAllowed: false;
     automaticWebsiteMutationAllowed: false;
     finalApprovalRequired: true;
@@ -72,9 +90,14 @@ function safe(value: string): string {
   return value.replace(/[&<>"']/gu, (token) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[token]!));
 }
 
-async function panel(image: Buffer, label: string, width: number): Promise<Buffer> {
+async function dimensions(image: Buffer, label: string): Promise<{ width: number; height: number }> {
   const meta = await sharp(image, { failOn: "error" }).metadata();
   if (!meta.width || !meta.height) throw new Error(`${label} screenshot has no dimensions.`);
+  return { width: meta.width, height: meta.height };
+}
+
+async function panel(image: Buffer, label: string, width: number): Promise<Buffer> {
+  const meta = await dimensions(image, label);
   const contentHeight = Math.min(1000, Math.max(180, Math.round(width * meta.height / meta.width)));
   const preview = await sharp(image).resize({ width, height: contentHeight, fit: "contain", background: "#111111" }).flatten({ background: "#111111" }).png().toBuffer();
   const caption = Buffer.from(`<svg width="${width}" height="50" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#050505"/><text x="16" y="32" font-family="Arial,sans-serif" font-size="19" fill="#ffffff">${safe(label)}</text></svg>`);
@@ -91,6 +114,21 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
   }
   if (!Array.isArray(spec.notes) || spec.notes.some((note) => typeof note !== "string" || !note.trim())) throw new Error("notes must be an array of non-empty strings.");
 
+  const [currentDesktopMeta, candidateDesktopMeta, currentMobileMeta, candidateMobileMeta] = await Promise.all([
+    dimensions(spec.currentDesktop, "currentDesktop"),
+    dimensions(spec.candidateDesktop, "candidateDesktop"),
+    dimensions(spec.currentMobile, "currentMobile"),
+    dimensions(spec.candidateMobile, "candidateMobile"),
+  ]);
+  const currentDesktopSha = sha256(spec.currentDesktop);
+  const candidateDesktopSha = sha256(spec.candidateDesktop);
+  const currentMobileSha = sha256(spec.currentMobile);
+  const candidateMobileSha = sha256(spec.candidateMobile);
+  const desktopDimensionsMatch = currentDesktopMeta.width === candidateDesktopMeta.width && currentDesktopMeta.height === candidateDesktopMeta.height;
+  const mobileDimensionsMatch = currentMobileMeta.width === candidateMobileMeta.width && currentMobileMeta.height === candidateMobileMeta.height;
+  const desktopScreenshotsDiffer = currentDesktopSha !== candidateDesktopSha;
+  const mobileScreenshotsDiffer = currentMobileSha !== candidateMobileSha;
+
   const values = [
     rating(spec.titleLegibility, "titleLegibility"),
     rating(spec.focalPointQuality, "focalPointQuality"),
@@ -99,6 +137,10 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
     rating(spec.overallPageQuality, "overallPageQuality"),
   ];
   const disqualifiers: string[] = [];
+  if (!desktopDimensionsMatch) disqualifiers.push("desktop-current-candidate-viewport-mismatch");
+  if (!mobileDimensionsMatch) disqualifiers.push("mobile-current-candidate-viewport-mismatch");
+  if (!desktopScreenshotsDiffer) disqualifiers.push("desktop-candidate-render-identical-to-current");
+  if (!mobileScreenshotsDiffer) disqualifiers.push("mobile-candidate-render-identical-to-current");
   if (spec.titleObscured) disqualifiers.push("title-obscured");
   if (spec.textContrastFailure) disqualifiers.push("text-contrast-failure");
   if (spec.importantSubjectCropped) disqualifiers.push("important-subject-cropped");
@@ -133,21 +175,40 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
   const proofPng = await sharp({ create: { width: 1418, height: rowOne + gap + rowTwo, channels: 4, background: "#171717" } }).composite(composites).png({ compressionLevel: 9 }).toBuffer();
 
   return {
+    contract: WORK_HEADER_PAGE_RENDER_REVIEW_CONTRACT,
     proofPng,
     evidence: Object.freeze({
       pageSlug,
       pageTitle,
       candidateId,
       candidateSha256,
-      currentDesktopSha256: sha256(spec.currentDesktop),
-      candidateDesktopSha256: sha256(spec.candidateDesktop),
-      currentMobileSha256: sha256(spec.currentMobile),
-      candidateMobileSha256: sha256(spec.candidateMobile),
+      currentDesktopSha256: currentDesktopSha,
+      candidateDesktopSha256: candidateDesktopSha,
+      currentMobileSha256: currentMobileSha,
+      candidateMobileSha256: candidateMobileSha,
+      desktopViewport: Object.freeze({
+        currentWidth: currentDesktopMeta.width,
+        currentHeight: currentDesktopMeta.height,
+        candidateWidth: candidateDesktopMeta.width,
+        candidateHeight: candidateDesktopMeta.height,
+        dimensionsMatch: desktopDimensionsMatch,
+        screenshotsDiffer: desktopScreenshotsDiffer,
+      }),
+      mobileViewport: Object.freeze({
+        currentWidth: currentMobileMeta.width,
+        currentHeight: currentMobileMeta.height,
+        candidateWidth: candidateMobileMeta.width,
+        candidateHeight: candidateMobileMeta.height,
+        dimensionsMatch: mobileDimensionsMatch,
+        screenshotsDiffer: mobileScreenshotsDiffer,
+      }),
       visualScore,
       disqualifiers: Object.freeze(disqualifiers),
       verdict,
       pageRenderReviewPerformed: true,
       exactScreenshotHashesBound: true,
+      comparableViewportGeometryVerified: desktopDimensionsMatch && mobileDimensionsMatch,
+      candidateRenderDifferenceVerified: desktopScreenshotsDiffer && mobileScreenshotsDiffer,
       automaticPublicationAllowed: false,
       automaticWebsiteMutationAllowed: false,
       finalApprovalRequired: true,
