@@ -13,16 +13,12 @@ import {
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-candidate-review";
-const SERVER_VERSION = "1.4.0";
+const SERVER_VERSION = "1.5.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
 
-const allowed = (path, output = false) => assertAllowedLocalPath(path, {
-  envName: ROOTS_ENV,
-  output,
-  label: "work header candidate review",
-});
+const allowed = (path, output = false) => assertAllowedLocalPath(path, { envName: ROOTS_ENV, output, label: "work header candidate review" });
 const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.env[WRITES_ENV] ?? "").toLowerCase());
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
@@ -35,13 +31,9 @@ async function readCandidateReviewReceipt(path) {
   const resolved = await allowed(path, false);
   const bytes = await readFile(resolved);
   const value = JSON.parse(bytes.toString("utf8"));
-  if (value.contract !== "evavo.work-header-candidate-review.v1" || !value.evidence) {
-    throw new Error("candidateReviewReceiptPath must point to an evavo.work-header-candidate-review.v1 receipt.");
-  }
+  if (value.contract !== "evavo.work-header-candidate-review.v1" || !value.evidence) throw new Error("candidateReviewReceiptPath must point to an evavo.work-header-candidate-review.v1 receipt.");
   const evidenceSha256 = digestWorkHeaderCandidateReviewEvidence(value.evidence);
-  if (typeof value.evidenceSha256 !== "string" || value.evidenceSha256 !== evidenceSha256) {
-    throw new Error("Candidate-review receipt evidence digest is missing or invalid.");
-  }
+  if (typeof value.evidenceSha256 !== "string" || value.evidenceSha256 !== evidenceSha256) throw new Error("Candidate-review receipt evidence digest is missing or invalid.");
   return { path: resolved, value, evidenceSha256, receiptSha256: sha256(bytes) };
 }
 
@@ -63,36 +55,36 @@ async function compareCandidates(args) {
 
   const candidates = await Promise.all(args.candidates.map(async (candidate) => {
     if (!candidate || typeof candidate.id !== "string" || typeof candidate.path !== "string") throw new Error("Each candidate requires id and path.");
-    return {
-      id: candidate.id,
-      image: await readFile(await allowed(candidate.path, false)),
-      ...(typeof candidate.provenance === "string" ? { provenance: candidate.provenance } : {}),
-    };
+    return { id: candidate.id, image: await readFile(await allowed(candidate.path, false)), ...(typeof candidate.provenance === "string" ? { provenance: candidate.provenance } : {}) };
   }));
   const result = await compareWorkHeaderCandidates({
     candidates,
     currentHeader: await optionalBuffer(args.currentHeaderPath),
     supportImage: await optionalBuffer(args.supportImagePath),
     tileImage: await optionalBuffer(args.tileImagePath),
+    reviewBrief: args.reviewBrief,
     maximumCandidates: args.maximumCandidates,
   });
   const proofPath = await allowed(args.proofPath, true);
   const receiptPath = await allowed(args.receiptPath, true);
   const evidenceSha256 = digestWorkHeaderCandidateReviewEvidence(result.evidence);
+  const proofSha256 = sha256(result.proofPng);
   await writeFile(proofPath, result.proofPng, { flag: "wx" });
   await writeFile(receiptPath, `${JSON.stringify({
     contract: "evavo.work-header-candidate-review.v1",
     proofPath,
-    proofSha256: sha256(result.proofPng),
+    proofSha256,
     evidenceSha256,
     evidence: result.evidence,
     approvalState: "unapproved",
     creativeWinner: null,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
-    nextRequiredAction: "Inspect this exact proof/evidence set, critique the current header and shortlisted candidates, then run the conservative selection resolver.",
+    nextRequiredAction: result.evidence.reviewBrief
+      ? "Inspect this exact project-grounded proof/evidence set, critique the current header and shortlisted candidates, then run the conservative selection resolver."
+      : "Add a semantic review brief before any replacement recommendation; technical review may continue but semantic replacement approval is blocked.",
   }, null, 2)}\n`, { flag: "wx" });
-  return { ok: true, proofPath, receiptPath, proofSha256: sha256(result.proofPng), evidenceSha256, evidence: result.evidence };
+  return { ok: true, proofPath, receiptPath, proofSha256, evidenceSha256, evidence: result.evidence };
 }
 
 async function recordCritique(args) {
@@ -104,20 +96,9 @@ async function recordCritique(args) {
 
   const board = await readCandidateReviewReceipt(args.candidateReviewReceiptPath);
   const candidateSha256 = hashForCritique(board.value.evidence, args.critique.candidateId);
-  const result = judgeWorkHeaderVisualCritique({
-    ...args.critique,
-    candidateSha256,
-    candidateReviewEvidenceSha256: board.evidenceSha256,
-  });
+  const result = judgeWorkHeaderVisualCritique({ ...args.critique, candidateSha256, candidateReviewEvidenceSha256: board.evidenceSha256 });
   const receiptPath = await allowed(args.receiptPath, true);
-  await writeFile(receiptPath, `${JSON.stringify({
-    ...result,
-    candidateReviewReceiptPath: board.path,
-    candidateReviewReceiptSha256: board.receiptSha256,
-    approvalState: "unapproved",
-    publicationAllowed: false,
-    cloudOverwriteAllowed: false,
-  }, null, 2)}\n`, { flag: "wx" });
+  await writeFile(receiptPath, `${JSON.stringify({ ...result, candidateReviewReceiptPath: board.path, candidateReviewReceiptSha256: board.receiptSha256, approvalState: "unapproved", publicationAllowed: false, cloudOverwriteAllowed: false }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, receiptPath, critique: result };
 }
 
@@ -144,9 +125,7 @@ async function resolveSelection(args) {
     const resolved = await allowed(args.currentHeaderCritiqueReceiptPath, false);
     const value = JSON.parse(await readFile(resolved, "utf8"));
     if (value.contract !== "evavo.work-header-visual-critique.v1") throw new Error("currentHeaderCritiqueReceiptPath must point to an evavo.work-header-visual-critique.v1 receipt.");
-    if (value.candidateReviewReceiptPath !== board.path || value.candidateReviewReceiptSha256 !== board.receiptSha256 || value.candidateReviewEvidenceSha256 !== board.evidenceSha256) {
-      throw new Error("Current-header critique is not bound to this exact candidate review receipt/evidence.");
-    }
+    if (value.candidateReviewReceiptPath !== board.path || value.candidateReviewReceiptSha256 !== board.receiptSha256 || value.candidateReviewEvidenceSha256 !== board.evidenceSha256) throw new Error("Current-header critique is not bound to this exact candidate review receipt/evidence.");
     currentHeaderCritique = value;
   }
 
@@ -159,35 +138,28 @@ async function resolveSelection(args) {
     minimumTechnicalScore: args.minimumTechnicalScore,
     maximumTechnicalDeficitToCurrent: args.maximumTechnicalDeficitToCurrent,
     requireCurrentHeaderBaseline: args.requireCurrentHeaderBaseline,
+    requireSemanticBrief: args.requireSemanticBrief,
   });
   const receiptPath = await allowed(args.receiptPath, true);
-  await writeFile(receiptPath, `${JSON.stringify({
-    ...result,
-    candidateReviewReceiptPath: board.path,
-    candidateReviewReceiptSha256: board.receiptSha256,
-    candidateReviewEvidenceSha256: board.evidenceSha256,
-    approvalState: "unapproved",
-    publicationAllowed: false,
-    cloudOverwriteAllowed: false,
-    websiteMutationAllowed: false,
-  }, null, 2)}\n`, { flag: "wx" });
+  await writeFile(receiptPath, `${JSON.stringify({ ...result, candidateReviewReceiptPath: board.path, candidateReviewReceiptSha256: board.receiptSha256, candidateReviewEvidenceSha256: board.evidenceSha256, approvalState: "unapproved", publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, receiptPath, resolution: result };
 }
 
 const tools = [
   {
     name: "evavo_work_header_candidate_review_capabilities",
-    description: "Describe comparative Work-header candidate review, hash-bound visual critique, evidence-lineage verification and conservative retain-current selection policy.",
+    description: "Describe project-grounded comparative Work-header review, hash-bound critique lineage and conservative retain-current selection policy.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_compare_work_header_candidates",
-    description: "Create a responsive comparison board for candidate headers plus the current baseline. Records exact image hashes, proof hash and canonical evidence hash; never selects a creative winner automatically.",
+    description: "Create a responsive comparison board including the current header, support/tile context and optional semantic project brief. Records exact image/proof/evidence hashes and never auto-selects a creative winner.",
     inputSchema: {
       type: "object",
       properties: {
         candidates: { type: "array", minItems: 2, maxItems: 12, items: { type: "object", properties: { id: { type: "string" }, path: { type: "string" }, provenance: { type: "string" } }, required: ["id", "path"], additionalProperties: false } },
         currentHeaderPath: { type: "string" }, supportImagePath: { type: "string" }, tileImagePath: { type: "string" },
+        reviewBrief: { type: "object", properties: { pageTitle: { type: "string" }, projectSummary: { type: "string" }, visualIntent: { type: "string" } }, required: ["pageTitle", "projectSummary"], additionalProperties: false },
         maximumCandidates: { type: "integer", minimum: 2, maximum: 12 }, proofPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" },
       },
       required: ["candidates", "proofPath", "receiptPath", "confirmLocalWrite"], additionalProperties: false,
@@ -195,17 +167,17 @@ const tools = [
   },
   {
     name: "evavo_record_work_header_visual_critique",
-    description: "Record visual judgement for one image from one exact candidate-review receipt. Binds the critique to both the image SHA-256 and canonical comparison-evidence SHA-256.",
+    description: "Record visual judgement for one exact image and one exact comparison evidence set.",
     inputSchema: { type: "object", properties: { candidateReviewReceiptPath: { type: "string" }, critique: { type: "object" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["candidateReviewReceiptPath", "critique", "receiptPath", "confirmLocalWrite"], additionalProperties: false },
   },
   {
     name: "evavo_resolve_work_header_selection",
-    description: "Resolve only critiques bound to the exact same immutable comparison receipt/evidence. Retains the current header unless a candidate proves material visual and technical advantage. Never mutates website or Cloudinary.",
+    description: "Resolve exact-bound critiques conservatively. By default a semantic project brief and current-header baseline are both required before recommending replacement.",
     inputSchema: {
       type: "object",
       properties: {
         candidateReviewReceiptPath: { type: "string" }, critiqueReceiptPaths: { type: "array", minItems: 1, maxItems: 12, items: { type: "string" } }, currentHeaderCritiqueReceiptPath: { type: "string" },
-        minimumVisualScore: { type: "number", minimum: 0, maximum: 100 }, minimumAdvantageOverCurrent: { type: "number", minimum: 0, maximum: 30 }, minimumTechnicalScore: { type: "number", minimum: 0, maximum: 100 }, maximumTechnicalDeficitToCurrent: { type: "number", minimum: 0, maximum: 25 }, requireCurrentHeaderBaseline: { type: "boolean" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" },
+        minimumVisualScore: { type: "number", minimum: 0, maximum: 100 }, minimumAdvantageOverCurrent: { type: "number", minimum: 0, maximum: 30 }, minimumTechnicalScore: { type: "number", minimum: 0, maximum: 100 }, maximumTechnicalDeficitToCurrent: { type: "number", minimum: 0, maximum: 25 }, requireCurrentHeaderBaseline: { type: "boolean" }, requireSemanticBrief: { type: "boolean" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" },
       },
       required: ["candidateReviewReceiptPath", "critiqueReceiptPaths", "receiptPath", "confirmLocalWrite"], additionalProperties: false,
     },
@@ -216,12 +188,13 @@ function capabilities() {
   return {
     contract: "evavo.work-header-candidate-review.v1",
     allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled(), comparativeResponsiveProofBoard: true,
-    currentHeaderTechnicalBaselineInProofBoard: true, candidateAndCurrentImageSha256Evidence: true, proofSha256Evidence: true,
-    canonicalReviewEvidenceSha256: true, visualCritiqueHashBindingRequired: true, visualCritiqueReviewEvidenceBindingRequired: true,
-    critiqueReceiptMustMatchExactCandidateReviewReceiptBytes: true, conservativeSelectionResolverAvailable: true,
-    retainCurrentByDefault: true, currentHeaderTechnicalAndVisualBaselineRequired: true, materialAdvantageRequiredForReplacementRecommendation: true,
-    materialTechnicalRegressionBlocksReplacementRecommendation: true, automaticCreativeWinner: false, automaticPublicationAllowed: false,
-    automaticWebsiteMutationAllowed: false, cloudOverwriteAllowed: false,
+    projectSemanticReviewBriefSupported: true, semanticBriefRequiredForReplacementByDefault: true, surroundingSupportAndTileReferencesInProof: true,
+    surroundingMediaSha256Evidence: true, currentHeaderTechnicalBaselineInProofBoard: true, candidateAndCurrentImageSha256Evidence: true,
+    proofSha256Evidence: true, canonicalReviewEvidenceSha256: true, visualCritiqueHashBindingRequired: true,
+    visualCritiqueReviewEvidenceBindingRequired: true, critiqueReceiptMustMatchExactCandidateReviewReceiptBytes: true,
+    conservativeSelectionResolverAvailable: true, retainCurrentByDefault: true, currentHeaderTechnicalAndVisualBaselineRequired: true,
+    materialAdvantageRequiredForReplacementRecommendation: true, materialTechnicalRegressionBlocksReplacementRecommendation: true,
+    automaticCreativeWinner: false, automaticPublicationAllowed: false, automaticWebsiteMutationAllowed: false, cloudOverwriteAllowed: false,
   };
 }
 
