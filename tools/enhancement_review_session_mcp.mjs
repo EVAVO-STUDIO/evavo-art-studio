@@ -9,7 +9,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-enhancement-review-session";
-const SERVER_VERSION = "1.3.0";
+const SERVER_VERSION = "1.4.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -34,7 +34,7 @@ async function optionalBuffer(path) {
   return (await bound(path, "optional image")).bytes;
 }
 
-async function verifyImageReviewSessionReceipt(path, manifest, candidateFile) {
+async function verifyImageReviewSessionReceipt(path, manifest, sourceFile, candidateFile) {
   const receipt = await bound(path, "imageReviewSessionReceiptPath");
   const value = JSON.parse(receipt.bytes.toString("utf8"));
   if (value.contract !== "evavo.image-review-session.v1") throw new Error("imageReviewSessionReceiptPath must point to an evavo.image-review-session.v1 receipt.");
@@ -43,6 +43,7 @@ async function verifyImageReviewSessionReceipt(path, manifest, candidateFile) {
     throw new Error("Image-review receipt carries forbidden approval or mutation authority.");
   }
   if (value.visualReviewRequired !== true) throw new Error("Image-review receipt must preserve mandatory visual review.");
+
   const binding = value.sourceBinding;
   if (!binding || typeof binding.path !== "string" || typeof binding.sha256 !== "string" || !Number.isInteger(binding.byteLength)) throw new Error("Image-review receipt source binding is malformed.");
   const rebound = await bound(binding.path, "image review source binding");
@@ -51,13 +52,17 @@ async function verifyImageReviewSessionReceipt(path, manifest, candidateFile) {
   if (binding.sha256 !== manifest.candidate_sha256) throw new Error("Durable image-review session candidate SHA does not match Enhancement Studio manifest.");
   if (value.resolvedProfile !== manifest.art_studio_review_profile) throw new Error("Durable image-review session profile does not match Enhancement Studio manifest review profile.");
 
+  let immutableSourceBound = false;
   for (const item of value.comparisonBindings ?? []) {
     if (!item || typeof item.id !== "string" || typeof item.path !== "string") throw new Error("Image-review comparison binding is malformed.");
     const comparison = await bound(item.path, `comparisonBinding:${item.id}`);
     if (comparison.sha256 !== item.sha256 || comparison.byteLength !== item.byteLength) throw new Error(`Image-review comparison source ${JSON.stringify(item.id)} changed after review.`);
+    if (comparison.path === sourceFile.path && comparison.sha256 === sourceFile.sha256 && comparison.byteLength === sourceFile.byteLength) immutableSourceBound = true;
   }
+  if (!immutableSourceBound) throw new Error("Durable image-review session must include the exact immutable enhancement source as a comparison binding.");
+  if (sourceFile.sha256 !== manifest.source_sha256) throw new Error("Durable review source comparison no longer matches Enhancement Studio manifest source SHA.");
 
-  return { path: receipt.path, sha256: receipt.sha256, value };
+  return { path: receipt.path, sha256: receipt.sha256, value, immutableSourceBound: true };
 }
 
 async function runReview(args) {
@@ -80,7 +85,7 @@ async function runReview(args) {
   if (sourceFile.sha256 !== manifest.source_sha256) throw new Error("Physical source bytes do not match Enhancement Studio manifest.");
   if (candidateFile.sha256 !== manifest.candidate_sha256) throw new Error("Physical candidate bytes do not match Enhancement Studio manifest.");
 
-  const imageReviewSession = await verifyImageReviewSessionReceipt(args.imageReviewSessionReceiptPath, manifest, candidateFile);
+  const imageReviewSession = await verifyImageReviewSessionReceipt(args.imageReviewSessionReceiptPath, manifest, sourceFile, candidateFile);
   const prefix = await allowed(args.outputPrefix, true);
 
   const result = await reviewEnhancementStudioCandidate({
@@ -100,7 +105,7 @@ async function runReview(args) {
   const receiptPath = `${prefix}.receipt.json`;
 
   const receipt = {
-    contract: "evavo.enhancement-art-review-session.v1_1",
+    contract: "evavo.enhancement-art-review-session.v1_2",
     manifestPath: manifestFile.path,
     manifestSha256: manifestFile.sha256,
     sourceBinding: { path: sourceFile.path, sha256: sourceFile.sha256, byteLength: sourceFile.byteLength },
@@ -108,6 +113,7 @@ async function runReview(args) {
     imageReviewSessionReceiptPath: imageReviewSession.path,
     imageReviewSessionReceiptSha256: imageReviewSession.sha256,
     imageReviewSessionVerified: true,
+    immutableSourceComparisonBindingVerified: true,
     qualityProofPath,
     differenceProofPath,
     pageProofPath,
@@ -134,6 +140,7 @@ async function runReview(args) {
     pageProofPath,
     imageReviewSessionReceiptPath: imageReviewSession.path,
     imageReviewSessionReceiptSha256: imageReviewSession.sha256,
+    immutableSourceComparisonBindingVerified: true,
     evidence: result.evidence,
   };
 }
@@ -141,12 +148,12 @@ async function runReview(args) {
 const tools = [
   {
     name: "evavo_enhancement_review_session_capabilities",
-    description: "Describe the end-to-end Art Studio receiving review for Enhancement Studio candidates with durable unified-review lineage.",
+    description: "Describe the end-to-end Art Studio receiving review for Enhancement Studio candidates with durable candidate-and-source lineage.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_review_enhancement_candidate_end_to_end",
-    description: "Verify a source-bound Enhancement Studio candidate and a durable Art Studio image-review receipt bound to the exact candidate bytes, then prove material technical benefit, review native/source-space quality and page context, and create rollback-safe review artifacts. Never grants publication or Cloudinary overwrite authority.",
+    description: "Verify a source-bound Enhancement Studio candidate and a durable Art Studio image-review receipt bound to both the exact candidate and immutable source comparison bytes, then run source-space/page-context review and create rollback-safe evidence. Never grants publication authority.",
     inputSchema: {
       type: "object",
       properties: {
@@ -168,12 +175,13 @@ const tools = [
 
 function capabilities() {
   return {
-    contract: "evavo.enhancement-art-review-session.v1_1",
+    contract: "evavo.enhancement-art-review-session.v1_2",
     serverVersion: SERVER_VERSION,
     allowedRootCount: configuredLocalRootCount(ROOTS_ENV),
     writesEnabled: writesEnabled(),
     durableImageReviewSessionRequired: true,
     exactCandidateReviewSessionBindingRequired: true,
+    immutableSourceComparisonBindingRequired: true,
     imageReviewSessionProfileMustMatchManifest: true,
     staleImageReviewSessionRejected: true,
     verifiesPhysicalBytes: true,
