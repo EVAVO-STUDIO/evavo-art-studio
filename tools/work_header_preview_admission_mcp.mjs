@@ -9,7 +9,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-preview-admission";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -20,7 +20,7 @@ const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 async function readBound(path) {
   const resolved = await allowed(path, false);
   const bytes = await readFile(resolved);
-  return { path: resolved, bytes, sha256: sha256(bytes) };
+  return { path: resolved, bytes, sha256: sha256(bytes), byteLength: bytes.length };
 }
 
 function captureByProfile(manifest, profile) {
@@ -51,19 +51,22 @@ async function admit(args) {
     currentMobile: currentMobile.bytes,
     candidateMobile: candidateMobile.bytes,
   });
+  if (admission.atomicEvidenceBundleVerified !== true) throw new Error("Candidate preview did not prove one rollback-safe atomic evidence bundle.");
   const screenshotBindings = {
-    currentDesktop: { path: currentDesktop.path, sha256: currentDesktop.sha256, bytes: currentDesktop.bytes.length },
-    candidateDesktop: { path: candidateDesktop.path, sha256: candidateDesktop.sha256, bytes: candidateDesktop.bytes.length },
-    currentMobile: { path: currentMobile.path, sha256: currentMobile.sha256, bytes: currentMobile.bytes.length },
-    candidateMobile: { path: candidateMobile.path, sha256: candidateMobile.sha256, bytes: candidateMobile.bytes.length },
+    currentDesktop: { path: currentDesktop.path, sha256: currentDesktop.sha256, bytes: currentDesktop.byteLength },
+    candidateDesktop: { path: candidateDesktop.path, sha256: candidateDesktop.sha256, bytes: candidateDesktop.byteLength },
+    currentMobile: { path: currentMobile.path, sha256: currentMobile.sha256, bytes: currentMobile.byteLength },
+    candidateMobile: { path: candidateMobile.path, sha256: candidateMobile.sha256, bytes: candidateMobile.byteLength },
   };
   const receipt = {
     contract: "evavo.work-header-preview-admission.v1",
     previewContract: manifest.contract,
     manifestPath: manifestFile.path,
     manifestSha256: manifestFile.sha256,
+    manifestByteLength: manifestFile.byteLength,
     admission,
     screenshotBindings,
+    atomicPreviewEvidenceBundleVerified: true,
     approvalState: "unapproved",
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
@@ -72,18 +75,18 @@ async function admit(args) {
   };
   const payload = `${JSON.stringify(receipt, null, 2)}\n`;
   await writeCreateOnlyBundle([{ path: receiptPath, data: payload, encoding: "utf8" }]);
-  return { ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), admission, screenshotBindings };
+  return { ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), admission, screenshotBindings, atomicPreviewEvidenceBundleVerified: true };
 }
 
 const tools = [
   {
     name: "evavo_work_header_preview_admission_capabilities",
-    description: "Describe durable, source-bound admission of next-website Work-header candidate preview v3 evidence into Art Studio.",
+    description: "Describe durable admission of rollback-safe next-website Work-header candidate preview v4 evidence into Art Studio.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_admit_work_header_candidate_preview",
-    description: "Re-read candidate-preview v3 evidence, reverify source identity and all screenshots, then write a rollback-safe create-only admission receipt required by page-render review.",
+    description: "Re-read candidate-preview v4 evidence, require one create-only rollback-safe screenshot+manifest bundle, reverify source identity and all screenshots, then write a create-only admission receipt required by page-render review.",
     inputSchema: {
       type: "object",
       properties: { manifestPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } },
@@ -97,11 +100,12 @@ function capabilities() {
   return {
     contract: "evavo.work-header-preview-admission.v1",
     serverVersion: SERVER_VERSION,
-    acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v3",
+    acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v4",
+    atomicPreviewEvidenceBundleRequired: true,
     durableAdmissionReceiptAvailable: true,
     createOnlyReceiptWrite: true,
     rollbackSafeReceiptWrite: true,
-    manifestSha256Bound: true,
+    manifestSha256AndLengthBound: true,
     screenshotPathSha256AndLengthBound: true,
     screenshotSha256Reverification: true,
     responsiveCandidateSourceIdentityRequired: true,
