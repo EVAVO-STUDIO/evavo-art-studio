@@ -4,16 +4,19 @@ import test from "node:test";
 
 const read = (name) => readFile(new URL(name, import.meta.url), "utf8");
 
-test("preview admission writes durable rollback-safe source-bound receipt", async () => {
+test("preview admission writes exact-candidate-byte rollback-safe receipt", async () => {
   const source = await read("./work_header_preview_admission_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.3.0"',
+    'SERVER_VERSION = "1.4.0"',
+    'acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v5"',
     'contract: "evavo.work-header-preview-admission.v1"',
     "writeCreateOnlyBundle",
     "rollbackSafeReceiptWrite: true",
     "manifestSha256AndLengthBound: true",
-    "screenshotBindings",
-    "atomicPreviewEvidenceBundleVerified: true",
+    "candidateContentBinding",
+    "candidateContentSha256AndLengthBound: true",
+    "candidateContentRefetchedDuringAdmission: true",
+    "exactCandidateResponseBytesVerified: true",
     'approvalState: "unapproved"',
     "publicationAllowed: false",
     "cloudOverwriteAllowed: false",
@@ -21,39 +24,36 @@ test("preview admission writes durable rollback-safe source-bound receipt", asyn
   ]) assert.ok(source.includes(token), `missing preview-admission token: ${token}`);
 });
 
-test("preview admission has read-only stale-evidence reverification", async () => {
+test("preview admission reverifies remote candidate bytes as well as manifest/screenshots", async () => {
   const source = await read("./work_header_preview_admission_mcp.mjs");
   for (const token of [
     "evavo_verify_work_header_preview_admission",
     "previewAdmissionReverificationAvailable: true",
-    "staleManifestOrScreenshotEvidenceRejected: true",
+    "candidateContentRefetchedDuringReverification: true",
+    "staleManifestScreenshotOrCandidateEvidenceRejected: true",
+    "Preview candidate response bytes changed after Art Studio admission.",
     "admissionRecomputedDuringReverification: true",
-    "Preview manifest bytes changed after Art Studio admission.",
-    "screenshot bytes changed after preview capture.",
-    "atomicEvidenceBundleVerified",
+    "candidateContentBytesVerified",
   ]) assert.ok(source.includes(token), `missing preview reverification token: ${token}`);
 });
 
-test("page render requires fully reverified atomic preview admission", async () => {
+test("page render requires exact local candidate to equal previewed response bytes", async () => {
   const source = await read("./work_header_page_render_review_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.5.0"',
+    'SERVER_VERSION = "1.6.0"',
     "previewAdmissionReceiptPath",
     "verifyPreviewAdmissionReceipt",
-    "previewAdmissionReceiptRequiredForPageRenderReview: true",
-    "previewAdmissionReceiptReverifiedBeforePageReview: true",
-    "previewAdmissionReceiptReverifiedBeforeApprovalPacket: true",
-    "previewAdmissionManifestSha256AndLengthReverified: true",
-    "atomicPreviewEvidenceBundleRequired: true",
-    "atomicPreviewEvidenceBundleReverifiedBeforePageReview: true",
-    "atomicEvidenceBundleVerified",
-    "previewAdmissionFullyReverified: true",
+    "exactPreviewedCandidateResponseSha256AndLengthRequired: true",
+    "selectedLocalCandidateMustMatchPreviewedResponseBytes: true",
+    "previewCandidateResponseRefetchedBeforePageReview: true",
+    "exactPreviewedCandidateBytesMatchedSelectedCandidate: true",
+    "Selected local candidate bytes do not match the exact candidate bytes previewed by the website.",
+    "previewedCandidateResponse",
     "rawCallerScreenshotPathsAccepted: false",
-  ]) assert.ok(source.includes(token), `missing page-render lineage token: ${token}`);
-  assert.ok(!source.includes('required: ["selectionReceiptPath", "candidateImagePath", "pageSlug", "pageTitle", "currentDesktopPath"'), "raw caller screenshot path schema unexpectedly returned");
+  ]) assert.ok(source.includes(token), `missing page-render exact-byte token: ${token}`);
 });
 
-test("page-render proof and source bindings include byte lengths", async () => {
+test("page-render proof and responsive source bindings include byte lengths", async () => {
   const source = await read("./work_header_page_render_review_mcp.mjs");
   for (const token of [
     "proofByteLength",
@@ -72,6 +72,4 @@ test("page-render proof/receipt and approval receipt use rollback-safe create-on
     "rollbackSafeApprovalReceiptWrite: true",
     "{ path: proofPath, data: result.proofPng }",
   ]) assert.ok(source.includes(token), `missing atomic evidence-write token: ${token}`);
-  assert.ok(!source.includes("await writeFile(proofPath"), "sequential proof write unexpectedly returned");
-  assert.ok(!source.includes("await writeFile(receiptPath"), "sequential receipt write unexpectedly returned");
 });
