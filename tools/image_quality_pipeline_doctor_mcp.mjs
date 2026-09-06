@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.8.0";
+const SERVER_VERSION = "1.9.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -21,7 +21,8 @@ const CHECKS = Object.freeze([
   Object.freeze({ id: "enhancement-review-admission", file: "packages/media/src/enhancement-review-bridge.ts", tokens: ["ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256", "schema_sha256", "stale or different shared review schema SHA-256", "candidateAspectRatioRelativeDrift", "ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT", "publicationAllowed: false", "cloudOverwriteAllowed: false"] }),
   Object.freeze({ id: "enhancement-session-fail-closed", file: "tools/enhancement_review_session_mcp.mjs", tokens: ['SERVER_VERSION = "1.7.0"', "admitEnhancementStudioReviewManifest(manifest)", "manifestAdmissionBeforeManifestPathReads: true", "exactManifestSchemaDigestRequired: true", "manifestGeometryPreservationRequired: true", 'contract: "evavo.enhancement-art-review-session.v1_5"', "proofSha256AndLengthBound: true", "enhancementReviewSessionReverificationAvailable: true", "evavo_verify_enhancement_review_session", "staleManifestSourceCandidateOrProofEvidenceRejected: true", "rollbackSafeReviewArtifactBundle: true"] }),
   Object.freeze({ id: "work-preview-admission-core", file: "packages/media/src/work-header-preview-admission.ts", tokens: ["evavo.work-header-candidate-preview-capture.v4", "evidenceBundle", "rollbackSafe", "allScreenshotsAndManifestPublishedTogether", "atomicEvidenceBundlePublished", "atomicEvidenceBundleVerified: true", "publicationAllowed: false"] }),
-  Object.freeze({ id: "work-preview-admission-mcp", file: "tools/work_header_preview_admission_mcp.mjs", tokens: ['SERVER_VERSION = "1.2.0"', 'acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v4"', "atomicPreviewEvidenceBundleRequired: true", "atomicPreviewEvidenceBundleVerified: true", "manifestSha256AndLengthBound: true", "rollbackSafeReceiptWrite: true"] }),
+  Object.freeze({ id: "work-preview-admission-mcp", file: "tools/work_header_preview_admission_mcp.mjs", tokens: ['SERVER_VERSION = "1.3.0"', 'acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v4"', "atomicPreviewEvidenceBundleRequired: true", "atomicPreviewEvidenceBundleVerified: true", "manifestSha256AndLengthBound: true", "previewAdmissionReverificationAvailable: true", "staleManifestOrScreenshotEvidenceRejected: true", "admissionRecomputedDuringReverification: true", "evavo_verify_work_header_preview_admission", "rollbackSafeReceiptWrite: true"] }),
+  Object.freeze({ id: "work-page-review-reverified-preview", file: "tools/work_header_page_render_review_mcp.mjs", tokens: ['SERVER_VERSION = "1.5.0"', "previewAdmissionManifestSha256AndLengthReverified: true", "atomicPreviewEvidenceBundleRequired: true", "atomicPreviewEvidenceBundleReverifiedBeforePageReview: true", "screenshotSha256AndLengthBinding: true", "pageRenderProofSha256AndLengthBinding: true", "previewAdmissionFullyReverified: true", "rollbackSafePageReviewEvidenceBundle: true"] }),
   Object.freeze({ id: "binary-edit-mask", file: "packages/media/src/existing-image-diff.ts", tokens: ["changeMaskPng", "binary", "opaqueRgbChangedPixels", "alphaChangedPixels"] }),
   Object.freeze({ id: "multi-region-inspection", file: "packages/media/src/existing-image-inspection-proof.ts", tokens: ["changeRegions", "maximumRegions: 3", "source-region-01", "segmentDefectMaskRegions"] }),
   Object.freeze({ id: "safe-output-bundle", file: "tools/lib/create_only_bundle.mjs", tokens: ["writeCreateOnlyBundle", "rollback", "link", "preflight"] }),
@@ -31,7 +32,6 @@ const CHECKS = Object.freeze([
   Object.freeze({ id: "finishing-plan-mcp", file: "tools/existing_image_finishing_plan_mcp.mjs", tokens: ["exactSourceMaskOverlayBindingRequired: true", "staleDefectEvidenceRejected: true", "smallestPreservationFirstOperationPreferred: true", "automaticRepairAllowed: false", "evavo_verify_existing_image_finishing_plan"] }),
   Object.freeze({ id: "inspection-mcp-regions", file: "tools/existing_image_inspection_mcp.mjs", tokens: ["connectedChangeRegionSegmentation: true", "rollbackSafeCreateOnlyProofWrite: true", 'SERVER_VERSION = "1.1.0"'] }),
   Object.freeze({ id: "edit-mask-no-private-sharp", file: "tools/existing_image_edit_mask_mcp.mjs", tokens: ["readRasterImageDimensions", "fragilePackageNodeModulesImportRemoved: true", "writeCreateOnlyBundle"] }),
-  Object.freeze({ id: "page-review-atomic", file: "tools/work_header_page_render_review_mcp.mjs", tokens: ["rollbackSafePageReviewEvidenceBundle: true", "rollbackSafeApprovalReceiptWrite: true", "writeCreateOnlyBundle"] }),
   Object.freeze({ id: "mcp-registration", file: ".mcp.json", tokens: ["evavo-image-review-orchestrator-v1", "evavo-image-review-session-v1", "evavo-image-quality-pipeline-doctor-v1", "evavo-existing-image-review-v1", "evavo-existing-image-defect-detection-v1", "evavo-existing-image-finishing-plan-v1", "evavo-work-header-preview-admission-v1", "evavo-enhancement-review-session-v1"] }),
 ]);
 
@@ -49,7 +49,7 @@ async function inspect() {
   }
   const blockers = checks.filter((check) => !check.ok).map((check) => check.id);
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_8",
+    contract: "evavo.image-quality-pipeline-doctor.v1_9",
     ready: blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
@@ -59,16 +59,16 @@ async function inspect() {
     publicationAllowed: false,
     nextAction: blockers.length
       ? "Repair the failing contract surfaces before relying on automated image review/finishing planning."
-      : "Static quality, preservation-planning, schema-digest, re-verifiable enhancement-session and atomic preview-admission contracts are aligned; cross-repo federation, runtime tests and mandatory visual confirmation remain separate requirements.",
+      : "Static quality, preservation-planning, schema-digest, enhancement-session and fully reverified atomic Work-preview/page-review contracts are aligned; cross-repo federation, runtime tests and mandatory visual confirmation remain separate requirements.",
   });
 }
 
 const tools = Object.freeze([
-  Object.freeze({ name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only static doctor for EVAVO image review, defect, evidence, preservation-finishing, enhancement handoff and Work-preview admission tooling.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
-  Object.freeze({ name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect alpha-aware QA, artifact signals, exact-byte-bound defect evidence, durable review sessions, preservation-first finishing plans, schema-bound enhancement admission, enhancement proof re-verification and atomic Work-preview admission. Read-only; does not execute image processing.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
+  Object.freeze({ name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only static doctor for EVAVO image review, defect, evidence, preservation-finishing, enhancement handoff and reverified Work-preview/page-review tooling.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
+  Object.freeze({ name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect alpha-aware QA, artifact signals, exact-byte-bound defect evidence, durable review sessions, preservation-first finishing plans, enhancement proof re-verification and fully reverified atomic Work-preview/page-review lineage. Read-only; does not execute image processing.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
 ]);
 function capabilities() {
-  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_8", serverVersion: SERVER_VERSION, readOnly: true, sourceMutationPerformed: false, runtimeExecutionPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
+  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_9", serverVersion: SERVER_VERSION, readOnly: true, sourceMutationPerformed: false, runtimeExecutionPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
 }
 async function callTool(name) {
   if (name === "evavo_image_quality_pipeline_doctor_capabilities") return capabilities();
