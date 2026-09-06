@@ -57,6 +57,7 @@ function manifest(overrides = {}) {
 test("admits Work header enhancement only with durable review plus complete preview/page boundary", () => {
   const admitted = admitEnhancementStudioReviewManifest(manifest());
   assert.equal(admitted.profile, "web-hero");
+  assert.equal(admitted.candidateAspectRatioRelativeDrift, 0);
   assert.equal(admitted.durableImageReviewSessionRequired, true);
   assert.equal(admitted.semanticReviewBriefRequired, true);
   assert.equal(admitted.candidatePreviewAdmissionRequired, true);
@@ -65,6 +66,22 @@ test("admits Work header enhancement only with durable review plus complete prev
   assert.equal(admitted.publicationAllowed, false);
   assert.equal(admitted.cloudOverwriteAllowed, false);
   assert.equal(admitted.finalApprovalRequired, true);
+});
+
+test("rejects candidate dimensions smaller than immutable source", () => {
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ candidate_width: 799, candidate_height: 900 })), /cannot be smaller/u);
+});
+
+test("rejects material aspect-ratio drift even when candidate is larger", () => {
+  assert.throws(
+    () => admitEnhancementStudioReviewManifest(manifest({ candidate_width: 1600, candidate_height: 1000 })),
+    /aspect ratio drift .* exceeds preservation limit/u,
+  );
+});
+
+test("allows tiny upscale rounding drift inside preservation limit", () => {
+  const admitted = admitEnhancementStudioReviewManifest(manifest({ candidate_width: 1600, candidate_height: 901 }));
+  assert.ok(admitted.candidateAspectRatioRelativeDrift < 0.0025);
 });
 
 test("rejects publication authority", () => {
