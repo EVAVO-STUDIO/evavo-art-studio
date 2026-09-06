@@ -1,0 +1,87 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "local-image-smoke-cel-vfx-v1",
+  "contentClass": "general",
+  "batch_size": 1,
+  "generation_mode": "independent",
+  "consistency_mode": "balanced",
+  "quality_profile": "concept_art_painterly",
+  "quality_overrides": {
+    "width": 768,
+    "height": 768,
+    "steps": 24,
+    "cfg": 5.5,
+    "denoise": 1,
+    "outputFormat": "png"
+  },
+  "character": {
+    "id": "cel-vfx-smoke-subject",
+    "description": "A single hand-drawn animation effects study with no character, focused on a compact smoke and ember burst",
+    "palette": ["charcoal grey", "warm ember orange", "off white"],
+    "signatureDetails": ["clear graphic silhouette", "layered hand-painted shapes", "readable animation-effect construction"]
+  },
+  "style": {
+    "name": "late-analog-cel-effects-study",
+    "description": "Hand-painted cel-animation effects artwork with purposeful shape design, stepped tonal bands and ink-and-paint character, evocative of high-quality late twentieth-century theatrical animation without copying any specific film, studio or artist",
+    "medium": "opaque cel paint and hand-inked animation drawing translated into a clean digital production frame",
+    "period": "late 1980s to 1990s analog animation production language",
+    "lighting": "the ember core motivates restrained warm light through layered smoke",
+    "palette": ["controlled charcoal greys", "warm ember accents", "off-white highlight shapes"],
+    "materials": ["painted smoke shapes", "dry-brush breakup", "small ember flecks"],
+    "lineTreatment": ["decisive contour accents", "designed breakup rather than particle noise", "no glossy 3D edges"],
+    "mustHave": ["looks illustrated and hand animated", "strong readable effect silhouette", "layered smoke volumes", "small controlled ember accents", "production-frame clarity"],
+    "mustAvoid": ["3D particle render", "photorealistic volumetrics", "generic AI fantasy effect", "neon glow", "text", "logos", "watermarks"]
+  },
+  "continuity_locks": [
+    "preserve the authored analog cel-effects visual language",
+    "keep the frame free of characters and typography"
+  ],
+  "quality_prompt": [
+    "specific production animation effects drawing",
+    "clean authored composition",
+    "readable hand-painted shape hierarchy"
+  ],
+  "negative": [
+    "CGI particle simulation",
+    "photographic smoke",
+    "plastic rendering",
+    "AI text artifacts",
+    "busy background"
+  ],
+  "seed_strategy": {
+    "base": 9062601,
+    "stride": 1
+  },
+  "output_rules": {
+    "exactCount": true,
+    "requireUniqueHashes": true,
+    "requireNonZeroBytes": true,
+    "requireDimensions": true,
+    "writeImageMetadata": true,
+    "preserveAttempts": false
+  },
+  "retry_rules": {
+    "maxShotAttempts": 2,
+    "retryMissing": true,
+    "retryInvalidFile": true,
+    "retryDimensionMismatch": true,
+    "retryDuplicate": true,
+    "seedBump": 1009
+  },
+  "provider": {
+    "baseUrl": "http://127.0.0.1:8192",
+    "adapterId": "comfyui:sdxl-base-local-concept_art_painterly"
+  },
+  "shots": [
+    {
+      "id": "001-smoke-ember-burst",
+      "description": "A compact smoke burst rising from a small orange ember flare, designed as a single clean animation-effects frame",
+      "pose": "smoke curls upward in three broad overlapping lobes with a small expanding base puff",
+      "camera": "straight-on orthographic effects-study view",
+      "background": "plain dark neutral field with ample negative space",
+      "framing": "centered effect occupying roughly sixty percent of the frame with comfortable margins",
+      "mustInclude": ["three readable smoke masses", "small ember core", "hand-painted edge breakup"],
+      "mustAvoid": ["character", "vehicle", "weapon", "text", "logo", "photographic background"]
+    }
+  ]
+}
