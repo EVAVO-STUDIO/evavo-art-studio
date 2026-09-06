@@ -14,10 +14,11 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-page-render-review";
-const SERVER_VERSION = "1.5.0";
+const SERVER_VERSION = "1.6.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
+const MAX_CANDIDATE_BYTES = 80 * 1024 * 1024;
 const allowed = (filePath, output = false) => assertAllowedLocalPath(filePath, { envName: ROOTS_ENV, output, label: "work header page render review" });
 const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.env[WRITES_ENV] ?? "").toLowerCase());
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
@@ -27,6 +28,24 @@ async function bound(filePath) {
   const bytes = await readFile(resolved);
   if (!bytes.length) throw new Error(`Evidence file is empty: ${resolved}`);
   return { path: resolved, bytes, sha256: sha256(bytes), byteLength: bytes.length };
+}
+
+async function fetchCandidateContent(url) {
+  if (typeof url !== "string" || !/^https?:\/\//u.test(url)) throw new Error("Preview candidate URL is invalid.");
+  const response = await fetch(url, {
+    method: "GET",
+    redirect: "follow",
+    cache: "no-store",
+    headers: { "cache-control": "no-cache", pragma: "no-cache", accept: "image/*,*/*;q=0.1" },
+  });
+  if (!response.ok) throw new Error(`Preview candidate byte reverification failed with HTTP ${response.status}.`);
+  const contentType = String(response.headers.get("content-type") ?? "").toLowerCase();
+  if (!contentType.startsWith("image/")) throw new Error("Preview candidate byte reverification returned non-image content.");
+  const advertisedLength = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(advertisedLength) && advertisedLength > MAX_CANDIDATE_BYTES) throw new Error("Preview candidate is too large for governed byte reverification.");
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (!bytes.length || bytes.length > MAX_CANDIDATE_BYTES) throw new Error("Preview candidate bytes are empty or exceed the governed review limit.");
+  return Object.freeze({ bytes, sha256: sha256(bytes), byteLength: bytes.length });
 }
 
 async function verifyCandidateReviewReceipt(filePath) {
@@ -85,7 +104,7 @@ async function verifyPreviewAdmissionReceipt(filePath) {
   const value = JSON.parse(receipt.bytes.toString("utf8"));
   if (value.contract !== "evavo.work-header-preview-admission.v1" || !value.admission) throw new Error("previewAdmissionReceiptPath must point to an evavo.work-header-preview-admission.v1 receipt.");
   if (value.approvalState !== "unapproved" || value.publicationAllowed !== false || value.cloudOverwriteAllowed !== false || value.websiteMutationAllowed !== false) throw new Error("Preview admission receipt carries forbidden approval/mutation authority.");
-  if (value.atomicPreviewEvidenceBundleVerified !== true || value.admission.atomicEvidenceBundleVerified !== true) throw new Error("Preview admission receipt does not prove the governed atomic preview evidence bundle.");
+  if (value.atomicPreviewEvidenceBundleVerified !== true || value.admission.atomicEvidenceBundleVerified !== true || value.exactCandidateResponseBytesVerified !== true) throw new Error("Preview admission receipt does not prove atomic evidence plus exact candidate response bytes.");
   if (typeof value.manifestPath !== "string" || typeof value.manifestSha256 !== "string" || !Number.isInteger(value.manifestByteLength)) throw new Error("Preview admission receipt is missing SHA-256/length manifest lineage.");
   const manifestFile = await bound(value.manifestPath);
   if (manifestFile.sha256 !== value.manifestSha256 || manifestFile.byteLength !== value.manifestByteLength) throw new Error("Preview manifest bytes changed after Art Studio admission.");
@@ -107,22 +126,26 @@ async function verifyPreviewAdmissionReceipt(filePath) {
     if (current.sha256 !== receiptBinding.sha256 || current.byteLength !== receiptBinding.bytes) throw new Error(`${label} screenshot bytes changed after preview admission.`);
     screenshots[label] = current;
   }
+  const candidateContent = await fetchCandidateContent(manifest.candidateSrc);
+  const contentBinding = value.candidateContentBinding;
+  if (!contentBinding || candidateContent.sha256 !== contentBinding.sha256 || candidateContent.byteLength !== contentBinding.byteLength) throw new Error("Preview candidate response bytes changed after preview admission.");
   const readmission = admitWorkHeaderCandidatePreviewManifest(manifest, {
     currentDesktop: screenshots.currentDesktop.bytes,
     candidateDesktop: screenshots.candidateDesktop.bytes,
     currentMobile: screenshots.currentMobile.bytes,
     candidateMobile: screenshots.candidateMobile.bytes,
+    candidateContent: candidateContent.bytes,
   });
-  for (const key of ["route", "candidateId", "candidateSrc", "candidateSourceUrlSha256", "naturalWidth", "naturalHeight"]) {
+  for (const key of ["route", "candidateId", "candidateSrc", "candidateSourceUrlSha256", "candidateContentSha256", "candidateContentByteLength", "naturalWidth", "naturalHeight"]) {
     if (readmission[key] !== value.admission[key]) throw new Error(`Preview admission evidence drifted for ${key}.`);
   }
-  for (const key of ["screenshotHashesVerified", "responsiveSourceIdentityVerified", "browserOnlyPreviewVerified", "candidateRenderDifferenceVerified", "titleSubtitleIdentityVerified", "atomicEvidenceBundleVerified"]) {
+  for (const key of ["screenshotHashesVerified", "candidateContentBytesVerified", "responsiveSourceIdentityVerified", "browserOnlyPreviewVerified", "candidateRenderDifferenceVerified", "titleSubtitleIdentityVerified", "atomicEvidenceBundleVerified"]) {
     if (readmission[key] !== true || value.admission[key] !== true) throw new Error(`Preview admission invariant ${key} is not verified.`);
   }
   for (const key of ["currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath"]) {
     if (readmission.pageRenderPaths?.[key] !== value.admission.pageRenderPaths?.[key]) throw new Error(`Preview admission page-render path drifted for ${key}.`);
   }
-  return { path: receipt.path, sha256: receipt.sha256, byteLength: receipt.byteLength, value, manifestFile, manifest, admission: readmission, screenshots, fullyReverified: true };
+  return { path: receipt.path, sha256: receipt.sha256, byteLength: receipt.byteLength, value, manifestFile, manifest, admission: readmission, screenshots, candidateContent, fullyReverified: true };
 }
 
 async function runPageReview(args) {
@@ -141,8 +164,9 @@ async function runPageReview(args) {
     verifyPreviewAdmissionReceipt(args.previewAdmissionReceiptPath),
     bound(args.candidateImagePath),
   ]);
-  if (preview.fullyReverified !== true || preview.admission.atomicEvidenceBundleVerified !== true) throw new Error("Preview admission must fully reverify before page-render review.");
+  if (preview.fullyReverified !== true || preview.admission.atomicEvidenceBundleVerified !== true || preview.admission.candidateContentBytesVerified !== true) throw new Error("Preview admission must fully reverify exact candidate bytes before page-render review.");
   if (candidateImage.sha256 !== selection.value.recommendedCandidateSha256) throw new Error("candidateImagePath does not match the exact candidate selected by the resolver.");
+  if (candidateImage.sha256 !== preview.admission.candidateContentSha256 || candidateImage.byteLength !== preview.admission.candidateContentByteLength) throw new Error("Selected local candidate bytes do not match the exact candidate bytes previewed by the website.");
   if (preview.admission.candidateId !== selection.value.recommendedCandidateId) throw new Error("Preview admission candidateId does not match the exact candidate selected by the resolver.");
   if (preview.admission.route !== args.pageSlug) throw new Error("Preview admission route does not match pageSlug.");
 
@@ -174,6 +198,7 @@ async function runPageReview(args) {
   const receiptPath = await allowed(args.receiptPath, true);
   const sourceBindings = {
     candidateImage: { path: candidateImage.path, sha256: candidateImage.sha256, byteLength: candidateImage.byteLength },
+    previewedCandidateResponse: { url: preview.admission.candidateSrc, sha256: preview.admission.candidateContentSha256, byteLength: preview.admission.candidateContentByteLength },
     currentDesktop: { path: preview.screenshots.currentDesktop.path, sha256: preview.screenshots.currentDesktop.sha256, byteLength: preview.screenshots.currentDesktop.byteLength },
     candidateDesktop: { path: preview.screenshots.candidateDesktop.path, sha256: preview.screenshots.candidateDesktop.sha256, byteLength: preview.screenshots.candidateDesktop.byteLength },
     currentMobile: { path: preview.screenshots.currentMobile.path, sha256: preview.screenshots.currentMobile.sha256, byteLength: preview.screenshots.currentMobile.byteLength },
@@ -191,6 +216,7 @@ async function runPageReview(args) {
     previewAdmissionReceiptByteLength: preview.byteLength,
     previewAdmissionFullyReverified: true,
     atomicPreviewEvidenceBundleVerified: true,
+    exactPreviewedCandidateBytesMatchedSelectedCandidate: true,
     previewManifestPath: preview.manifestFile.path,
     previewManifestSha256: preview.manifestFile.sha256,
     previewManifestByteLength: preview.manifestFile.byteLength,
@@ -208,7 +234,7 @@ async function runPageReview(args) {
     { path: proofPath, data: result.proofPng },
     { path: receiptPath, data: `${JSON.stringify(pageReceipt, null, 2)}\n`, encoding: "utf8" },
   ]);
-  return { ok: true, proofPath, receiptPath, previewAdmissionReceiptPath: preview.path, previewAdmissionFullyReverified: true, atomicPreviewEvidenceBundleVerified: true, evidence: result.evidence };
+  return { ok: true, proofPath, receiptPath, previewAdmissionReceiptPath: preview.path, previewAdmissionFullyReverified: true, atomicPreviewEvidenceBundleVerified: true, exactPreviewedCandidateBytesMatchedSelectedCandidate: true, evidence: result.evidence };
 }
 
 async function verifyPageReceipt(filePath) {
@@ -216,17 +242,20 @@ async function verifyPageReceipt(filePath) {
   const value = JSON.parse(receipt.bytes.toString("utf8"));
   if (value.contract !== "evavo.work-header-page-render-review.v2" || !value.evidence) throw new Error("Page-render receipt contract is invalid.");
   if (value.approvalState !== "unapproved" || value.publicationAllowed !== false || value.cloudOverwriteAllowed !== false || value.websiteMutationAllowed !== false) throw new Error("Page-render receipt carries forbidden approval/mutation authority.");
-  if (value.previewAdmissionFullyReverified !== true || value.atomicPreviewEvidenceBundleVerified !== true) throw new Error("Page-render receipt lacks fully reverified atomic preview-admission evidence.");
+  if (value.previewAdmissionFullyReverified !== true || value.atomicPreviewEvidenceBundleVerified !== true || value.exactPreviewedCandidateBytesMatchedSelectedCandidate !== true) throw new Error("Page-render receipt lacks fully reverified exact candidate preview evidence.");
   const proof = await bound(value.proofPath);
   if (proof.sha256 !== value.proofSha256 || proof.byteLength !== value.proofByteLength) throw new Error("Page-render proof bytes changed after review.");
   const preview = await verifyPreviewAdmissionReceipt(value.previewAdmissionReceiptPath);
   if (preview.sha256 !== value.previewAdmissionReceiptSha256 || preview.byteLength !== value.previewAdmissionReceiptByteLength || preview.manifestFile.sha256 !== value.previewManifestSha256 || preview.manifestFile.byteLength !== value.previewManifestByteLength || preview.manifestFile.path !== value.previewManifestPath) throw new Error("Page-render receipt is bound to stale preview-admission lineage.");
   const bindings = value.sourceBindings ?? {};
   for (const [label, binding] of Object.entries(bindings)) {
+    if (label === "previewedCandidateResponse") continue;
     const current = await bound(binding.path);
     if (current.sha256 !== binding.sha256 || current.byteLength !== binding.byteLength) throw new Error(`${label} bytes changed after page-render review.`);
   }
   if (!bindings.candidateImage || bindings.candidateImage.sha256 !== value.evidence.candidateSha256) throw new Error("Page-render candidate-image binding does not match reviewed candidate SHA-256.");
+  if (!bindings.previewedCandidateResponse || bindings.previewedCandidateResponse.sha256 !== preview.admission.candidateContentSha256 || bindings.previewedCandidateResponse.byteLength !== preview.admission.candidateContentByteLength) throw new Error("Page-render previewed candidate response binding drifted.");
+  if (bindings.candidateImage.sha256 !== bindings.previewedCandidateResponse.sha256 || bindings.candidateImage.byteLength !== bindings.previewedCandidateResponse.byteLength) throw new Error("Page-render local candidate no longer matches exact previewed candidate bytes.");
   if (bindings.currentDesktop?.sha256 !== value.evidence.currentDesktopSha256 || bindings.candidateDesktop?.sha256 !== value.evidence.candidateDesktopSha256 || bindings.currentMobile?.sha256 !== value.evidence.currentMobileSha256 || bindings.candidateMobile?.sha256 !== value.evidence.candidateMobileSha256) throw new Error("Page-render screenshot source bindings do not match review evidence.");
   if (bindings.currentDesktop?.path !== preview.screenshots.currentDesktop.path || bindings.candidateDesktop?.path !== preview.screenshots.candidateDesktop.path || bindings.currentMobile?.path !== preview.screenshots.currentMobile.path || bindings.candidateMobile?.path !== preview.screenshots.candidateMobile.path) throw new Error("Page-render screenshots no longer match admitted preview evidence.");
   const selection = await verifySelectionReceipt(value.selectionReceiptPath);
@@ -258,6 +287,9 @@ async function runApprovalPacket(args) {
     previewAdmissionReceiptByteLength: page.preview.byteLength,
     previewAdmissionFullyReverified: true,
     atomicPreviewEvidenceBundleVerified: true,
+    exactPreviewedCandidateBytesMatchedSelectedCandidate: true,
+    previewCandidateContentSha256: page.preview.admission.candidateContentSha256,
+    previewCandidateContentByteLength: page.preview.admission.candidateContentByteLength,
     previewManifestPath: page.preview.manifestFile.path,
     previewManifestSha256: page.preview.manifestFile.sha256,
     previewManifestByteLength: page.preview.manifestFile.byteLength,
@@ -276,12 +308,12 @@ async function runApprovalPacket(args) {
 const tools = [
   {
     name: "evavo_work_header_page_render_review_capabilities",
-    description: "Describe exact-selection page-render review that requires fully reverified atomic browser-preview admission evidence.",
+    description: "Describe exact-selection page-render review requiring fully reverified atomic browser-preview admission plus an exact byte match between the selected local candidate and website-previewed candidate response.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_review_work_header_candidate_page_render",
-    description: "Review the exact selected candidate using only screenshots derived from a fully reverified atomic next-website preview admission receipt. Raw screenshot paths cannot be substituted by the caller.",
+    description: "Review the exact selected candidate using screenshots from a fully reverified preview admission and require the selected local candidate SHA-256/length to equal the exact website-previewed candidate response bytes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -296,7 +328,7 @@ const tools = [
   },
   {
     name: "evavo_prepare_work_header_approval_packet",
-    description: "Reverify candidate review, selection, atomic preview admission, preview manifest, screenshot bytes, page-render proof and material quality advantage before preparing a review-only packet.",
+    description: "Reverify candidate review, selection, exact previewed candidate response bytes, atomic preview admission, screenshots, page-render proof and material quality advantage before preparing a review-only packet.",
     inputSchema: { type: "object", properties: { selectionReceiptPath: { type: "string" }, pageRenderReceiptPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["selectionReceiptPath", "pageRenderReceiptPath", "receiptPath", "confirmLocalWrite"], additionalProperties: false },
   },
 ];
@@ -312,6 +344,9 @@ function capabilities() {
     previewAdmissionManifestSha256AndLengthReverified: true,
     atomicPreviewEvidenceBundleRequired: true,
     atomicPreviewEvidenceBundleReverifiedBeforePageReview: true,
+    exactPreviewedCandidateResponseSha256AndLengthRequired: true,
+    selectedLocalCandidateMustMatchPreviewedResponseBytes: true,
+    previewCandidateResponseRefetchedBeforePageReview: true,
     rawCallerScreenshotPathsAccepted: false,
     rollbackSafePageReviewEvidenceBundle: true,
     rollbackSafeApprovalReceiptWrite: true,
