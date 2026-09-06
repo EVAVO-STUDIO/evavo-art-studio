@@ -19,6 +19,14 @@
         "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
       }
     },
+    "evavo-image-review-session-v1": {
+      "command": "node",
+      "args": ["tools/image_review_session_mcp.mjs"],
+      "env": {
+        "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+        "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"
+      }
+    },
     "evavo-image-quality-pipeline-doctor-v1": {
       "command": "node",
       "args": ["tools/image_quality_pipeline_doctor_mcp.mjs"],
