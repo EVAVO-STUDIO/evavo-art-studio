@@ -11,7 +11,7 @@ import {
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-candidate-review";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -60,7 +60,7 @@ async function compareCandidates(args) {
     creativeWinner: null,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
-    nextRequiredAction: "A human or vision-capable agent must inspect the board and submit explicit visual critiques before running the conservative selection resolver.",
+    nextRequiredAction: "A human or vision-capable agent must inspect the board, critique the current header and shortlisted candidates, then run the conservative selection resolver.",
   }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, proofPath, receiptPath, evidence: result.evidence };
 }
@@ -114,6 +114,7 @@ async function resolveSelection(args) {
     minimumVisualScore: args.minimumVisualScore,
     minimumAdvantageOverCurrent: args.minimumAdvantageOverCurrent,
     minimumTechnicalScore: args.minimumTechnicalScore,
+    maximumTechnicalDeficitToCurrent: args.maximumTechnicalDeficitToCurrent,
     requireCurrentHeaderBaseline: args.requireCurrentHeaderBaseline,
   });
   const receiptPath = await allowed(args.receiptPath, true);
@@ -135,7 +136,7 @@ const tools = [
   },
   {
     name: "evavo_compare_work_header_candidates",
-    description: "Create a side-by-side responsive crop board for multiple Work-header candidates, technically shortlist them, and deliberately refuse to choose a creative winner automatically.",
+    description: "Create a side-by-side responsive crop board for multiple Work-header candidates plus the current header baseline, technically shortlist them, and deliberately refuse to choose a creative winner automatically.",
     inputSchema: {
       type: "object",
       properties: {
@@ -161,7 +162,7 @@ const tools = [
   },
   {
     name: "evavo_record_work_header_visual_critique",
-    description: "Record explicit human/vision judgement for one Work-header candidate after inspecting the proof board. Generic, AI-looking, blurry/cheap, damaged-text/logo and failed-mobile-crop flags are hard disqualifiers.",
+    description: "Record explicit human/vision judgement for one Work-header image after inspecting the proof board. Use candidateId=current-header when critiquing the baseline. Generic, AI-looking, blurry/cheap, damaged-text/logo and failed-mobile-crop flags are hard disqualifiers.",
     inputSchema: {
       type: "object",
       properties: {
@@ -175,7 +176,7 @@ const tools = [
   },
   {
     name: "evavo_resolve_work_header_selection",
-    description: "Resolve technical evidence plus explicit visual critiques into a conservative recommendation. Defaults to retaining the current header unless a candidate proves a material visual and technical advantage. Never mutates the website or Cloudinary.",
+    description: "Resolve technical evidence plus explicit visual critiques into a conservative recommendation. Defaults to retaining the current header unless a candidate proves a material visual advantage without becoming materially technically worse. Never mutates the website or Cloudinary.",
     inputSchema: {
       type: "object",
       properties: {
@@ -185,6 +186,7 @@ const tools = [
         minimumVisualScore: { type: "number", minimum: 0, maximum: 100 },
         minimumAdvantageOverCurrent: { type: "number", minimum: 0, maximum: 30 },
         minimumTechnicalScore: { type: "number", minimum: 0, maximum: 100 },
+        maximumTechnicalDeficitToCurrent: { type: "number", minimum: 0, maximum: 25 },
         requireCurrentHeaderBaseline: { type: "boolean" },
         receiptPath: { type: "string" },
         confirmLocalWrite: { type: "boolean" },
@@ -201,12 +203,14 @@ function capabilities() {
     allowedRootCount: configuredLocalRootCount(ROOTS_ENV),
     writesEnabled: writesEnabled(),
     comparativeResponsiveProofBoard: true,
+    currentHeaderTechnicalBaselineInProofBoard: true,
     technicalShortlistingOnly: true,
     explicitVisualCritiqueRequired: true,
     conservativeSelectionResolverAvailable: true,
     retainCurrentByDefault: true,
-    currentHeaderBaselineRecommended: true,
+    currentHeaderTechnicalAndVisualBaselineRequired: true,
     materialAdvantageRequiredForReplacementRecommendation: true,
+    materialTechnicalRegressionBlocksReplacementRecommendation: true,
     genericStockRiskHardDisqualifier: true,
     aiLookingRiskHardDisqualifier: true,
     blurryCheapRiskHardDisqualifier: true,
