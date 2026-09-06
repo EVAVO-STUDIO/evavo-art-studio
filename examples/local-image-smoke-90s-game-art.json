@@ -1,0 +1,59 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "local-smoke-90s-game-art-v1",
+  "contentClass": "general",
+  "batch_size": 1,
+  "generation_mode": "independent",
+  "consistency_mode": "strict",
+  "quality_profile": "cinematic_stills",
+  "quality_overrides": {
+    "width": 768,
+    "height": 768,
+    "steps": 34,
+    "cfg": 5.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "denoise": 1,
+    "outputFormat": "png"
+  },
+  "character": {
+    "id": "retro-game-hero",
+    "description": "A rugged science-fiction mercenary designed like premium mid-1990s PC and arcade game key art translated into readable sprite-era game production art",
+    "face": "strong simple facial planes readable at reduced scale",
+    "hair": "short practical 1990s action-game haircut",
+    "build": "athletic but believable action-game silhouette",
+    "costume": "chunky practical sci-fi armour with utility straps, boots and restrained industrial detailing",
+    "palette": ["gunmetal", "olive", "dusty tan", "controlled red accent"],
+    "signatureDetails": ["strong readable silhouette", "large shape grouping", "retro PC game visual identity"]
+  },
+  "style": {
+    "name": "premium-1990s-pc-arcade-game-art",
+    "description": "Authentic mid-1990s PC and arcade action-game production art combining hand-painted key-art sensibility, sprite readability, chunky silhouettes and limited-era rendering discipline rather than modern glossy concept art",
+    "medium": "painted and pixel-informed game production illustration",
+    "period": "1993-1998 PC, DOS, SNES, Mega Drive and arcade visual language",
+    "lighting": "dramatic directional game-art lighting with clear value separation",
+    "palette": ["limited earthy industrial palette", "deep shadow", "warm hazard light", "small saturated accents"],
+    "materials": ["painted steel", "worn concrete", "dust", "cloth webbing", "low-gloss armour"],
+    "lineTreatment": ["crisp silhouette edges", "large readable forms", "selective hand-painted detail", "no modern micro-detail overload"],
+    "mustHave": ["recognisable 1990s game composition", "readable sprite-like silhouette", "chunky environment forms", "purposeful limited detail", "strong gameplay-facing visual clarity"],
+    "mustAvoid": ["modern AAA photoreal concept art", "PBR gloss", "cinematic depth-of-field blur", "mobile-game UI", "generic AI fantasy detail", "text", "logo", "watermark"]
+  },
+  "continuity_locks": ["keep the hero silhouette and costume construction coherent", "keep the visual language firmly mid-1990s rather than modern retro cosplay"],
+  "quality_prompt": ["authored 1990s game art", "strong gameplay silhouette", "specific retro production design", "clean shape hierarchy"],
+  "negative": ["modern tactical gear", "photorealistic skin", "ray-traced look", "PBR materials", "generic fantasy armour", "text", "watermark", "extra limbs", "melted weapon"],
+  "seed_strategy": {"base": 905200, "stride": 1},
+  "output_rules": {"exactCount": true, "requireUniqueHashes": true, "requireNonZeroBytes": true, "requireDimensions": true, "writeImageMetadata": true, "preserveAttempts": false},
+  "retry_rules": {"maxShotAttempts": 3, "retryMissing": true, "retryInvalidFile": true, "retryDimensionMismatch": true, "retryDuplicate": true, "seedBump": 1009},
+  "provider": {"baseUrl": "http://127.0.0.1:8192", "adapterId": "comfyui:sdxl-base-local-cinematic_stills"},
+  "shots": [
+    {
+      "id": "001-retro-combat-scene",
+      "description": "Side-on action-game scene in a battered industrial outpost: the mercenary advances through a wide gameplay lane while a mechanical enemy enters from the opposite side, with readable cover, hazard lights and chunky level geometry",
+      "pose": "dynamic side-on combat-ready movement with clear limb separation",
+      "camera": "mostly side-stage gameplay view with only mild perspective, not isometric and not modern over-the-shoulder",
+      "expression": "focused and determined",
+      "background": "industrial sci-fi outpost built from large readable 1990s game level shapes",
+      "framing": "full-body action composition with generous gameplay space around both opposing silhouettes"
+    }
+  ]
+}
