@@ -9,6 +9,7 @@ function selection(overrides = {}) {
     candidateReviewEvidenceSha256: "a".repeat(64),
     recommendation: "candidate-recommended",
     recommendedCandidateId: "candidate-a",
+    recommendedCandidateSha256: "b".repeat(64),
     eligibleCandidateIds: ["candidate-a"],
     rejectedCandidateIds: [],
     reasons: ["candidate-proves-material-comparative-advantage:candidate-a"],
@@ -52,6 +53,8 @@ test("approval packet can become ready but never becomes approval", () => {
   const result = prepareWorkHeaderApprovalPacket({ selection: selection(), pageRender: page() });
   assert.equal(result.status, "ready-for-explicit-approval");
   assert.equal(result.candidateId, "candidate-a");
+  assert.equal(result.candidateSha256, "b".repeat(64));
+  assert.equal(result.verified.candidateHashMatchesPageRender, true);
   assert.equal(result.explicitApprovalStillRequired, true);
   assert.equal(result.automaticPublicationAllowed, false);
   assert.equal(result.automaticWebsiteMutationAllowed, false);
@@ -59,7 +62,7 @@ test("approval packet can become ready but never becomes approval", () => {
 
 test("approval packet blocks when resolver retained current header", () => {
   const result = prepareWorkHeaderApprovalPacket({
-    selection: selection({ recommendation: "retain-current", recommendedCandidateId: null }),
+    selection: selection({ recommendation: "retain-current", recommendedCandidateId: null, recommendedCandidateSha256: null }),
     pageRender: page(),
   });
   assert.equal(result.status, "blocked");
@@ -73,4 +76,13 @@ test("approval packet blocks failed page render", () => {
   });
   assert.equal(result.status, "blocked");
   assert.ok(result.blockers.some((item) => item.startsWith("page-render-not-shortlisted")));
+});
+
+test("approval packet blocks page render from different candidate bytes", () => {
+  const result = prepareWorkHeaderApprovalPacket({
+    selection: selection(),
+    pageRender: page({ candidateSha256: "9".repeat(64) }),
+  });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.includes("page-render-candidate-hash-does-not-match-selection"));
 });
