@@ -21,6 +21,8 @@ export interface WorkHeaderApprovalPacketResult {
     critiqueHashBindingVerified: boolean;
     reviewEvidenceHashBindingVerified: boolean;
     pageRenderShortlisted: boolean;
+    comparableViewportGeometryVerified: boolean;
+    candidateRenderDifferenceVerified: boolean;
     candidateIdentityMatchesPageRender: boolean;
     candidateHashMatchesPageRender: boolean;
   }>;
@@ -42,6 +44,8 @@ export function prepareWorkHeaderApprovalPacket(spec: WorkHeaderApprovalPacketSp
 
   const pageRenderShortlisted = spec.pageRender.verdict === "page-shortlist" && spec.pageRender.disqualifiers.length === 0;
   if (!pageRenderShortlisted) blockers.push(`page-render-not-shortlisted:${spec.pageRender.verdict}`);
+  if (!spec.pageRender.comparableViewportGeometryVerified) blockers.push("page-render-current-candidate-viewports-not-comparable");
+  if (!spec.pageRender.candidateRenderDifferenceVerified) blockers.push("page-render-does-not-prove-candidate-was-visible-in-both-viewports");
 
   const candidateIdentityMatchesPageRender = Boolean(spec.selection.recommendedCandidateId) &&
     spec.pageRender.candidateId === spec.selection.recommendedCandidateId;
@@ -64,6 +68,8 @@ export function prepareWorkHeaderApprovalPacket(spec: WorkHeaderApprovalPacketSp
       critiqueHashBindingVerified: spec.selection.critiqueHashBindingVerified,
       reviewEvidenceHashBindingVerified: spec.selection.reviewEvidenceHashBindingVerified,
       pageRenderShortlisted,
+      comparableViewportGeometryVerified: spec.pageRender.comparableViewportGeometryVerified,
+      candidateRenderDifferenceVerified: spec.pageRender.candidateRenderDifferenceVerified,
       candidateIdentityMatchesPageRender,
       candidateHashMatchesPageRender,
     }),
