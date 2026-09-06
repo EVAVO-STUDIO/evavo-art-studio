@@ -1,4 +1,5 @@
 import type { WorkHeaderCandidateReviewResult } from "./work-header-candidate-review.js";
+import { digestWorkHeaderCandidateReviewEvidence } from "./work-header-review-lineage.js";
 import type { WorkHeaderVisualCritiqueResult } from "./work-header-visual-critique.js";
 
 export const WORK_HEADER_SELECTION_RESOLVER_CONTRACT = "evavo.work-header-selection-resolver.v1" as const;
@@ -16,6 +17,7 @@ export interface WorkHeaderSelectionResolverSpec {
 
 export interface WorkHeaderSelectionResolverResult {
   readonly contract: typeof WORK_HEADER_SELECTION_RESOLVER_CONTRACT;
+  readonly candidateReviewEvidenceSha256: string;
   readonly recommendation: "retain-current" | "no-acceptable-candidate" | "candidate-recommended" | "needs-current-baseline";
   readonly recommendedCandidateId: string | null;
   readonly eligibleCandidateIds: readonly string[];
@@ -25,6 +27,7 @@ export interface WorkHeaderSelectionResolverResult {
   readonly currentHeaderVisualScore: number | null;
   readonly currentHeaderTechnicalScore: number | null;
   readonly critiqueHashBindingVerified: boolean;
+  readonly reviewEvidenceHashBindingVerified: boolean;
   readonly automaticPublicationAllowed: false;
   readonly automaticCloudOverwriteAllowed: false;
   readonly automaticWebsiteMutationAllowed: false;
@@ -41,6 +44,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   if (!spec?.candidateReview || !Array.isArray(spec.candidateReview.candidates)) throw new Error("candidateReview evidence is required.");
   if (!Array.isArray(spec.critiques) || spec.critiques.length < 1) throw new Error("At least one candidate critique is required.");
 
+  const reviewEvidenceSha256 = digestWorkHeaderCandidateReviewEvidence(spec.candidateReview);
   const minimumVisualScore = finite(spec.minimumVisualScore, 82, 0, 100, "minimumVisualScore");
   const minimumAdvantageOverCurrent = finite(spec.minimumAdvantageOverCurrent, 5, 0, 30, "minimumAdvantageOverCurrent");
   const minimumTechnicalScore = finite(spec.minimumTechnicalScore, 80, 0, 100, "minimumTechnicalScore");
@@ -52,8 +56,9 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   for (const critique of spec.critiques) {
     const candidate = candidateById.get(critique.candidateId);
     if (!candidate) throw new Error(`Critique references unknown candidate ${JSON.stringify(critique.candidateId)}.`);
-    if (critique.candidateSha256 !== candidate.imageSha256) {
-      throw new Error(`Critique hash mismatch for candidate ${JSON.stringify(critique.candidateId)}.`);
+    if (critique.candidateSha256 !== candidate.imageSha256) throw new Error(`Critique hash mismatch for candidate ${JSON.stringify(critique.candidateId)}.`);
+    if (critique.candidateReviewEvidenceSha256 !== reviewEvidenceSha256) {
+      throw new Error(`Critique review-evidence hash mismatch for candidate ${JSON.stringify(critique.candidateId)}.`);
     }
     if (critiquesById.has(critique.candidateId)) throw new Error(`Duplicate critique for candidate ${JSON.stringify(critique.candidateId)}.`);
     critiquesById.set(critique.candidateId, critique);
@@ -64,6 +69,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     const currentHash = spec.candidateReview.currentHeader?.imageSha256;
     if (!currentHash) throw new Error("Current-header critique supplied without current-header technical/hash evidence.");
     if (spec.currentHeaderCritique.candidateSha256 !== currentHash) throw new Error("Current-header critique hash does not match the comparative review baseline image.");
+    if (spec.currentHeaderCritique.candidateReviewEvidenceSha256 !== reviewEvidenceSha256) throw new Error("Current-header critique review-evidence hash does not match the comparative review evidence.");
   }
 
   const currentVisualScore = spec.currentHeaderCritique?.visualScore ?? null;
@@ -111,9 +117,11 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
 
   const base = {
     contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
+    candidateReviewEvidenceSha256: reviewEvidenceSha256,
     currentHeaderVisualScore: currentVisualScore,
     currentHeaderTechnicalScore,
     critiqueHashBindingVerified: true,
+    reviewEvidenceHashBindingVerified: true,
     automaticPublicationAllowed: false as const,
     automaticCloudOverwriteAllowed: false as const,
     automaticWebsiteMutationAllowed: false as const,
@@ -121,52 +129,20 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   };
 
   if (requireCurrentHeaderBaseline && !currentBaselineComplete) {
-    return Object.freeze({
-      ...base,
-      recommendation: "needs-current-baseline" as const,
-      recommendedCandidateId: null,
-      eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
-      rejectedCandidateIds: Object.freeze([...rejected]),
-      reasons: Object.freeze(reasons),
-      currentHeaderBaselineProvided: false,
-    });
+    return Object.freeze({ ...base, recommendation: "needs-current-baseline" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: false });
   }
 
   if (eligible.length === 0) {
     reasons.push("no-candidate-cleared-technical-and-visual-selection-gates");
-    return Object.freeze({
-      ...base,
-      recommendation: currentBaselineComplete ? "retain-current" as const : "no-acceptable-candidate" as const,
-      recommendedCandidateId: null,
-      eligibleCandidateIds: Object.freeze([]),
-      rejectedCandidateIds: Object.freeze([...rejected]),
-      reasons: Object.freeze(reasons),
-      currentHeaderBaselineProvided: currentBaselineComplete,
-    });
+    return Object.freeze({ ...base, recommendation: currentBaselineComplete ? "retain-current" as const : "no-acceptable-candidate" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze([]), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
   }
 
   const best = eligible[0]!;
   if (currentVisualScore !== null && best.score < currentVisualScore + minimumAdvantageOverCurrent) {
     reasons.push(`best-candidate-does-not-beat-current-by-required-margin:${best.score}<${currentVisualScore + minimumAdvantageOverCurrent}`);
-    return Object.freeze({
-      ...base,
-      recommendation: "retain-current" as const,
-      recommendedCandidateId: null,
-      eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
-      rejectedCandidateIds: Object.freeze([...rejected]),
-      reasons: Object.freeze(reasons),
-      currentHeaderBaselineProvided: currentBaselineComplete,
-    });
+    return Object.freeze({ ...base, recommendation: "retain-current" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
   }
 
   reasons.push(`candidate-proves-material-comparative-advantage:${best.id}`);
-  return Object.freeze({
-    ...base,
-    recommendation: "candidate-recommended" as const,
-    recommendedCandidateId: best.id,
-    eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
-    rejectedCandidateIds: Object.freeze([...rejected]),
-    reasons: Object.freeze(reasons),
-    currentHeaderBaselineProvided: currentBaselineComplete,
-  });
+  return Object.freeze({ ...base, recommendation: "candidate-recommended" as const, recommendedCandidateId: best.id, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
 }
