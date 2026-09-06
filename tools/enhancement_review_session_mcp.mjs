@@ -13,7 +13,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-enhancement-review-session";
-const SERVER_VERSION = "1.6.0";
+const SERVER_VERSION = "1.7.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -28,6 +28,10 @@ async function bound(path, label = "file") {
   return { path: resolved, bytes, sha256: sha256(bytes), byteLength: bytes.length };
 }
 async function optionalBuffer(path) { return path ? (await bound(path, "optional image")).bytes : undefined; }
+
+function proofBinding(path, bytes) {
+  return Object.freeze({ path, sha256: sha256(bytes), byteLength: bytes.length });
+}
 
 async function verifyImageReviewSessionReceipt(path, manifest, admittedManifest, sourceFile, candidateFile) {
   const receipt = await bound(path, "imageReviewSessionReceiptPath");
@@ -55,7 +59,27 @@ async function verifyImageReviewSessionReceipt(path, manifest, admittedManifest,
   }
   if (!immutableSourceBound) throw new Error("Durable image-review session must include the exact immutable enhancement source as a comparison binding.");
   if (sourceFile.sha256 !== admittedManifest.sourceSha256 || sourceFile.sha256 !== manifest.source_sha256) throw new Error("Durable review source comparison no longer matches admitted Enhancement Studio manifest source SHA.");
-  return { path: receipt.path, sha256: receipt.sha256, value, immutableSourceBound: true, finishingPlanVerified: true };
+  return { path: receipt.path, sha256: receipt.sha256, byteLength: receipt.byteLength, value, immutableSourceBound: true, finishingPlanVerified: true };
+}
+
+async function admitManifestFile(manifestPath) {
+  const manifestFile = await bound(await allowed(manifestPath, false), "manifestPath");
+  const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
+  const admittedManifest = admitEnhancementStudioReviewManifest(manifest);
+  if (manifest.schema_sha256 !== ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256) throw new Error("Enhancement Studio manifest schema digest is stale or unsupported.");
+  if (admittedManifest.schemaSha256 !== ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256) throw new Error("Art Studio manifest admission did not verify the current enhancement-review schema digest.");
+  if (admittedManifest.durableImageReviewSessionRequired !== true) throw new Error("Enhancement Studio manifest does not require the durable image-review session boundary.");
+  return { manifestFile, manifest, admittedManifest };
+}
+
+async function verifyManifestFiles(manifest, admittedManifest) {
+  const [sourceFile, candidateFile] = await Promise.all([
+    bound(await allowed(manifest.source_path, false), "source image"),
+    bound(await allowed(manifest.candidate_path, false), "candidate image"),
+  ]);
+  if (sourceFile.sha256 !== admittedManifest.sourceSha256 || sourceFile.sha256 !== manifest.source_sha256) throw new Error("Physical source bytes do not match admitted Enhancement Studio manifest.");
+  if (candidateFile.sha256 !== admittedManifest.candidateSha256 || candidateFile.sha256 !== manifest.candidate_sha256) throw new Error("Physical candidate bytes do not match admitted Enhancement Studio manifest.");
+  return { sourceFile, candidateFile };
 }
 
 async function runReview(args) {
@@ -63,23 +87,9 @@ async function runReview(args) {
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
 
-  const manifestFile = await bound(await allowed(args.manifestPath, false), "manifestPath");
-  const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
-
-  // Admit the manifest before trusting any path supplied by it. This validates
-  // contract/schema digest, safety authority, role/profile mapping and geometry.
-  const admittedManifest = admitEnhancementStudioReviewManifest(manifest);
-  if (manifest.schema_sha256 !== ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256) throw new Error("Enhancement Studio manifest schema digest is stale or unsupported.");
-  if (admittedManifest.schemaSha256 !== ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256) throw new Error("Art Studio manifest admission did not verify the current enhancement-review schema digest.");
-  if (admittedManifest.durableImageReviewSessionRequired !== true) throw new Error("Enhancement Studio manifest does not require the durable image-review session boundary.");
-
-  const [sourceFile, candidateFile] = await Promise.all([
-    bound(await allowed(manifest.source_path, false), "source image"),
-    bound(await allowed(manifest.candidate_path, false), "candidate image"),
-  ]);
-  if (sourceFile.sha256 !== admittedManifest.sourceSha256 || sourceFile.sha256 !== manifest.source_sha256) throw new Error("Physical source bytes do not match admitted Enhancement Studio manifest.");
-  if (candidateFile.sha256 !== admittedManifest.candidateSha256 || candidateFile.sha256 !== manifest.candidate_sha256) throw new Error("Physical candidate bytes do not match admitted Enhancement Studio manifest.");
-
+  // Admit contract/schema/authority/geometry before trusting manifest-supplied paths.
+  const { manifestFile, manifest, admittedManifest } = await admitManifestFile(args.manifestPath);
+  const { sourceFile, candidateFile } = await verifyManifestFiles(manifest, admittedManifest);
   const imageReviewSession = await verifyImageReviewSessionReceipt(args.imageReviewSessionReceiptPath, manifest, admittedManifest, sourceFile, candidateFile);
   const prefix = await allowed(args.outputPrefix, true);
   const result = await reviewEnhancementStudioCandidate({
@@ -97,10 +107,16 @@ async function runReview(args) {
   const differenceProofPath = `${prefix}.difference-proof.png`;
   const pageProofPath = result.pageProofPng ? `${prefix}.page-proof.png` : null;
   const receiptPath = `${prefix}.receipt.json`;
+  const proofBindings = Object.freeze({
+    quality: proofBinding(qualityProofPath, result.qualityProofPng),
+    difference: proofBinding(differenceProofPath, result.differenceProofPng),
+    page: result.pageProofPng && pageProofPath ? proofBinding(pageProofPath, result.pageProofPng) : null,
+  });
   const receipt = {
-    contract: "evavo.enhancement-art-review-session.v1_4",
+    contract: "evavo.enhancement-art-review-session.v1_5",
     manifestPath: manifestFile.path,
     manifestSha256: manifestFile.sha256,
+    manifestByteLength: manifestFile.byteLength,
     manifestContract: manifest.contract,
     manifestSchemaSha256: admittedManifest.schemaSha256,
     manifestAdmissionVerified: true,
@@ -108,15 +124,12 @@ async function runReview(args) {
     candidateAspectRatioRelativeDrift: admittedManifest.candidateAspectRatioRelativeDrift,
     sourceBinding: { path: sourceFile.path, sha256: sourceFile.sha256, byteLength: sourceFile.byteLength },
     candidateBinding: { path: candidateFile.path, sha256: candidateFile.sha256, byteLength: candidateFile.byteLength },
-    imageReviewSessionReceiptPath: imageReviewSession.path,
-    imageReviewSessionReceiptSha256: imageReviewSession.sha256,
+    imageReviewSessionBinding: { path: imageReviewSession.path, sha256: imageReviewSession.sha256, byteLength: imageReviewSession.byteLength },
     imageReviewSessionVerified: true,
     immutableSourceComparisonBindingVerified: true,
     finishingPlanVerified: true,
     finishingPlan: imageReviewSession.value.finishingPlan,
-    qualityProofPath,
-    differenceProofPath,
-    pageProofPath,
+    proofBindings,
     evidence: result.evidence,
     approvalState: "unapproved",
     publicationAllowed: false,
@@ -133,9 +146,6 @@ async function runReview(args) {
   return {
     ok: true,
     receiptPath,
-    qualityProofPath,
-    differenceProofPath,
-    pageProofPath,
     manifestAdmissionVerified: true,
     manifestSchemaSha256: admittedManifest.schemaSha256,
     manifestGeometryPreservationVerified: true,
@@ -144,17 +154,71 @@ async function runReview(args) {
     immutableSourceComparisonBindingVerified: true,
     finishingPlanVerified: true,
     finishingRoute: imageReviewSession.value.finishingPlan.route,
+    proofBindings,
     evidence: result.evidence,
   };
 }
 
+async function verifyEnhancementReviewSession(args) {
+  if (typeof args.receiptPath !== "string") throw new Error("receiptPath is required.");
+  const receiptFile = await bound(args.receiptPath, "receiptPath");
+  const value = JSON.parse(receiptFile.bytes.toString("utf8"));
+  if (value.contract !== "evavo.enhancement-art-review-session.v1_5") throw new Error("Unsupported enhancement review-session receipt contract.");
+  if (value.approvalState !== "unapproved" || value.publicationAllowed !== false || value.cloudOverwriteAllowed !== false || value.websiteMutationAllowed !== false || value.finalVisualApprovalRequired !== true) throw new Error("Enhancement review-session receipt carries forbidden approval or mutation authority.");
+  if (value.manifestAdmissionVerified !== true || value.manifestGeometryPreservationVerified !== true) throw new Error("Enhancement review-session receipt is missing manifest admission/geometry verification evidence.");
+
+  const { manifestFile, manifest, admittedManifest } = await admitManifestFile(value.manifestPath);
+  if (manifestFile.sha256 !== value.manifestSha256 || manifestFile.byteLength !== value.manifestByteLength) throw new Error("Enhancement manifest bytes changed after review session creation.");
+  if (value.manifestSchemaSha256 !== admittedManifest.schemaSha256) throw new Error("Enhancement review-session schema binding is stale.");
+  const { sourceFile, candidateFile } = await verifyManifestFiles(manifest, admittedManifest);
+  for (const [label, current, expected] of [
+    ["source", sourceFile, value.sourceBinding],
+    ["candidate", candidateFile, value.candidateBinding],
+  ]) {
+    if (!expected || current.path !== expected.path || current.sha256 !== expected.sha256 || current.byteLength !== expected.byteLength) throw new Error(`${label} binding changed after enhancement review.`);
+  }
+
+  const reviewSession = await verifyImageReviewSessionReceipt(value.imageReviewSessionBinding?.path, manifest, admittedManifest, sourceFile, candidateFile);
+  if (!value.imageReviewSessionBinding || reviewSession.path !== value.imageReviewSessionBinding.path || reviewSession.sha256 !== value.imageReviewSessionBinding.sha256 || reviewSession.byteLength !== value.imageReviewSessionBinding.byteLength) throw new Error("Durable image-review session binding changed after enhancement review.");
+  if (value.finishingPlanVerified !== true || !value.finishingPlan || value.finishingPlan.automaticRepairAllowed !== false || value.finishingPlan.visualConfirmationRequired !== true) throw new Error("Enhancement review-session finishing plan is missing or no longer review-only.");
+
+  const proofBindings = value.proofBindings;
+  if (!proofBindings?.quality || !proofBindings?.difference) throw new Error("Enhancement review-session proof bindings are incomplete.");
+  for (const [label, binding] of Object.entries(proofBindings)) {
+    if (binding === null) continue;
+    if (!binding || typeof binding.path !== "string" || typeof binding.sha256 !== "string" || !Number.isInteger(binding.byteLength)) throw new Error(`${label} proof binding is malformed.`);
+    const proof = await bound(binding.path, `${label} proof`);
+    if (proof.sha256 !== binding.sha256 || proof.byteLength !== binding.byteLength) throw new Error(`${label} proof bytes changed after enhancement review.`);
+  }
+
+  return Object.freeze({
+    ok: true,
+    receiptPath: receiptFile.path,
+    receiptSha256: receiptFile.sha256,
+    receiptByteLength: receiptFile.byteLength,
+    manifestAdmissionVerified: true,
+    manifestSchemaSha256: admittedManifest.schemaSha256,
+    manifestGeometryPreservationVerified: true,
+    sourceBindingVerified: true,
+    candidateBindingVerified: true,
+    imageReviewSessionBindingVerified: true,
+    finishingPlanVerified: true,
+    proofBindingsVerified: true,
+    approvalState: "unapproved",
+    publicationAllowed: false,
+    cloudOverwriteAllowed: false,
+    websiteMutationAllowed: false,
+  });
+}
+
 const tools = [
-  { name: "evavo_enhancement_review_session_capabilities", description: "Describe end-to-end enhancement review with fail-closed manifest admission plus durable candidate/source and finishing-plan lineage.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_review_enhancement_candidate_end_to_end", description: "Admit the exact Enhancement Studio manifest before trusting any manifest path, verify its pinned schema digest and geometry/safety contract, then verify exact candidate/source bytes and a current durable image-review receipt before rollback-safe review evidence is written.", inputSchema: { type: "object", properties: { manifestPath: { type: "string", minLength: 1 }, imageReviewSessionReceiptPath: { type: "string", minLength: 1 }, outputPrefix: { type: "string", minLength: 1 }, headerPath: { type: "string" }, supportPath: { type: "string" }, tilePath: { type: "string" }, desktopScreenshotPath: { type: "string" }, mobileScreenshotPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["manifestPath", "imageReviewSessionReceiptPath", "outputPrefix", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_enhancement_review_session_capabilities", description: "Describe end-to-end enhancement review with fail-closed manifest admission, exact proof bindings and stale-evidence verification.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_review_enhancement_candidate_end_to_end", description: "Admit the Enhancement Studio manifest before trusting manifest paths, verify schema/geometry and exact candidate/source/image-review lineage, then emit rollback-safe SHA-bound proof evidence.", inputSchema: { type: "object", properties: { manifestPath: { type: "string", minLength: 1 }, imageReviewSessionReceiptPath: { type: "string", minLength: 1 }, outputPrefix: { type: "string", minLength: 1 }, headerPath: { type: "string" }, supportPath: { type: "string" }, tilePath: { type: "string" }, desktopScreenshotPath: { type: "string" }, mobileScreenshotPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["manifestPath", "imageReviewSessionReceiptPath", "outputPrefix", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_enhancement_review_session", description: "Reverify an enhancement review-session receipt against the current manifest schema admission, exact source/candidate/image-review receipt bytes and every proof SHA-256/byte-length binding. Read-only.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
 ];
 function capabilities() {
   return {
-    contract: "evavo.enhancement-art-review-session.v1_4",
+    contract: "evavo.enhancement-art-review-session.v1_5",
     serverVersion: SERVER_VERSION,
     allowedRootCount: configuredLocalRootCount(ROOTS_ENV),
     writesEnabled: writesEnabled(),
@@ -171,6 +235,9 @@ function capabilities() {
     finishingPlanMustRemainReviewOnly: true,
     imageReviewSessionProfileMustMatchManifest: true,
     staleImageReviewSessionRejected: true,
+    proofSha256AndLengthBound: true,
+    enhancementReviewSessionReverificationAvailable: true,
+    staleManifestSourceCandidateOrProofEvidenceRejected: true,
     rollbackSafeReviewArtifactBundle: true,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
@@ -180,6 +247,7 @@ function capabilities() {
 async function callTool(name, args) {
   if (name === "evavo_enhancement_review_session_capabilities") return capabilities();
   if (name === "evavo_review_enhancement_candidate_end_to_end") return runReview(args ?? {});
+  if (name === "evavo_verify_enhancement_review_session") return verifyEnhancementReviewSession(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 const toolResult = (payload, isError = false) => ({ content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError });
