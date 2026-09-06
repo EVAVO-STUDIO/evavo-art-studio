@@ -13,7 +13,7 @@ import {
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-candidate-review";
-const SERVER_VERSION = "1.5.0";
+const SERVER_VERSION = "1.6.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -22,9 +22,22 @@ const allowed = (path, output = false) => assertAllowedLocalPath(path, { envName
 const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.env[WRITES_ENV] ?? "").toLowerCase());
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
-async function optionalBuffer(path) {
-  if (!path) return undefined;
-  return readFile(await allowed(path, false));
+async function readBound(path) {
+  const resolved = await allowed(path, false);
+  const bytes = await readFile(resolved);
+  return { path: resolved, bytes, sha256: sha256(bytes) };
+}
+
+async function optionalBound(path) {
+  return path ? readBound(path) : null;
+}
+
+async function verifySourceBinding(binding, label) {
+  if (!binding) return null;
+  if (typeof binding.path !== "string" || typeof binding.sha256 !== "string") throw new Error(`${label} source binding is malformed.`);
+  const current = await readBound(binding.path);
+  if (current.sha256 !== binding.sha256) throw new Error(`${label} source bytes changed after candidate review; generate a fresh comparison board.`);
+  return current;
 }
 
 async function readCandidateReviewReceipt(path) {
@@ -32,9 +45,29 @@ async function readCandidateReviewReceipt(path) {
   const bytes = await readFile(resolved);
   const value = JSON.parse(bytes.toString("utf8"));
   if (value.contract !== "evavo.work-header-candidate-review.v1" || !value.evidence) throw new Error("candidateReviewReceiptPath must point to an evavo.work-header-candidate-review.v1 receipt.");
+
   const evidenceSha256 = digestWorkHeaderCandidateReviewEvidence(value.evidence);
   if (typeof value.evidenceSha256 !== "string" || value.evidenceSha256 !== evidenceSha256) throw new Error("Candidate-review receipt evidence digest is missing or invalid.");
-  return { path: resolved, value, evidenceSha256, receiptSha256: sha256(bytes) };
+
+  if (typeof value.proofPath !== "string" || typeof value.proofSha256 !== "string") throw new Error("Candidate-review receipt proof binding is missing.");
+  const proof = await readBound(value.proofPath);
+  if (proof.sha256 !== value.proofSha256) throw new Error("Candidate-review proof bytes changed after review; generate a fresh comparison board.");
+
+  const sourceBindings = value.sourceBindings;
+  if (!sourceBindings || !Array.isArray(sourceBindings.candidates)) throw new Error("Candidate-review receipt source bindings are missing.");
+  for (const candidate of sourceBindings.candidates) {
+    const current = await verifySourceBinding(candidate, `candidate:${candidate?.id ?? "unknown"}`);
+    const evidenceCandidate = value.evidence.candidates?.find((item) => item.id === candidate.id);
+    if (!evidenceCandidate || current?.sha256 !== evidenceCandidate.imageSha256) throw new Error(`Candidate ${JSON.stringify(candidate.id)} source binding does not match review evidence.`);
+  }
+  const currentHeader = await verifySourceBinding(sourceBindings.currentHeader, "current-header");
+  if (currentHeader && currentHeader.sha256 !== value.evidence.currentHeader?.imageSha256) throw new Error("Current-header source binding does not match review evidence.");
+  const support = await verifySourceBinding(sourceBindings.supportImage, "support-image");
+  if (support && support.sha256 !== value.evidence.supportImageSha256) throw new Error("Support-image source binding does not match review evidence.");
+  const tile = await verifySourceBinding(sourceBindings.tileImage, "tile-image");
+  if (tile && tile.sha256 !== value.evidence.tileImageSha256) throw new Error("Tile-image source binding does not match review evidence.");
+
+  return { path: resolved, value, evidenceSha256, proofSha256: proof.sha256, receiptSha256: sha256(bytes) };
 }
 
 function hashForCritique(evidence, candidateId) {
@@ -53,28 +86,41 @@ async function compareCandidates(args) {
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
 
-  const candidates = await Promise.all(args.candidates.map(async (candidate) => {
+  const candidateBindings = await Promise.all(args.candidates.map(async (candidate) => {
     if (!candidate || typeof candidate.id !== "string" || typeof candidate.path !== "string") throw new Error("Each candidate requires id and path.");
-    return { id: candidate.id, image: await readFile(await allowed(candidate.path, false)), ...(typeof candidate.provenance === "string" ? { provenance: candidate.provenance } : {}) };
+    const source = await readBound(candidate.path);
+    return { id: candidate.id, path: source.path, sha256: source.sha256, image: source.bytes, ...(typeof candidate.provenance === "string" ? { provenance: candidate.provenance } : {}) };
   }));
+  const currentHeader = await optionalBound(args.currentHeaderPath);
+  const supportImage = await optionalBound(args.supportImagePath);
+  const tileImage = await optionalBound(args.tileImagePath);
+
   const result = await compareWorkHeaderCandidates({
-    candidates,
-    currentHeader: await optionalBuffer(args.currentHeaderPath),
-    supportImage: await optionalBuffer(args.supportImagePath),
-    tileImage: await optionalBuffer(args.tileImagePath),
+    candidates: candidateBindings.map(({ id, image, provenance }) => ({ id, image, ...(provenance ? { provenance } : {}) })),
+    currentHeader: currentHeader?.bytes,
+    supportImage: supportImage?.bytes,
+    tileImage: tileImage?.bytes,
     reviewBrief: args.reviewBrief,
     maximumCandidates: args.maximumCandidates,
   });
+
   const proofPath = await allowed(args.proofPath, true);
   const receiptPath = await allowed(args.receiptPath, true);
   const evidenceSha256 = digestWorkHeaderCandidateReviewEvidence(result.evidence);
   const proofSha256 = sha256(result.proofPng);
   await writeFile(proofPath, result.proofPng, { flag: "wx" });
+  const sourceBindings = {
+    candidates: candidateBindings.map(({ id, path, sha256: digest }) => ({ id, path, sha256: digest })),
+    currentHeader: currentHeader ? { path: currentHeader.path, sha256: currentHeader.sha256 } : null,
+    supportImage: supportImage ? { path: supportImage.path, sha256: supportImage.sha256 } : null,
+    tileImage: tileImage ? { path: tileImage.path, sha256: tileImage.sha256 } : null,
+  };
   await writeFile(receiptPath, `${JSON.stringify({
     contract: "evavo.work-header-candidate-review.v1",
     proofPath,
     proofSha256,
     evidenceSha256,
+    sourceBindings,
     evidence: result.evidence,
     approvalState: "unapproved",
     creativeWinner: null,
@@ -84,7 +130,7 @@ async function compareCandidates(args) {
       ? "Inspect this exact project-grounded proof/evidence set, critique the current header and shortlisted candidates, then run the conservative selection resolver."
       : "Add a semantic review brief before any replacement recommendation; technical review may continue but semantic replacement approval is blocked.",
   }, null, 2)}\n`, { flag: "wx" });
-  return { ok: true, proofPath, receiptPath, proofSha256, evidenceSha256, evidence: result.evidence };
+  return { ok: true, proofPath, receiptPath, proofSha256, evidenceSha256, sourceBindings, evidence: result.evidence };
 }
 
 async function recordCritique(args) {
@@ -98,7 +144,15 @@ async function recordCritique(args) {
   const candidateSha256 = hashForCritique(board.value.evidence, args.critique.candidateId);
   const result = judgeWorkHeaderVisualCritique({ ...args.critique, candidateSha256, candidateReviewEvidenceSha256: board.evidenceSha256 });
   const receiptPath = await allowed(args.receiptPath, true);
-  await writeFile(receiptPath, `${JSON.stringify({ ...result, candidateReviewReceiptPath: board.path, candidateReviewReceiptSha256: board.receiptSha256, approvalState: "unapproved", publicationAllowed: false, cloudOverwriteAllowed: false }, null, 2)}\n`, { flag: "wx" });
+  await writeFile(receiptPath, `${JSON.stringify({
+    ...result,
+    candidateReviewReceiptPath: board.path,
+    candidateReviewReceiptSha256: board.receiptSha256,
+    candidateReviewProofSha256: board.proofSha256,
+    approvalState: "unapproved",
+    publicationAllowed: false,
+    cloudOverwriteAllowed: false,
+  }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, receiptPath, critique: result };
 }
 
@@ -117,6 +171,7 @@ async function resolveSelection(args) {
     if (value.contract !== "evavo.work-header-visual-critique.v1") throw new Error(`Critique receipt ${resolved} has an unsupported contract.`);
     if (value.candidateReviewReceiptPath !== board.path) throw new Error(`Critique receipt ${resolved} is not bound to this candidate review receipt.`);
     if (value.candidateReviewReceiptSha256 !== board.receiptSha256) throw new Error(`Critique receipt ${resolved} is bound to a different version of the candidate review receipt.`);
+    if (value.candidateReviewProofSha256 !== board.proofSha256) throw new Error(`Critique receipt ${resolved} is bound to a different proof image.`);
     if (value.candidateReviewEvidenceSha256 !== board.evidenceSha256) throw new Error(`Critique receipt ${resolved} is bound to changed candidate review evidence.`);
     critiques.push(value);
   }
@@ -125,7 +180,7 @@ async function resolveSelection(args) {
     const resolved = await allowed(args.currentHeaderCritiqueReceiptPath, false);
     const value = JSON.parse(await readFile(resolved, "utf8"));
     if (value.contract !== "evavo.work-header-visual-critique.v1") throw new Error("currentHeaderCritiqueReceiptPath must point to an evavo.work-header-visual-critique.v1 receipt.");
-    if (value.candidateReviewReceiptPath !== board.path || value.candidateReviewReceiptSha256 !== board.receiptSha256 || value.candidateReviewEvidenceSha256 !== board.evidenceSha256) throw new Error("Current-header critique is not bound to this exact candidate review receipt/evidence.");
+    if (value.candidateReviewReceiptPath !== board.path || value.candidateReviewReceiptSha256 !== board.receiptSha256 || value.candidateReviewProofSha256 !== board.proofSha256 || value.candidateReviewEvidenceSha256 !== board.evidenceSha256) throw new Error("Current-header critique is not bound to this exact candidate review receipt/proof/evidence.");
     currentHeaderCritique = value;
   }
 
@@ -141,19 +196,30 @@ async function resolveSelection(args) {
     requireSemanticBrief: args.requireSemanticBrief,
   });
   const receiptPath = await allowed(args.receiptPath, true);
-  await writeFile(receiptPath, `${JSON.stringify({ ...result, candidateReviewReceiptPath: board.path, candidateReviewReceiptSha256: board.receiptSha256, candidateReviewEvidenceSha256: board.evidenceSha256, approvalState: "unapproved", publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false }, null, 2)}\n`, { flag: "wx" });
+  await writeFile(receiptPath, `${JSON.stringify({
+    ...result,
+    candidateReviewReceiptPath: board.path,
+    candidateReviewReceiptSha256: board.receiptSha256,
+    candidateReviewProofSha256: board.proofSha256,
+    candidateReviewEvidenceSha256: board.evidenceSha256,
+    sourceBindingsVerifiedAtResolution: true,
+    approvalState: "unapproved",
+    publicationAllowed: false,
+    cloudOverwriteAllowed: false,
+    websiteMutationAllowed: false,
+  }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, receiptPath, resolution: result };
 }
 
 const tools = [
   {
     name: "evavo_work_header_candidate_review_capabilities",
-    description: "Describe project-grounded comparative Work-header review, hash-bound critique lineage and conservative retain-current selection policy.",
+    description: "Describe project-grounded comparative Work-header review with proof, evidence and live source-file lineage verification.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_compare_work_header_candidates",
-    description: "Create a responsive comparison board including the current header, support/tile context and optional semantic project brief. Records exact image/proof/evidence hashes and never auto-selects a creative winner.",
+    description: "Create a responsive comparison board including current header, support/tile context and optional semantic project brief. Records source paths plus exact image/proof/evidence hashes and never auto-selects a creative winner.",
     inputSchema: {
       type: "object",
       properties: {
@@ -167,12 +233,12 @@ const tools = [
   },
   {
     name: "evavo_record_work_header_visual_critique",
-    description: "Record visual judgement for one exact image and one exact comparison evidence set.",
+    description: "Record visual judgement only after verifying the exact proof bytes, comparison evidence and all bound source images are unchanged.",
     inputSchema: { type: "object", properties: { candidateReviewReceiptPath: { type: "string" }, critique: { type: "object" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["candidateReviewReceiptPath", "critique", "receiptPath", "confirmLocalWrite"], additionalProperties: false },
   },
   {
     name: "evavo_resolve_work_header_selection",
-    description: "Resolve exact-bound critiques conservatively. By default a semantic project brief and current-header baseline are both required before recommending replacement.",
+    description: "Re-verify proof/evidence/source bindings and resolve exact-bound critiques conservatively. Semantic brief and current baseline are required by default; website/Cloudinary mutation remains blocked.",
     inputSchema: {
       type: "object",
       properties: {
@@ -189,6 +255,7 @@ function capabilities() {
     contract: "evavo.work-header-candidate-review.v1",
     allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled(), comparativeResponsiveProofBoard: true,
     projectSemanticReviewBriefSupported: true, semanticBriefRequiredForReplacementByDefault: true, surroundingSupportAndTileReferencesInProof: true,
+    sourceFilePathAndShaBindings: true, sourceBindingsReverifiedBeforeCritiqueAndResolution: true, proofBytesReverifiedBeforeCritiqueAndResolution: true,
     surroundingMediaSha256Evidence: true, currentHeaderTechnicalBaselineInProofBoard: true, candidateAndCurrentImageSha256Evidence: true,
     proofSha256Evidence: true, canonicalReviewEvidenceSha256: true, visualCritiqueHashBindingRequired: true,
     visualCritiqueReviewEvidenceBindingRequired: true, critiqueReceiptMustMatchExactCandidateReviewReceiptBytes: true,
