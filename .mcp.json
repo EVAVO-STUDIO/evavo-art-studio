@@ -50,6 +50,13 @@
         "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
       }
     },
+    "evavo-work-header-preview-admission-v1": {
+      "command": "node",
+      "args": ["tools/work_header_preview_admission_mcp.mjs"],
+      "env": {
+        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"
+      }
+    },
     "evavo-work-header-page-render-review-v1": {
       "command": "node",
       "args": ["tools/work_header_page_render_review_mcp.mjs"],
