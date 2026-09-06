@@ -93,10 +93,12 @@ export async function orchestrateImageReview(
   if (encoded.byteLength === 0) throw new Error("Image review orchestration input is empty.");
   const inferred = await inferProfile(encoded, context);
   const profile = getImageReviewProfile(inferred.profile);
+  const strictTransparentRgb = inferred.profile === "logo-transparent" || inferred.profile === "product-cutout";
   const [quality, defects, artifactSignals] = await Promise.all([
     reviewExistingImageQuality(encoded, {
       minimumSharpness: profile.minimumSharpness,
       minimumLumaStdDev: profile.minimumLumaStdDev,
+      transparentRgbDetectionMode: strictTransparentRgb ? "all" : "edge-only",
       maximumTransparentRgbContaminationRatio: profile.maximumTransparentRgbContaminationRatio,
       maximumEdgeHaloRiskRatio: profile.maximumEdgeHaloRiskRatio,
       maximumPinholeRatio: profile.maximumPinholeRatio,
