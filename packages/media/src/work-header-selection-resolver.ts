@@ -10,6 +10,7 @@ export interface WorkHeaderSelectionResolverSpec {
   readonly minimumVisualScore?: number;
   readonly minimumAdvantageOverCurrent?: number;
   readonly minimumTechnicalScore?: number;
+  readonly maximumTechnicalDeficitToCurrent?: number;
   readonly requireCurrentHeaderBaseline?: boolean;
 }
 
@@ -22,6 +23,7 @@ export interface WorkHeaderSelectionResolverResult {
   readonly reasons: readonly string[];
   readonly currentHeaderBaselineProvided: boolean;
   readonly currentHeaderVisualScore: number | null;
+  readonly currentHeaderTechnicalScore: number | null;
   readonly automaticPublicationAllowed: false;
   readonly automaticCloudOverwriteAllowed: false;
   readonly automaticWebsiteMutationAllowed: false;
@@ -36,9 +38,9 @@ function finite(value: number | undefined, fallback: number, min: number, max: n
 
 /**
  * Resolves comparative technical evidence + explicit visual critiques into a
- * conservative recommendation. It defaults to retaining the current header
- * unless a candidate is technically eligible, visually shortlisted and proves
- * a material advantage. This still never grants publication/mutation authority.
+ * conservative recommendation. The current header is treated as a baseline to
+ * beat, not as disposable legacy media. Replacement requires both technical
+ * safety and a material visual advantage. No recommendation grants mutation.
  */
 export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec): WorkHeaderSelectionResolverResult {
   if (!spec?.candidateReview || !Array.isArray(spec.candidateReview.candidates)) throw new Error("candidateReview evidence is required.");
@@ -47,6 +49,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   const minimumVisualScore = finite(spec.minimumVisualScore, 82, 0, 100, "minimumVisualScore");
   const minimumAdvantageOverCurrent = finite(spec.minimumAdvantageOverCurrent, 5, 0, 30, "minimumAdvantageOverCurrent");
   const minimumTechnicalScore = finite(spec.minimumTechnicalScore, 80, 0, 100, "minimumTechnicalScore");
+  const maximumTechnicalDeficitToCurrent = finite(spec.maximumTechnicalDeficitToCurrent, 3, 0, 25, "maximumTechnicalDeficitToCurrent");
   const requireCurrentHeaderBaseline = spec.requireCurrentHeaderBaseline ?? true;
 
   const candidateById = new Map(spec.candidateReview.candidates.map((candidate) => [candidate.id, candidate] as const));
@@ -57,11 +60,12 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     critiquesById.set(critique.candidateId, critique);
   }
 
-  const currentScore = spec.currentHeaderCritique?.visualScore ?? null;
+  const currentVisualScore = spec.currentHeaderCritique?.visualScore ?? null;
+  const currentTechnicalScore = spec.candidateReview.currentHeader?.technicalScore ?? null;
+  const currentBaselineComplete = Boolean(spec.currentHeaderCritique) && currentTechnicalScore !== null;
   const reasons: string[] = [];
-  if (requireCurrentHeaderBaseline && !spec.currentHeaderCritique) {
-    reasons.push("current-header-visual-baseline-required-before-replacement-recommendation");
-  }
+  if (requireCurrentHeaderBaseline && !spec.currentHeaderCritique) reasons.push("current-header-visual-baseline-required-before-replacement-recommendation");
+  if (requireCurrentHeaderBaseline && currentTechnicalScore === null) reasons.push("current-header-technical-baseline-required-before-replacement-recommendation");
 
   const eligible: Array<{ id: string; score: number; technicalScore: number }> = [];
   const rejected = new Set<string>();
@@ -89,12 +93,17 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
       reasons.push(`candidate-too-similar-to-support:${candidate.id}`);
       continue;
     }
+    if (currentTechnicalScore !== null && candidate.technicalScore < currentTechnicalScore - maximumTechnicalDeficitToCurrent) {
+      rejected.add(candidate.id);
+      reasons.push(`candidate-technically-worse-than-current:${candidate.id}:${candidate.technicalScore}<${currentTechnicalScore - maximumTechnicalDeficitToCurrent}`);
+      continue;
+    }
     eligible.push({ id: candidate.id, score: critique.visualScore, technicalScore: candidate.technicalScore });
   }
 
   eligible.sort((a, b) => b.score - a.score || b.technicalScore - a.technicalScore || a.id.localeCompare(b.id));
 
-  if (requireCurrentHeaderBaseline && !spec.currentHeaderCritique) {
+  if (requireCurrentHeaderBaseline && !currentBaselineComplete) {
     return Object.freeze({
       contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
       recommendation: "needs-current-baseline",
@@ -103,7 +112,8 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
       rejectedCandidateIds: Object.freeze([...rejected]),
       reasons: Object.freeze(reasons),
       currentHeaderBaselineProvided: false,
-      currentHeaderVisualScore: null,
+      currentHeaderVisualScore: currentVisualScore,
+      currentHeaderTechnicalScore,
       automaticPublicationAllowed: false,
       automaticCloudOverwriteAllowed: false,
       automaticWebsiteMutationAllowed: false,
@@ -115,13 +125,14 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     reasons.push("no-candidate-cleared-technical-and-visual-selection-gates");
     return Object.freeze({
       contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
-      recommendation: spec.currentHeaderCritique ? "retain-current" : "no-acceptable-candidate",
+      recommendation: currentBaselineComplete ? "retain-current" : "no-acceptable-candidate",
       recommendedCandidateId: null,
       eligibleCandidateIds: Object.freeze([]),
       rejectedCandidateIds: Object.freeze([...rejected]),
       reasons: Object.freeze(reasons),
-      currentHeaderBaselineProvided: Boolean(spec.currentHeaderCritique),
-      currentHeaderVisualScore: currentScore,
+      currentHeaderBaselineProvided: currentBaselineComplete,
+      currentHeaderVisualScore: currentVisualScore,
+      currentHeaderTechnicalScore,
       automaticPublicationAllowed: false,
       automaticCloudOverwriteAllowed: false,
       automaticWebsiteMutationAllowed: false,
@@ -130,8 +141,8 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   }
 
   const best = eligible[0]!;
-  if (currentScore !== null && best.score < currentScore + minimumAdvantageOverCurrent) {
-    reasons.push(`best-candidate-does-not-beat-current-by-required-margin:${best.score}<${currentScore + minimumAdvantageOverCurrent}`);
+  if (currentVisualScore !== null && best.score < currentVisualScore + minimumAdvantageOverCurrent) {
+    reasons.push(`best-candidate-does-not-beat-current-by-required-margin:${best.score}<${currentVisualScore + minimumAdvantageOverCurrent}`);
     return Object.freeze({
       contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
       recommendation: "retain-current",
@@ -139,8 +150,9 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
       eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
       rejectedCandidateIds: Object.freeze([...rejected]),
       reasons: Object.freeze(reasons),
-      currentHeaderBaselineProvided: true,
-      currentHeaderVisualScore: currentScore,
+      currentHeaderBaselineProvided: currentBaselineComplete,
+      currentHeaderVisualScore: currentVisualScore,
+      currentHeaderTechnicalScore,
       automaticPublicationAllowed: false,
       automaticCloudOverwriteAllowed: false,
       automaticWebsiteMutationAllowed: false,
@@ -156,8 +168,9 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
     rejectedCandidateIds: Object.freeze([...rejected]),
     reasons: Object.freeze(reasons),
-    currentHeaderBaselineProvided: Boolean(spec.currentHeaderCritique),
-    currentHeaderVisualScore: currentScore,
+    currentHeaderBaselineProvided: currentBaselineComplete,
+    currentHeaderVisualScore: currentVisualScore,
+    currentHeaderTechnicalScore,
     automaticPublicationAllowed: false,
     automaticCloudOverwriteAllowed: false,
     automaticWebsiteMutationAllowed: false,
