@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { reviewExistingImageQuality } from "./existing-image-quality-review.js";
 import { detectExistingImageDefects } from "./existing-image-defect-detection.js";
 import { segmentDefectMaskRegions } from "./defect-region-components.js";
+import { detectImageArtifactSignals } from "./image-artifact-signals.js";
 import { reviewWorkHeaderImage } from "./work-header-quality.js";
 import { compareImageSimilarity } from "./image-similarity.js";
 import {
@@ -24,6 +25,7 @@ export interface ImageReviewOrchestrationResult {
     evidence: Awaited<ReturnType<typeof detectExistingImageDefects>>["evidence"];
     regions: Awaited<ReturnType<typeof segmentDefectMaskRegions>>;
   }>;
+  readonly artifactSignals: Awaited<ReturnType<typeof detectImageArtifactSignals>>;
   readonly header?: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"];
   readonly similarity: readonly Readonly<{
     id: string;
@@ -91,7 +93,7 @@ export async function orchestrateImageReview(
   if (encoded.byteLength === 0) throw new Error("Image review orchestration input is empty.");
   const inferred = await inferProfile(encoded, context);
   const profile = getImageReviewProfile(inferred.profile);
-  const [quality, defects] = await Promise.all([
+  const [quality, defects, artifactSignals] = await Promise.all([
     reviewExistingImageQuality(encoded, {
       minimumSharpness: profile.minimumSharpness,
       minimumLumaStdDev: profile.minimumLumaStdDev,
@@ -101,6 +103,7 @@ export async function orchestrateImageReview(
       maximumBlockinessRatio: profile.maximumBlockinessRatio,
     }),
     detectExistingImageDefects(encoded, { profile: inferred.profile }),
+    detectImageArtifactSignals(encoded, { profile: inferred.profile }),
   ]);
   const defectRegions = await segmentDefectMaskRegions(defects.maskPng, {
     minimumPixelCount: 2,
@@ -109,7 +112,7 @@ export async function orchestrateImageReview(
   });
 
   const blockers: string[] = [];
-  const warnings: string[] = [...quality.issues];
+  const warnings: string[] = [...quality.issues, ...artifactSignals.warnings];
 
   if (quality.grade === "fail") blockers.push("technical image-quality review failed");
   if (quality.transparentRgbContaminationRatio > profile.maximumTransparentRgbContaminationRatio) blockers.push("transparent RGB contamination exceeds profile limit");
@@ -122,6 +125,10 @@ export async function orchestrateImageReview(
     warnings.push(`defect-mask-coverage:${(defects.evidence.maskCoverageRatio * 100).toFixed(3)}%`);
     warnings.push(`defect-action:${defects.evidence.suggestedAction}`);
   }
+
+  if (artifactSignals.nearestNeighbourUpscaleRisk && inferred.profile !== "pixel-art") blockers.push("probable-nearest-neighbour-upscale-of-non-pixel-art");
+  if (artifactSignals.posterizationRisk) warnings.push("tonal-posterization-needs-visual-review");
+  if (artifactSignals.ringingRiskRatio > 0.02 && inferred.profile !== "pixel-art") warnings.push("strong-ringing-or-oversharpen-signal");
 
   let header: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"] | undefined;
   if (context.intendedRole === "work-header") {
@@ -151,7 +158,7 @@ export async function orchestrateImageReview(
     else if (compared.nearDuplicate) warnings.push(`near-duplicate-of:${candidate.id}:${compared.perceptualSimilarity.toFixed(3)}`);
   }
 
-  const finishSignal = defects.evidence.defectPixels > 0 || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur/u.test(warning));
+  const finishSignal = defects.evidence.defectPixels > 0 || artifactSignals.warnings.length > 0 || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur|ring|posterization/u.test(warning));
   const decision: ImageReviewOrchestrationResult["decision"] = blockers.length
     ? "reject"
     : finishSignal
@@ -163,6 +170,7 @@ export async function orchestrateImageReview(
     profileReason: Object.freeze(inferred.reasons),
     quality,
     defectReview: Object.freeze({ evidence: defects.evidence, regions: defectRegions }),
+    artifactSignals,
     ...(header ? { header } : {}),
     similarity: Object.freeze(similarity),
     decision,
@@ -172,6 +180,7 @@ export async function orchestrateImageReview(
     visualChecklist: Object.freeze([
       ...profile.visualChecks,
       "Inspect the highest-ranked connected defect regions before authorising localized repair.",
+      "Check ringing/oversharpen, tonal posterization and suspicious resampling signals against the actual image before accepting them as defects.",
       "Judge the image at intended runtime size, not only at 100% zoom.",
       "Reject imagery that is technically valid but looks cheap, generic, repetitive, semantically weak or badly art-directed.",
       "For page media, compare against adjacent imagery and avoid near-duplicate storytelling.",
