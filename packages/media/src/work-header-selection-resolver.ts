@@ -13,17 +13,19 @@ export interface WorkHeaderSelectionResolverSpec {
   readonly minimumTechnicalScore?: number;
   readonly maximumTechnicalDeficitToCurrent?: number;
   readonly requireCurrentHeaderBaseline?: boolean;
+  readonly requireSemanticBrief?: boolean;
 }
 
 export interface WorkHeaderSelectionResolverResult {
   readonly contract: typeof WORK_HEADER_SELECTION_RESOLVER_CONTRACT;
   readonly candidateReviewEvidenceSha256: string;
-  readonly recommendation: "retain-current" | "no-acceptable-candidate" | "candidate-recommended" | "needs-current-baseline";
+  readonly recommendation: "retain-current" | "no-acceptable-candidate" | "candidate-recommended" | "needs-current-baseline" | "needs-review-brief";
   readonly recommendedCandidateId: string | null;
   readonly eligibleCandidateIds: readonly string[];
   readonly rejectedCandidateIds: readonly string[];
   readonly reasons: readonly string[];
   readonly currentHeaderBaselineProvided: boolean;
+  readonly semanticBriefProvided: boolean;
   readonly currentHeaderVisualScore: number | null;
   readonly currentHeaderTechnicalScore: number | null;
   readonly critiqueHashBindingVerified: boolean;
@@ -50,6 +52,8 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   const minimumTechnicalScore = finite(spec.minimumTechnicalScore, 80, 0, 100, "minimumTechnicalScore");
   const maximumTechnicalDeficitToCurrent = finite(spec.maximumTechnicalDeficitToCurrent, 3, 0, 25, "maximumTechnicalDeficitToCurrent");
   const requireCurrentHeaderBaseline = spec.requireCurrentHeaderBaseline ?? true;
+  const requireSemanticBrief = spec.requireSemanticBrief ?? true;
+  const semanticBriefProvided = Boolean(spec.candidateReview.reviewBrief?.pageTitle && spec.candidateReview.reviewBrief?.projectSummary);
 
   const candidateById = new Map(spec.candidateReview.candidates.map((candidate) => [candidate.id, candidate] as const));
   const critiquesById = new Map<string, WorkHeaderVisualCritiqueResult>();
@@ -57,9 +61,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     const candidate = candidateById.get(critique.candidateId);
     if (!candidate) throw new Error(`Critique references unknown candidate ${JSON.stringify(critique.candidateId)}.`);
     if (critique.candidateSha256 !== candidate.imageSha256) throw new Error(`Critique hash mismatch for candidate ${JSON.stringify(critique.candidateId)}.`);
-    if (critique.candidateReviewEvidenceSha256 !== reviewEvidenceSha256) {
-      throw new Error(`Critique review-evidence hash mismatch for candidate ${JSON.stringify(critique.candidateId)}.`);
-    }
+    if (critique.candidateReviewEvidenceSha256 !== reviewEvidenceSha256) throw new Error(`Critique review-evidence hash mismatch for candidate ${JSON.stringify(critique.candidateId)}.`);
     if (critiquesById.has(critique.candidateId)) throw new Error(`Duplicate critique for candidate ${JSON.stringify(critique.candidateId)}.`);
     critiquesById.set(critique.candidateId, critique);
   }
@@ -76,6 +78,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   const currentTechnicalScore = spec.candidateReview.currentHeader?.technicalScore ?? null;
   const currentBaselineComplete = Boolean(spec.currentHeaderCritique) && currentTechnicalScore !== null;
   const reasons: string[] = [];
+  if (requireSemanticBrief && !semanticBriefProvided) reasons.push("semantic-review-brief-required-before-replacement-recommendation");
   if (requireCurrentHeaderBaseline && !spec.currentHeaderCritique) reasons.push("current-header-visual-baseline-required-before-replacement-recommendation");
   if (requireCurrentHeaderBaseline && currentTechnicalScore === null) reasons.push("current-header-technical-baseline-required-before-replacement-recommendation");
 
@@ -83,28 +86,11 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   const rejected = new Set<string>();
   for (const candidate of spec.candidateReview.candidates) {
     const critique = critiquesById.get(candidate.id);
-    if (!candidate.technicallyEligibleForVisualReview) {
-      rejected.add(candidate.id);
-      continue;
-    }
-    if (!critique) {
-      rejected.add(candidate.id);
-      reasons.push(`missing-visual-critique:${candidate.id}`);
-      continue;
-    }
-    if (critique.verdict !== "visual-shortlist" || !critique.eligibleForFinalSelection) {
-      rejected.add(candidate.id);
-      continue;
-    }
-    if (critique.disqualifiers.length > 0 || critique.visualScore < minimumVisualScore || candidate.technicalScore < minimumTechnicalScore) {
-      rejected.add(candidate.id);
-      continue;
-    }
-    if (candidate.nearDuplicateOfSupport || candidate.exactDuplicateOfSupport) {
-      rejected.add(candidate.id);
-      reasons.push(`candidate-too-similar-to-support:${candidate.id}`);
-      continue;
-    }
+    if (!candidate.technicallyEligibleForVisualReview) { rejected.add(candidate.id); continue; }
+    if (!critique) { rejected.add(candidate.id); reasons.push(`missing-visual-critique:${candidate.id}`); continue; }
+    if (critique.verdict !== "visual-shortlist" || !critique.eligibleForFinalSelection) { rejected.add(candidate.id); continue; }
+    if (critique.disqualifiers.length > 0 || critique.visualScore < minimumVisualScore || candidate.technicalScore < minimumTechnicalScore) { rejected.add(candidate.id); continue; }
+    if (candidate.nearDuplicateOfSupport || candidate.exactDuplicateOfSupport) { rejected.add(candidate.id); reasons.push(`candidate-too-similar-to-support:${candidate.id}`); continue; }
     if (currentTechnicalScore !== null && candidate.technicalScore < currentTechnicalScore - maximumTechnicalDeficitToCurrent) {
       rejected.add(candidate.id);
       reasons.push(`candidate-technically-worse-than-current:${candidate.id}:${candidate.technicalScore}<${currentTechnicalScore - maximumTechnicalDeficitToCurrent}`);
@@ -120,6 +106,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     candidateReviewEvidenceSha256: reviewEvidenceSha256,
     currentHeaderVisualScore: currentVisualScore,
     currentHeaderTechnicalScore,
+    semanticBriefProvided,
     critiqueHashBindingVerified: true,
     reviewEvidenceHashBindingVerified: true,
     automaticPublicationAllowed: false as const,
@@ -128,10 +115,12 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     finalHumanApprovalRequired: true as const,
   };
 
+  if (requireSemanticBrief && !semanticBriefProvided) {
+    return Object.freeze({ ...base, recommendation: "needs-review-brief" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
+  }
   if (requireCurrentHeaderBaseline && !currentBaselineComplete) {
     return Object.freeze({ ...base, recommendation: "needs-current-baseline" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: false });
   }
-
   if (eligible.length === 0) {
     reasons.push("no-candidate-cleared-technical-and-visual-selection-gates");
     return Object.freeze({ ...base, recommendation: currentBaselineComplete ? "retain-current" as const : "no-acceptable-candidate" as const, recommendedCandidateId: null, eligibleCandidateIds: Object.freeze([]), rejectedCandidateIds: Object.freeze([...rejected]), reasons: Object.freeze(reasons), currentHeaderBaselineProvided: currentBaselineComplete });
