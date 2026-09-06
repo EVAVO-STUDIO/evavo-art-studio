@@ -24,6 +24,7 @@ export interface WorkHeaderSelectionResolverResult {
   readonly currentHeaderBaselineProvided: boolean;
   readonly currentHeaderVisualScore: number | null;
   readonly currentHeaderTechnicalScore: number | null;
+  readonly critiqueHashBindingVerified: boolean;
   readonly automaticPublicationAllowed: false;
   readonly automaticCloudOverwriteAllowed: false;
   readonly automaticWebsiteMutationAllowed: false;
@@ -36,12 +37,6 @@ function finite(value: number | undefined, fallback: number, min: number, max: n
   return value;
 }
 
-/**
- * Resolves comparative technical evidence + explicit visual critiques into a
- * conservative recommendation. The current header is treated as a baseline to
- * beat, not as disposable legacy media. Replacement requires both technical
- * safety and a material visual advantage. No recommendation grants mutation.
- */
 export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec): WorkHeaderSelectionResolverResult {
   if (!spec?.candidateReview || !Array.isArray(spec.candidateReview.candidates)) throw new Error("candidateReview evidence is required.");
   if (!Array.isArray(spec.critiques) || spec.critiques.length < 1) throw new Error("At least one candidate critique is required.");
@@ -55,9 +50,20 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   const candidateById = new Map(spec.candidateReview.candidates.map((candidate) => [candidate.id, candidate] as const));
   const critiquesById = new Map<string, WorkHeaderVisualCritiqueResult>();
   for (const critique of spec.critiques) {
-    if (!candidateById.has(critique.candidateId)) throw new Error(`Critique references unknown candidate ${JSON.stringify(critique.candidateId)}.`);
+    const candidate = candidateById.get(critique.candidateId);
+    if (!candidate) throw new Error(`Critique references unknown candidate ${JSON.stringify(critique.candidateId)}.`);
+    if (critique.candidateSha256 !== candidate.imageSha256) {
+      throw new Error(`Critique hash mismatch for candidate ${JSON.stringify(critique.candidateId)}.`);
+    }
     if (critiquesById.has(critique.candidateId)) throw new Error(`Duplicate critique for candidate ${JSON.stringify(critique.candidateId)}.`);
     critiquesById.set(critique.candidateId, critique);
+  }
+
+  if (spec.currentHeaderCritique) {
+    if (spec.currentHeaderCritique.candidateId !== "current-header") throw new Error("Current-header critique must use candidateId=current-header.");
+    const currentHash = spec.candidateReview.currentHeader?.imageSha256;
+    if (!currentHash) throw new Error("Current-header critique supplied without current-header technical/hash evidence.");
+    if (spec.currentHeaderCritique.candidateSha256 !== currentHash) throw new Error("Current-header critique hash does not match the comparative review baseline image.");
   }
 
   const currentVisualScore = spec.currentHeaderCritique?.visualScore ?? null;
@@ -103,40 +109,39 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
 
   eligible.sort((a, b) => b.score - a.score || b.technicalScore - a.technicalScore || a.id.localeCompare(b.id));
 
+  const base = {
+    contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
+    currentHeaderVisualScore: currentVisualScore,
+    currentHeaderTechnicalScore,
+    critiqueHashBindingVerified: true,
+    automaticPublicationAllowed: false as const,
+    automaticCloudOverwriteAllowed: false as const,
+    automaticWebsiteMutationAllowed: false as const,
+    finalHumanApprovalRequired: true as const,
+  };
+
   if (requireCurrentHeaderBaseline && !currentBaselineComplete) {
     return Object.freeze({
-      contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
-      recommendation: "needs-current-baseline",
+      ...base,
+      recommendation: "needs-current-baseline" as const,
       recommendedCandidateId: null,
       eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
       rejectedCandidateIds: Object.freeze([...rejected]),
       reasons: Object.freeze(reasons),
       currentHeaderBaselineProvided: false,
-      currentHeaderVisualScore: currentVisualScore,
-      currentHeaderTechnicalScore,
-      automaticPublicationAllowed: false,
-      automaticCloudOverwriteAllowed: false,
-      automaticWebsiteMutationAllowed: false,
-      finalHumanApprovalRequired: true,
     });
   }
 
   if (eligible.length === 0) {
     reasons.push("no-candidate-cleared-technical-and-visual-selection-gates");
     return Object.freeze({
-      contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
-      recommendation: currentBaselineComplete ? "retain-current" : "no-acceptable-candidate",
+      ...base,
+      recommendation: currentBaselineComplete ? "retain-current" as const : "no-acceptable-candidate" as const,
       recommendedCandidateId: null,
       eligibleCandidateIds: Object.freeze([]),
       rejectedCandidateIds: Object.freeze([...rejected]),
       reasons: Object.freeze(reasons),
       currentHeaderBaselineProvided: currentBaselineComplete,
-      currentHeaderVisualScore: currentVisualScore,
-      currentHeaderTechnicalScore,
-      automaticPublicationAllowed: false,
-      automaticCloudOverwriteAllowed: false,
-      automaticWebsiteMutationAllowed: false,
-      finalHumanApprovalRequired: true,
     });
   }
 
@@ -144,36 +149,24 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
   if (currentVisualScore !== null && best.score < currentVisualScore + minimumAdvantageOverCurrent) {
     reasons.push(`best-candidate-does-not-beat-current-by-required-margin:${best.score}<${currentVisualScore + minimumAdvantageOverCurrent}`);
     return Object.freeze({
-      contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
-      recommendation: "retain-current",
+      ...base,
+      recommendation: "retain-current" as const,
       recommendedCandidateId: null,
       eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
       rejectedCandidateIds: Object.freeze([...rejected]),
       reasons: Object.freeze(reasons),
       currentHeaderBaselineProvided: currentBaselineComplete,
-      currentHeaderVisualScore: currentVisualScore,
-      currentHeaderTechnicalScore,
-      automaticPublicationAllowed: false,
-      automaticCloudOverwriteAllowed: false,
-      automaticWebsiteMutationAllowed: false,
-      finalHumanApprovalRequired: true,
     });
   }
 
   reasons.push(`candidate-proves-material-comparative-advantage:${best.id}`);
   return Object.freeze({
-    contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
-    recommendation: "candidate-recommended",
+    ...base,
+    recommendation: "candidate-recommended" as const,
     recommendedCandidateId: best.id,
     eligibleCandidateIds: Object.freeze(eligible.map((item) => item.id)),
     rejectedCandidateIds: Object.freeze([...rejected]),
     reasons: Object.freeze(reasons),
     currentHeaderBaselineProvided: currentBaselineComplete,
-    currentHeaderVisualScore: currentVisualScore,
-    currentHeaderTechnicalScore,
-    automaticPublicationAllowed: false,
-    automaticCloudOverwriteAllowed: false,
-    automaticWebsiteMutationAllowed: false,
-    finalHumanApprovalRequired: true,
   });
 }
