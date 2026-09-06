@@ -9,6 +9,8 @@ const HASH_B = "b".repeat(64);
 
 function candidateReview(overrides = {}) {
   return {
+    reviewBrief: { pageTitle: "Support Agent", projectSummary: "AI support product case study for EVAVO Work.", visualIntent: "Show the product/service clearly without generic AI imagery." },
+    semanticBriefRequiredForReplacement: true,
     currentHeader: {
       imageSha256: HASH_CURRENT,
       technicalScore: 90,
@@ -17,6 +19,8 @@ function candidateReview(overrides = {}) {
       minimumCropRetainedRatio: 0.74,
       maximumUpscaleRatio: 1,
     },
+    supportImageSha256: "d".repeat(64),
+    tileImageSha256: "e".repeat(64),
     candidates: [
       { id: "a", imageSha256: HASH_A, provenance: "cloudinary:a", technicalScore: 91, technicalGrade: "pass", technicalIssues: [], minimumCropRetainedRatio: 0.72, maximumUpscaleRatio: 1, similarityToCurrentHeader: 0.4, similarityToSupportImage: 0.3, similarityToTileImage: 0.2, exactDuplicateOfSupport: false, nearDuplicateOfSupport: false, technicallyEligibleForVisualReview: true },
       { id: "b", imageSha256: HASH_B, provenance: "cloudinary:b", technicalScore: 88, technicalGrade: "pass", technicalIssues: [], minimumCropRetainedRatio: 0.70, maximumUpscaleRatio: 1, similarityToCurrentHeader: 0.5, similarityToSupportImage: 0.4, similarityToTileImage: 0.3, exactDuplicateOfSupport: false, nearDuplicateOfSupport: false, technicallyEligibleForVisualReview: true },
@@ -27,6 +31,7 @@ function candidateReview(overrides = {}) {
     visualCritiqueRequired: true,
     currentHeaderBaselineRequiredForReplacement: true,
     critiqueHashBindingRequired: true,
+    surroundingMediaHashBindingRequired: true,
     visualCritiqueDimensions: ["semantic relevance"],
     ...overrides,
   };
@@ -53,6 +58,18 @@ function critique(review, candidateId, visualScore, candidateSha256, overrides =
     ...overrides,
   };
 }
+
+test("requires semantic project brief before replacement recommendation", () => {
+  const review = candidateReview({ reviewBrief: null });
+  const result = resolveWorkHeaderSelection({
+    candidateReview: review,
+    critiques: [critique(review, "a", 94, HASH_A)],
+    currentHeaderCritique: critique(review, "current-header", 80, HASH_CURRENT),
+  });
+  assert.equal(result.recommendation, "needs-review-brief");
+  assert.equal(result.semanticBriefProvided, false);
+  assert.equal(result.recommendedCandidateId, null);
+});
 
 test("requires both current-header technical and visual baselines by default", () => {
   const review = candidateReview({ currentHeader: null });
@@ -90,6 +107,7 @@ test("recommends candidate only after material comparative advantage", () => {
   });
   assert.equal(result.recommendation, "candidate-recommended");
   assert.equal(result.recommendedCandidateId, "a");
+  assert.equal(result.semanticBriefProvided, true);
   assert.equal(result.currentHeaderTechnicalScore, 90);
   assert.match(result.candidateReviewEvidenceSha256, /^[0-9a-f]{64}$/u);
   assert.equal(result.finalHumanApprovalRequired, true);
@@ -126,7 +144,7 @@ test("rejects stale visual critique bound to different candidate bytes", () => {
   assert.throws(
     () => resolveWorkHeaderSelection({
       candidateReview: review,
-      critiques: [critique(review, "a", 96, "d".repeat(64))],
+      critiques: [critique(review, "a", 96, "f".repeat(64))],
       currentHeaderCritique: critique(review, "current-header", 80, HASH_CURRENT),
     }),
     /Critique hash mismatch/u,
