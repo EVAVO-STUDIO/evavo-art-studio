@@ -30,6 +30,8 @@ export interface EnhancementStudioReviewManifest {
   readonly comparative_candidate_review_required?: boolean;
   readonly current_header_baseline_required?: boolean;
   readonly semantic_review_brief_required?: boolean;
+  readonly candidate_page_render_review_required?: boolean;
+  readonly approval_packet_required?: boolean;
   readonly publication_allowed: boolean;
   readonly cloud_overwrite_allowed: boolean;
   readonly automatic_creative_approval: boolean;
@@ -46,6 +48,8 @@ export interface AdmittedEnhancementStudioReview {
   readonly comparativeCandidateReviewRequired: boolean;
   readonly currentHeaderBaselineRequired: boolean;
   readonly semanticReviewBriefRequired: boolean;
+  readonly candidatePageRenderReviewRequired: boolean;
+  readonly approvalPacketRequired: boolean;
   readonly requiredTools: readonly string[];
   readonly visualChecks: readonly string[];
   readonly publicationAllowed: false;
@@ -81,9 +85,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   if (value.contract !== ENHANCEMENT_ART_REVIEW_CONTRACT) throw new Error(`Unsupported Enhancement Studio review contract ${JSON.stringify(value.contract)}.`);
   if (value.source_immutable !== true || value.candidate_is_review_only !== true) throw new Error("Enhancement Studio manifest must preserve immutable-source and review-candidate boundaries.");
   if (value.art_studio_visual_review_required !== true) throw new Error("Enhancement Studio candidate cannot bypass Art Studio visual review.");
-  if (value.publication_allowed !== false || value.cloud_overwrite_allowed !== false || value.automatic_creative_approval !== false || value.automatic_release_approval !== false) {
-    throw new Error("Enhancement Studio manifest attempted to carry forbidden publication/approval authority.");
-  }
+  if (value.publication_allowed !== false || value.cloud_overwrite_allowed !== false || value.automatic_creative_approval !== false || value.automatic_release_approval !== false) throw new Error("Enhancement Studio manifest attempted to carry forbidden publication/approval authority.");
   if (value.approval_state !== "unapproved") throw new Error("Enhancement Studio candidates must enter Art Studio in the unapproved state.");
 
   const profile = value.art_studio_review_profile as ImageReviewProfileName;
@@ -110,12 +112,16 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
     if (value.comparative_candidate_review_required !== true) throw new Error("Work-header enhancement candidates must require comparative candidate review.");
     if (value.current_header_baseline_required !== true) throw new Error("Work-header enhancement candidates must require current-header baseline review before replacement recommendation.");
     if (value.semantic_review_brief_required !== true) throw new Error("Work-header enhancement candidates must require a semantic project review brief before replacement recommendation.");
+    if (value.candidate_page_render_review_required !== true) throw new Error("Work-header enhancement candidates must require candidate-specific desktop/mobile page-render review before approval.");
+    if (value.approval_packet_required !== true) throw new Error("Work-header enhancement candidates must require a pre-approval packet that preserves explicit approval as a separate step.");
     for (const tool of [
       "evavo_review_work_header_image",
       "evavo_review_image_for_intended_use",
       "evavo_compare_work_header_candidates",
       "evavo_record_work_header_visual_critique",
       "evavo_resolve_work_header_selection",
+      "evavo_review_work_header_candidate_page_render",
+      "evavo_prepare_work_header_approval_packet",
     ]) {
       if (!requiredTools.includes(tool)) throw new Error(`Work-header enhancement candidates must require ${tool}.`);
     }
@@ -132,6 +138,8 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
     comparativeCandidateReviewRequired: value.comparative_candidate_review_required === true,
     currentHeaderBaselineRequired: value.current_header_baseline_required === true,
     semanticReviewBriefRequired: value.semantic_review_brief_required === true,
+    candidatePageRenderReviewRequired: value.candidate_page_render_review_required === true,
+    approvalPacketRequired: value.approval_packet_required === true,
     requiredTools,
     visualChecks,
     publicationAllowed: false,
