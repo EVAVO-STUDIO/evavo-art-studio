@@ -47,6 +47,18 @@ async function json(file, label) {
   try { return JSON.parse(await readFile(file, 'utf8')); }
   catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
 }
+async function jsonWithBytes(file, label) {
+  let bytes;
+  try { bytes = await readFile(file); }
+  catch (error) { fail(`${label} is unreadable: ${error instanceof Error ? error.message : String(error)}`); }
+  try {
+    return Object.freeze({
+      value: JSON.parse(bytes.toString('utf8')),
+      bytes,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+  } catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
+}
 function providerProfile(catalog, adapterId) {
   if (!catalog || !Array.isArray(catalog.profiles)) fail('ComfyUI catalog has no profiles');
   const profileId = adapterId.startsWith('comfyui:') ? adapterId.slice('comfyui:'.length) : adapterId;
@@ -80,8 +92,12 @@ function validateReferencePlan(referencePlan, catalog, baseAdapterId) {
   });
 }
 async function prepareManifest(sourcePath, port) {
-  const source = await json(sourcePath, 'batch manifest');
+  const sourceInput = await jsonWithBytes(sourcePath, 'batch manifest');
+  const source = sourceInput.value;
   if (source?.schema !== BATCH_SCHEMA) fail(`batch manifest must use ${BATCH_SCHEMA}`);
+  if (Object.prototype.hasOwnProperty.call(source, 'evavoProvenance')) {
+    fail('batch manifest evavoProvenance is reserved for the governed local entrypoint');
+  }
 
   const plan = compileBatchPlan(source);
   const audit = auditBatchPlan(plan);
@@ -97,6 +113,12 @@ async function prepareManifest(sourcePath, port) {
     catalogPath: defaultCatalog(),
     adapterId: qualityAdapter(bound),
   };
+  bound.evavoProvenance = {
+    schema: 'evavo.local-generation-manifest-provenance.v1',
+    sourceManifestSha256: sourceInput.sha256,
+    sourceManifestByteLength: sourceInput.bytes.length,
+    governedEntry: 'run-local-art-batch-entry-v2',
+  };
 
   const catalog = await json(bound.provider.catalogPath, 'physical ComfyUI catalog');
   const baseProfile = providerProfile(catalog, bound.provider.adapterId);
@@ -108,8 +130,9 @@ async function prepareManifest(sourcePath, port) {
   const referencePlan = prepareReferenceExecutionPlan(plan);
   const referencePreflight = validateReferencePlan(referencePlan, catalog, bound.provider.adapterId);
 
-  const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`, 'utf8');
+  const sourceBytes = sourceInput.bytes;
   const boundBytes = Buffer.from(`${JSON.stringify(bound, null, 2)}\n`, 'utf8');
+  const executionManifestSha256 = createHash('sha256').update(boundBytes).digest('hex');
   const fingerprint = createHash('sha256').update(sourceBytes).update(boundBytes).digest('hex');
   const requestRoot = path.join(localAppData(), 'EVAVO', 'ArtStudio', 'agent-requests', 'managed-batch-v2', fingerprint);
   await mkdir(requestRoot, { recursive: true });
@@ -136,6 +159,8 @@ async function prepareManifest(sourcePath, port) {
     referenceDependencies: referencePreflight.hasDependencies,
     referenceAdapterIds: referencePreflight.adapterIds,
     referenceExecutionBridge: 'v2-staged-to-v1-runtime',
+    sourceManifestSha256: sourceInput.sha256,
+    executionManifestSha256,
   }, null, 2)}\n`, 'utf8');
   return Object.freeze({
     original, execution, auditPath, providerPath, fingerprint,
@@ -144,6 +169,8 @@ async function prepareManifest(sourcePath, port) {
     referenceInputCount: referencePreflight.referenceInputCount,
     referenceStages: referencePreflight.stages,
     referenceAdapterIds: referencePreflight.adapterIds,
+    sourceManifestSha256: sourceInput.sha256,
+    executionManifestSha256,
   });
 }
 async function runManaged(args, manifest, port) {
@@ -179,6 +206,7 @@ export async function runLocalArtBatchEntry(argv = process.argv.slice(2)) {
   process.stderr.write(`${JSON.stringify({
     kind: 'evavo.local-art-batch-entry.v2', status: 'prepared',
     sourceManifest: manifest.original, executionManifest: manifest.execution,
+    sourceManifestSha256: manifest.sourceManifestSha256, executionManifestSha256: manifest.executionManifestSha256,
     promptAudit: manifest.auditPath, providerSelection: manifest.providerPath,
     auditScore: manifest.auditScore, auditWarnings: manifest.auditWarnings,
     adapterId: manifest.adapterId, profileId: manifest.profileId,
