@@ -1,7 +1,7 @@
 import type { WorkHeaderPageRenderReviewResult } from "./work-header-page-render-review.js";
 import type { WorkHeaderSelectionResolverResult } from "./work-header-selection-resolver.js";
 
-export const WORK_HEADER_APPROVAL_PACKET_CONTRACT = "evavo.work-header-approval-packet.v1" as const;
+export const WORK_HEADER_APPROVAL_PACKET_CONTRACT = "evavo.work-header-approval-packet.v2" as const;
 
 export interface WorkHeaderApprovalPacketSpec {
   readonly selection: WorkHeaderSelectionResolverResult;
@@ -23,6 +23,7 @@ export interface WorkHeaderApprovalPacketResult {
     pageRenderShortlisted: boolean;
     comparableViewportGeometryVerified: boolean;
     candidateRenderDifferenceVerified: boolean;
+    materialPageQualityAdvantageVerified: boolean;
     candidateIdentityMatchesPageRender: boolean;
     candidateHashMatchesPageRender: boolean;
   }>;
@@ -46,6 +47,7 @@ export function prepareWorkHeaderApprovalPacket(spec: WorkHeaderApprovalPacketSp
   if (!pageRenderShortlisted) blockers.push(`page-render-not-shortlisted:${spec.pageRender.verdict}`);
   if (!spec.pageRender.comparableViewportGeometryVerified) blockers.push("page-render-current-candidate-viewports-not-comparable");
   if (!spec.pageRender.candidateRenderDifferenceVerified) blockers.push("page-render-does-not-prove-candidate-was-visible-in-both-viewports");
+  if (!spec.pageRender.materialPageQualityAdvantageVerified) blockers.push("page-render-does-not-prove-material-quality-advantage-over-current");
 
   const candidateIdentityMatchesPageRender = Boolean(spec.selection.recommendedCandidateId) &&
     spec.pageRender.candidateId === spec.selection.recommendedCandidateId;
@@ -70,6 +72,7 @@ export function prepareWorkHeaderApprovalPacket(spec: WorkHeaderApprovalPacketSp
       pageRenderShortlisted,
       comparableViewportGeometryVerified: spec.pageRender.comparableViewportGeometryVerified,
       candidateRenderDifferenceVerified: spec.pageRender.candidateRenderDifferenceVerified,
+      materialPageQualityAdvantageVerified: spec.pageRender.materialPageQualityAdvantageVerified,
       candidateIdentityMatchesPageRender,
       candidateHashMatchesPageRender,
     }),
