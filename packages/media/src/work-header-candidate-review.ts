@@ -9,17 +9,26 @@ export interface WorkHeaderCandidateInput {
   readonly provenance?: string;
 }
 
+export interface WorkHeaderReviewBrief {
+  readonly pageTitle: string;
+  readonly projectSummary: string;
+  readonly visualIntent?: string;
+}
+
 export interface WorkHeaderCandidateReviewSpec {
   readonly candidates: readonly WorkHeaderCandidateInput[];
   readonly currentHeader?: Buffer;
   readonly supportImage?: Buffer;
   readonly tileImage?: Buffer;
+  readonly reviewBrief?: WorkHeaderReviewBrief;
   readonly maximumCandidates?: number;
 }
 
 export interface WorkHeaderCandidateReviewResult {
   readonly proofPng: Buffer;
   readonly evidence: Readonly<{
+    reviewBrief: Readonly<{ pageTitle: string; projectSummary: string; visualIntent: string | null }> | null;
+    semanticBriefRequiredForReplacement: true;
     currentHeader: Readonly<{
       imageSha256: string;
       technicalScore: number;
@@ -65,6 +74,34 @@ function safeLabel(value: string): string {
   return value.replace(/[&<>"']/gu, (token) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[token]!));
 }
 
+function cleanBrief(brief: WorkHeaderReviewBrief | undefined) {
+  if (!brief) return null;
+  const pageTitle = String(brief.pageTitle ?? "").trim();
+  const projectSummary = String(brief.projectSummary ?? "").trim();
+  const visualIntent = brief.visualIntent === undefined ? null : String(brief.visualIntent).trim();
+  if (!pageTitle || pageTitle.length > 200) throw new Error("reviewBrief.pageTitle must contain 1-200 characters.");
+  if (!projectSummary || projectSummary.length > 1200) throw new Error("reviewBrief.projectSummary must contain 1-1200 characters.");
+  if (visualIntent !== null && (!visualIntent || visualIntent.length > 800)) throw new Error("reviewBrief.visualIntent must contain 1-800 characters when supplied.");
+  return Object.freeze({ pageTitle, projectSummary, visualIntent });
+}
+
+async function briefPanel(brief: NonNullable<ReturnType<typeof cleanBrief>>): Promise<Buffer> {
+  const width = 1418;
+  const height = 128;
+  const summary = brief.projectSummary.length > 150 ? `${brief.projectSummary.slice(0, 147)}…` : brief.projectSummary;
+  const intent = brief.visualIntent ? (brief.visualIntent.length > 140 ? `${brief.visualIntent.slice(0, 137)}…` : brief.visualIntent) : "No extra visual intent supplied.";
+  const svg = Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#050505"/><text x="20" y="30" font-family="Arial,sans-serif" font-size="22" fill="#ffffff">REVIEW BRIEF • ${safeLabel(brief.pageTitle)}</text><text x="20" y="62" font-family="Arial,sans-serif" font-size="16" fill="#dddddd">${safeLabel(summary)}</text><text x="20" y="92" font-family="Arial,sans-serif" font-size="15" fill="#aaaaaa">Visual intent: ${safeLabel(intent)}</text><text x="20" y="116" font-family="Arial,sans-serif" font-size="14" fill="#ff7b95">Judge semantic relevance against this brief; sharp but irrelevant imagery is a failure.</text></svg>`);
+  return sharp(svg).png().toBuffer();
+}
+
+async function referencePanel(image: Buffer, label: string): Promise<Buffer> {
+  const width = 700;
+  const height = 440;
+  const preview = await sharp(image, { failOn: "error" }).resize({ width, height: 380, fit: "contain", background: "#111111" }).flatten({ background: "#111111" }).png().toBuffer();
+  const caption = Buffer.from(`<svg width="${width}" height="60" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#050505"/><text x="18" y="27" font-family="Arial,sans-serif" font-size="20" fill="#ffffff">${safeLabel(label)}</text><text x="18" y="49" font-family="Arial,sans-serif" font-size="13" fill="#aaaaaa">Context reference • SHA ${sha256(image).slice(0, 12)}</text></svg>`);
+  return sharp({ create: { width, height, channels: 4, background: "#111111" } }).composite([{ input: preview, left: 0, top: 0 }, { input: caption, left: 0, top: 380 }]).png().toBuffer();
+}
+
 async function candidatePanel(id: string, proof: Buffer, score: number, grade: string, issues: readonly string[], current = false): Promise<Buffer> {
   const width = 700;
   const proofMeta = await sharp(proof).metadata();
@@ -100,6 +137,7 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
   const ids = spec.candidates.map((candidate) => candidate.id.trim());
   if (ids.some((id) => !id)) throw new Error("Every Work-header candidate requires a non-empty id.");
   if (new Set(ids).size !== ids.length) throw new Error("Work-header candidate ids must be unique.");
+  const reviewBrief = cleanBrief(spec.reviewBrief);
 
   const currentHeaderReview = spec.currentHeader ? await reviewWorkHeaderImage(spec.currentHeader) : null;
   const reviewed = await Promise.all(spec.candidates.map(async (candidate) => {
@@ -132,45 +170,43 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
     };
   }));
 
-  const technicalShortlist = reviewed
-    .filter((item) => item.evidence.technicallyEligibleForVisualReview)
-    .sort((a, b) => b.evidence.technicalScore - a.evidence.technicalScore)
-    .map((item) => item.evidence.id);
+  const technicalShortlist = reviewed.filter((item) => item.evidence.technicallyEligibleForVisualReview).sort((a, b) => b.evidence.technicalScore - a.evidence.technicalScore).map((item) => item.evidence.id);
 
   const panels: Buffer[] = [];
-  if (currentHeaderReview && spec.currentHeader) {
-    panels.push(await candidatePanel("current-header", currentHeaderReview.proofPng, currentHeaderReview.evidence.score, currentHeaderReview.evidence.grade, currentHeaderReview.evidence.issues, true));
-  }
+  if (reviewBrief) panels.push(await briefPanel(reviewBrief));
+  if (spec.supportImage) panels.push(await referencePanel(spec.supportImage, "CURRENT SUPPORT IMAGE"));
+  if (spec.tileImage) panels.push(await referencePanel(spec.tileImage, "CURRENT WORK TILE"));
+  if (currentHeaderReview && spec.currentHeader) panels.push(await candidatePanel("current-header", currentHeaderReview.proofPng, currentHeaderReview.evidence.score, currentHeaderReview.evidence.grade, currentHeaderReview.evidence.issues, true));
   panels.push(...await Promise.all(reviewed.map((item) => candidatePanel(item.evidence.id, item.header.proofPng, item.evidence.technicalScore, item.evidence.technicalGrade, item.evidence.technicalIssues))));
 
   const panelMeta = await Promise.all(panels.map((panel) => sharp(panel).metadata()));
   const gap = 18;
-  const width = 700 * 2 + gap;
-  const rows = Math.ceil(panels.length / 2);
-  const rowHeights: number[] = [];
-  for (let row = 0; row < rows; row += 1) {
-    const left = panelMeta[row * 2]?.height ?? 0;
-    const right = panelMeta[row * 2 + 1]?.height ?? 0;
-    rowHeights.push(Math.max(left, right));
-  }
-  const height = rowHeights.reduce((sum, value) => sum + value, 0) + gap * Math.max(0, rows - 1);
+  const width = 1418;
   const composites: OverlayOptions[] = [];
   let top = 0;
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < 2; column += 1) {
-      const index = row * 2 + column;
-      if (panels[index]) composites.push({ input: panels[index], left: column * (700 + gap), top });
+  for (let index = 0; index < panels.length;) {
+    const panelWidth = panelMeta[index]?.width ?? 700;
+    if (panelWidth > 700) {
+      composites.push({ input: panels[index], left: 0, top });
+      top += (panelMeta[index]?.height ?? 0) + gap;
+      index += 1;
+      continue;
     }
-    top += rowHeights[row]! + gap;
+    const leftHeight = panelMeta[index]?.height ?? 0;
+    const rightHeight = panelMeta[index + 1]?.width && (panelMeta[index + 1]?.width ?? 0) <= 700 ? (panelMeta[index + 1]?.height ?? 0) : 0;
+    composites.push({ input: panels[index], left: 0, top });
+    if (rightHeight > 0) composites.push({ input: panels[index + 1], left: 718, top });
+    top += Math.max(leftHeight, rightHeight) + gap;
+    index += rightHeight > 0 ? 2 : 1;
   }
-  const proofPng = await sharp({ create: { width, height, channels: 4, background: "#171717" } })
-    .composite(composites)
-    .png({ compressionLevel: 9 })
-    .toBuffer();
+  const proofHeight = Math.max(1, top - gap);
+  const proofPng = await sharp({ create: { width, height: proofHeight, channels: 4, background: "#171717" } }).composite(composites).png({ compressionLevel: 9 }).toBuffer();
 
   return {
     proofPng,
     evidence: Object.freeze({
+      reviewBrief,
+      semanticBriefRequiredForReplacement: true,
       currentHeader: currentHeaderReview && spec.currentHeader ? baselineEvidence(currentHeaderReview, spec.currentHeader) : null,
       supportImageSha256: spec.supportImage ? sha256(spec.supportImage) : null,
       tileImageSha256: spec.tileImage ? sha256(spec.tileImage) : null,
@@ -183,7 +219,7 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
       critiqueHashBindingRequired: true,
       surroundingMediaHashBindingRequired: true,
       visualCritiqueDimensions: Object.freeze([
-        "semantic relevance to the actual case study/project",
+        "semantic relevance to the actual case study/project and supplied review brief",
         "focal-point strength and immediate readability",
         "desktop/laptop/mobile crop stability",
         "visual hierarchy with the page title and copy",
