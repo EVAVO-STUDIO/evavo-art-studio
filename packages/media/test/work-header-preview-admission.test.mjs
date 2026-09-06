@@ -15,14 +15,15 @@ function fixture() {
   };
   const candidateSrc = "https://res.cloudinary.com/dntogqtey/image/upload/v1/example.png";
   const candidateSha = sha(buffers.candidateContent);
-  const response = (protocol) => ({
-    url: candidateSrc, status: 200, mimeType: "image/png", sha256: candidateSha, byteLength: buffers.candidateContent.length,
+  const response = (profile, protocol) => ({
+    requestId: `${profile}-candidate-request`, url: candidateSrc, method: "GET", requestStartedAfterTrigger: true, exactTriggeredRequestBound: true,
+    initiatorType: "script", documentUrl: "https://evavo.com.au/work/opportunity-agent", status: 200, mimeType: "image/png", sha256: candidateSha, byteLength: buffers.candidateContent.length,
     protocol, fromDiskCache: false, fromServiceWorker: false, encodedDataLength: buffers.candidateContent.length + 128, bodyBase64EncodedByCdp: true,
   });
   const capture = (profile, currentPath, candidatePath, currentBuffer, candidateBuffer) => ({
     profile, candidateRenderChanged: true, titleTextStable: true, subtitleTextStable: true,
     candidateResolvedSrc: candidateSrc, candidateResolvedSrcMatchesRequested: true,
-    candidateHeader: { naturalWidth: 1600, naturalHeight: 900 }, browserCandidateResponse: response(profile === "desktop" ? "h2" : "h3"),
+    candidateHeader: { naturalWidth: 1600, naturalHeight: 900 }, browserCandidateResponse: response(profile, profile === "desktop" ? "h2" : "h3"),
     currentScreenshot: { path: currentPath, sha256: sha(currentBuffer), bytes: currentBuffer.length },
     candidateScreenshot: { path: candidatePath, sha256: sha(candidateBuffer), bytes: candidateBuffer.length },
   });
@@ -32,7 +33,7 @@ function fixture() {
   ];
   const artifactPath = "C:/evidence/candidate-source.bin";
   const manifest = {
-    contract: "evavo.work-header-candidate-preview-capture.v7",
+    contract: "evavo.work-header-candidate-preview-capture.v8",
     route: "/work/opportunity-agent", candidateId: "candidate-a", candidateSrc,
     candidateSource: {
       requestedUrl: candidateSrc, requestedUrlSha256: textSha(candidateSrc), resolvedUrlDesktop: candidateSrc, resolvedUrlMobile: candidateSrc,
@@ -43,12 +44,13 @@ function fixture() {
     browserCandidateResponseIdentity: {
       desktopSha256: candidateSha, desktopByteLength: buffers.candidateContent.length,
       mobileSha256: candidateSha, mobileByteLength: buffers.candidateContent.length,
-      matchesImmutableCandidateArtifact: true, stableAcrossProfiles: true,
+      matchesImmutableCandidateArtifact: true, stableAcrossProfiles: true, exactTriggeredRequestsBoundAcrossProfiles: true,
     },
     captures,
     pageRenderReviewInput: {
       pageSlug: "/work/opportunity-agent", candidateId: "candidate-a", candidateContentSha256: candidateSha, candidateContentByteLength: buffers.candidateContent.length,
       candidateContentArtifactPath: artifactPath, browserCandidateResponseSha256: candidateSha, browserCandidateResponseByteLength: buffers.candidateContent.length,
+      browserCandidateRequestBindingRequired: true,
       currentDesktopPath: captures[0].currentScreenshot.path, candidateDesktopPath: captures[0].candidateScreenshot.path,
       currentMobilePath: captures[1].currentScreenshot.path, candidateMobilePath: captures[1].candidateScreenshot.path,
     },
@@ -57,7 +59,7 @@ function fixture() {
       candidateResolvedSrcMatchesRequested: true, candidateResolvedSrcStableAcrossProfiles: true, candidateNaturalDimensionsStableAcrossProfiles: true,
       candidateContentSha256AndLengthBound: true, candidateContentStableAcrossCapture: true, immutableCandidateContentArtifactPublished: true,
       browserResponseBodyCapturedOnEveryProfile: true, browserResponseBodyMatchesImmutableCandidateArtifact: true, browserResponseBodyStableAcrossProfiles: true,
-      atomicEvidenceBundlePublished: true,
+      browserResponseBoundToExactTriggeredRequestOnEveryProfile: true, atomicEvidenceBundlePublished: true,
     },
     evidenceBundle: { createOnly: true, rollbackSafe: true, candidateContentArtifactIncluded: true, allScreenshotsCandidateContentAndManifestPublishedTogether: true },
     serverMutationPerformed: false, deploymentMutationPerformed: false, cloudinaryMutationPerformed: false, browserDomPreviewMutationOnly: true,
@@ -65,18 +67,43 @@ function fixture() {
   return { manifest, buffers };
 }
 
-test("admits preview only when browser-loaded bytes equal immutable candidate bytes", () => {
+test("admits preview only when browser-loaded bytes come from exact triggered GET requests", () => {
   const { manifest, buffers } = fixture();
   const result = admitWorkHeaderCandidatePreviewManifest(manifest, buffers);
   assert.equal(result.browserResponseBodyIdentityVerified, true);
   assert.equal(result.browserResponseMetadataBound, true);
+  assert.equal(result.exactTriggeredBrowserRequestBindingVerified, true);
+  assert.equal(result.browserResponseBindings.desktop.requestId, "desktop-candidate-request");
+  assert.equal(result.browserResponseBindings.mobile.requestId, "mobile-candidate-request");
+  assert.equal(result.browserResponseBindings.desktop.method, "GET");
   assert.equal(result.browserResponseBindings.desktop.protocol, "h2");
   assert.equal(result.browserResponseBindings.mobile.protocol, "h3");
-  assert.equal(result.browserResponseBindings.desktop.sha256, manifest.candidateSource.contentSha256);
-  assert.equal(result.browserResponseBindings.mobile.byteLength, buffers.candidateContent.length);
   assert.equal(result.immutableCandidateContentArtifactVerified, true);
-  assert.equal(result.candidateContentSha256, manifest.candidateSource.contentSha256);
   assert.equal(result.publicationAllowed, false);
+});
+
+test("rejects a matching response that was not started after candidate substitution", () => {
+  const { manifest, buffers } = fixture();
+  manifest.captures[0].browserCandidateResponse.requestStartedAfterTrigger = false;
+  assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /exact GET request started by candidate substitution/u);
+});
+
+test("rejects non-GET candidate request evidence", () => {
+  const { manifest, buffers } = fixture();
+  manifest.captures[1].browserCandidateResponse.method = "POST";
+  assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /exact GET request started by candidate substitution/u);
+});
+
+test("rejects missing exact-trigger identity summary", () => {
+  const { manifest, buffers } = fixture();
+  manifest.browserCandidateResponseIdentity.exactTriggeredRequestsBoundAcrossProfiles = false;
+  assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /browser response-body\/request identity/u);
+});
+
+test("rejects page-render handoff that drops exact request binding", () => {
+  const { manifest, buffers } = fixture();
+  manifest.pageRenderReviewInput.browserCandidateRequestBindingRequired = false;
+  assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /browser-response\/request binding/u);
 });
 
 test("rejects browser-loaded byte mismatch", () => {
@@ -88,7 +115,7 @@ test("rejects browser-loaded byte mismatch", () => {
 test("rejects browser response summary drift", () => {
   const { manifest, buffers } = fixture();
   manifest.browserCandidateResponseIdentity.mobileByteLength += 1;
-  assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /browser response-body identity/u);
+  assert.throws(() => admitWorkHeaderCandidatePreviewManifest(manifest, buffers), /browser response-body\/request identity/u);
 });
 
 test("rejects invalid Chrome response metadata", () => {
@@ -104,7 +131,7 @@ test("normalizes cache and service-worker delivery metadata without changing byt
   const result = admitWorkHeaderCandidatePreviewManifest(manifest, buffers);
   assert.equal(result.browserResponseBindings.desktop.fromDiskCache, true);
   assert.equal(result.browserResponseBindings.mobile.fromServiceWorker, true);
-  assert.equal(result.browserResponseBodyIdentityVerified, true);
+  assert.equal(result.exactTriggeredBrowserRequestBindingVerified, true);
 });
 
 test("rejects immutable candidate artifact drift", () => {
