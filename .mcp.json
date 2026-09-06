@@ -42,6 +42,14 @@
         "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
       }
     },
+    "evavo-work-header-candidate-review-v1": {
+      "command": "node",
+      "args": ["tools/work_header_candidate_review_mcp.mjs"],
+      "env": {
+        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+        "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
+      }
+    },
     "evavo-existing-image-polish-v1": {
       "command": "node",
       "args": ["tools/existing_image_polish_mcp.mjs"],
