@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evavo.work-header-current-target-attestation.v1",
+  "title": "EVAVO Work Header Current Target Attestation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "schemaSha256",
+    "attestationState",
+    "targetKind",
+    "targetIdentifier",
+    "route",
+    "observedSource",
+    "currentTargetSnapshot",
+    "currentTargetIdentityVerified",
+    "sourceReadOnly",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed"
+  ],
+  "properties": {
+    "contract": { "const": "evavo.work-header-current-target-attestation.v1" },
+    "schemaSha256": { "$ref": "#/$defs/sha256" },
+    "attestationState": { "const": "captured-read-only" },
+    "targetKind": { "enum": ["website-header-source-update", "cloudinary-stable-id-replacement"] },
+    "targetIdentifier": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "route": { "type": "string", "pattern": "^/work/[a-z0-9-]+$" },
+    "observedSource": { "$ref": "#/$defs/observedSource" },
+    "currentTargetSnapshot": { "$ref": "#/$defs/fileBinding" },
+    "currentTargetIdentityVerified": { "const": true },
+    "sourceReadOnly": { "const": true },
+    "publicationAllowed": { "const": false },
+    "cloudOverwriteAllowed": { "const": false },
+    "websiteMutationAllowed": { "const": false }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "byteLength", "immutableEvidence"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 1 },
+        "immutableEvidence": { "const": true }
+      }
+    },
+    "observedSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "sha256", "byteLength"],
+      "properties": {
+        "kind": { "enum": ["local-file", "https-url"] },
+        "locator": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 1 },
+        "contentType": { "type": ["string", "null"], "maxLength": 256 }
+      }
+    }
+  }
+}
