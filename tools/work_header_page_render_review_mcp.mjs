@@ -12,7 +12,7 @@ import {
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-page-render-review";
-const SERVER_VERSION = "1.2.0";
+const SERVER_VERSION = "1.3.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -59,18 +59,14 @@ async function verifySelectionReceipt(path) {
   const value = JSON.parse(receipt.bytes.toString("utf8"));
   if (value.contract !== "evavo.work-header-selection-resolver.v1") throw new Error("selectionReceiptPath must point to an evavo.work-header-selection-resolver.v1 receipt.");
   if (value.publicationAllowed !== false || value.cloudOverwriteAllowed !== false || value.websiteMutationAllowed !== false) throw new Error("Selection receipt carries forbidden mutation/publication authority.");
-  if (value.recommendation !== "candidate-recommended" || !value.recommendedCandidateId || !value.recommendedCandidateSha256) {
-    throw new Error(`Selection receipt does not recommend a candidate: ${String(value.recommendation)}.`);
-  }
+  if (value.recommendation !== "candidate-recommended" || !value.recommendedCandidateId || !value.recommendedCandidateSha256) throw new Error(`Selection receipt does not recommend a candidate: ${String(value.recommendation)}.`);
   if (value.sourceBindingsVerifiedAtResolution !== true) throw new Error("Selection receipt does not prove source bindings were reverified at resolution.");
   if (typeof value.candidateReviewReceiptPath !== "string") throw new Error("Selection receipt is missing candidate-review lineage.");
 
   const board = await verifyCandidateReviewReceipt(value.candidateReviewReceiptPath);
   if (value.candidateReviewReceiptSha256 !== board.sha256) throw new Error("Selection receipt is bound to a different candidate-review receipt version.");
   if (value.candidateReviewProofSha256 !== board.proofSha256) throw new Error("Selection receipt is bound to a different candidate-review proof.");
-  if (value.candidateReviewEvidenceSha256 !== board.evidenceSha256 || value.candidateReviewEvidenceSha256 !== value.candidateReviewEvidenceSha256) {
-    throw new Error("Selection receipt is bound to changed candidate-review evidence.");
-  }
+  if (value.candidateReviewEvidenceSha256 !== board.evidenceSha256) throw new Error("Selection receipt is bound to changed candidate-review evidence.");
   const selected = board.value.evidence.candidates?.find((candidate) => candidate.id === value.recommendedCandidateId);
   if (!selected || selected.imageSha256 !== value.recommendedCandidateSha256) throw new Error("Selection candidate identity/hash no longer matches candidate-review evidence.");
   return { path: receipt.path, sha256: receipt.sha256, value, board };
@@ -79,6 +75,9 @@ async function verifySelectionReceipt(path) {
 async function runPageReview(args) {
   for (const name of ["selectionReceiptPath", "candidateImagePath", "currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath", "receiptPath", "proofPath"]) {
     if (typeof args[name] !== "string") throw new Error(`${name} is required.`);
+  }
+  for (const name of ["titleLegibility", "focalPointQuality", "hierarchyQuality", "responsiveConsistency", "overallPageQuality", "currentPageQuality"]) {
+    if (!Number.isFinite(args[name])) throw new Error(`${name} is required and must be numeric.`);
   }
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
@@ -103,6 +102,8 @@ async function runPageReview(args) {
     hierarchyQuality: args.hierarchyQuality,
     responsiveConsistency: args.responsiveConsistency,
     overallPageQuality: args.overallPageQuality,
+    currentPageQuality: args.currentPageQuality,
+    minimumPageQualityAdvantage: args.minimumPageQualityAdvantage,
     titleObscured: args.titleObscured === true,
     textContrastFailure: args.textContrastFailure === true,
     importantSubjectCropped: args.importantSubjectCropped === true,
@@ -110,6 +111,7 @@ async function runPageReview(args) {
     candidateLooksWorseThanCurrent: args.candidateLooksWorseThanCurrent === true,
     notes: args.notes ?? [],
   });
+
   const proofPath = await allowed(args.proofPath, true);
   const receiptPath = await allowed(args.receiptPath, true);
   const sourceBindings = {
@@ -121,7 +123,7 @@ async function runPageReview(args) {
   };
   await writeFile(proofPath, result.proofPng, { flag: "wx" });
   await writeFile(receiptPath, `${JSON.stringify({
-    contract: "evavo.work-header-page-render-review.v1",
+    contract: "evavo.work-header-page-render-review.v2",
     selectionReceiptPath: selection.path,
     selectionReceiptSha256: selection.sha256,
     candidateReviewReceiptPath: selection.board.path,
@@ -142,7 +144,7 @@ async function runPageReview(args) {
 async function verifyPageReceipt(path) {
   const receipt = await bound(path);
   const value = JSON.parse(receipt.bytes.toString("utf8"));
-  if (value.contract !== "evavo.work-header-page-render-review.v1" || !value.evidence) throw new Error("Page render receipt contract is invalid.");
+  if (value.contract !== "evavo.work-header-page-render-review.v2" || !value.evidence) throw new Error("Page-render receipt contract is invalid.");
   const proof = await bound(value.proofPath);
   if (proof.sha256 !== value.proofSha256) throw new Error("Page-render proof bytes changed after review.");
   const bindings = value.sourceBindings ?? {};
@@ -151,17 +153,11 @@ async function verifyPageReceipt(path) {
     if (current.sha256 !== binding.sha256) throw new Error(`${label} bytes changed after page-render review.`);
   }
   if (!bindings.candidateImage || bindings.candidateImage.sha256 !== value.evidence.candidateSha256) throw new Error("Page-render candidate-image binding does not match reviewed candidate SHA-256.");
-  if (bindings.currentDesktop?.sha256 !== value.evidence.currentDesktopSha256 || bindings.candidateDesktop?.sha256 !== value.evidence.candidateDesktopSha256 || bindings.currentMobile?.sha256 !== value.evidence.currentMobileSha256 || bindings.candidateMobile?.sha256 !== value.evidence.candidateMobileSha256) {
-    throw new Error("Page-render screenshot source bindings do not match review evidence.");
-  }
+  if (bindings.currentDesktop?.sha256 !== value.evidence.currentDesktopSha256 || bindings.candidateDesktop?.sha256 !== value.evidence.candidateDesktopSha256 || bindings.currentMobile?.sha256 !== value.evidence.currentMobileSha256 || bindings.candidateMobile?.sha256 !== value.evidence.candidateMobileSha256) throw new Error("Page-render screenshot source bindings do not match review evidence.");
   const selection = await verifySelectionReceipt(value.selectionReceiptPath);
   if (selection.sha256 !== value.selectionReceiptSha256) throw new Error("Page-render review is bound to a different selection receipt version.");
-  if (selection.value.recommendedCandidateId !== value.evidence.candidateId || selection.value.recommendedCandidateSha256 !== value.evidence.candidateSha256) {
-    throw new Error("Page-render candidate no longer matches verified selection evidence.");
-  }
-  if (value.candidateReviewReceiptSha256 !== selection.board.sha256 || value.candidateReviewEvidenceSha256 !== selection.board.evidenceSha256) {
-    throw new Error("Page-render review is bound to stale candidate-review lineage.");
-  }
+  if (selection.value.recommendedCandidateId !== value.evidence.candidateId || selection.value.recommendedCandidateSha256 !== value.evidence.candidateSha256) throw new Error("Page-render candidate no longer matches verified selection evidence.");
+  if (value.candidateReviewReceiptSha256 !== selection.board.sha256 || value.candidateReviewEvidenceSha256 !== selection.board.evidenceSha256) throw new Error("Page-render review is bound to stale candidate-review lineage.");
   return { path: receipt.path, sha256: receipt.sha256, value, selection };
 }
 
@@ -196,38 +192,41 @@ async function runApprovalPacket(args) {
 const tools = [
   {
     name: "evavo_work_header_page_render_review_capabilities",
-    description: "Describe exact-selection candidate page-render review with end-to-end review lineage verification and review-only approval-packet preparation.",
+    description: "Describe exact-selection candidate page-render review with material current-page quality advantage, end-to-end lineage verification and review-only approval packets.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_review_work_header_candidate_page_render",
-    description: "Review actual current and proposed desktop/mobile renders only for the exact candidate from a verified selection receipt. Rejects viewport mismatches and unchanged candidate renders.",
+    description: "Review actual current and proposed desktop/mobile renders for the exact selected candidate. A candidate must prove a configurable material page-quality advantage over the current page, not merely look acceptable in isolation.",
     inputSchema: {
       type: "object",
       properties: {
         selectionReceiptPath: { type: "string" }, candidateImagePath: { type: "string" }, pageSlug: { type: "string" }, pageTitle: { type: "string" },
         currentDesktopPath: { type: "string" }, candidateDesktopPath: { type: "string" }, currentMobilePath: { type: "string" }, candidateMobilePath: { type: "string" },
-        titleLegibility: { type: "number", minimum: 0, maximum: 5 }, focalPointQuality: { type: "number", minimum: 0, maximum: 5 }, hierarchyQuality: { type: "number", minimum: 0, maximum: 5 }, responsiveConsistency: { type: "number", minimum: 0, maximum: 5 }, overallPageQuality: { type: "number", minimum: 0, maximum: 5 },
+        titleLegibility: { type: "number", minimum: 0, maximum: 5 }, focalPointQuality: { type: "number", minimum: 0, maximum: 5 }, hierarchyQuality: { type: "number", minimum: 0, maximum: 5 }, responsiveConsistency: { type: "number", minimum: 0, maximum: 5 }, overallPageQuality: { type: "number", minimum: 0, maximum: 5 }, currentPageQuality: { type: "number", minimum: 0, maximum: 5 }, minimumPageQualityAdvantage: { type: "number", minimum: 0, maximum: 2 },
         titleObscured: { type: "boolean" }, textContrastFailure: { type: "boolean" }, importantSubjectCropped: { type: "boolean" }, layoutOverflowOrBreakage: { type: "boolean" }, candidateLooksWorseThanCurrent: { type: "boolean" }, notes: { type: "array", items: { type: "string" } },
         proofPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" },
       },
-      required: ["selectionReceiptPath", "candidateImagePath", "pageSlug", "pageTitle", "currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath", "titleLegibility", "focalPointQuality", "hierarchyQuality", "responsiveConsistency", "overallPageQuality", "proofPath", "receiptPath", "confirmLocalWrite"],
+      required: ["selectionReceiptPath", "candidateImagePath", "pageSlug", "pageTitle", "currentDesktopPath", "candidateDesktopPath", "currentMobilePath", "candidateMobilePath", "titleLegibility", "focalPointQuality", "hierarchyQuality", "responsiveConsistency", "overallPageQuality", "currentPageQuality", "proofPath", "receiptPath", "confirmLocalWrite"],
       additionalProperties: false,
     },
   },
   {
     name: "evavo_prepare_work_header_approval_packet",
-    description: "Reverify candidate-review sources, proof/evidence, selection lineage, exact candidate bytes and page-render screenshots before preparing a review-only packet for explicit approval.",
+    description: "Reverify candidate-review sources, selection lineage, exact candidate bytes, responsive screenshots and material page-quality advantage before preparing a review-only packet for explicit approval.",
     inputSchema: { type: "object", properties: { selectionReceiptPath: { type: "string" }, pageRenderReceiptPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["selectionReceiptPath", "pageRenderReceiptPath", "receiptPath", "confirmLocalWrite"], additionalProperties: false },
   },
 ];
 
 function capabilities() {
   return {
-    contract: "evavo.work-header-page-render-review.v1",
+    contract: "evavo.work-header-page-render-review.v2",
     selectionReceiptRequiredForPageRenderReview: true,
     candidateReviewLineageReverified: true,
     selectionLineageReverified: true,
+    currentPageQualityBaselineRequired: true,
+    materialPageQualityAdvantageRequired: true,
+    defaultMinimumPageQualityAdvantage: 0.25,
     exactCandidateImageSha256Binding: true,
     candidateImageReverifiedBeforeApprovalPacket: true,
     currentVsCandidateDesktopReview: true,
