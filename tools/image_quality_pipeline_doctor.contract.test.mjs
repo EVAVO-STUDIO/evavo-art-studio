@@ -7,8 +7,8 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 test("image quality doctor covers fail-closed review through explicit execution authorization", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_22"',
-    'SERVER_VERSION = "1.22.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_23"',
+    'SERVER_VERSION = "1.23.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -18,7 +18,7 @@ test("image quality doctor covers fail-closed review through explicit execution 
     'id: "work-preview-core-v8"',
     'id: "work-preview-mcp-v180"',
     'id: "work-page-review-input-safety"',
-    'id: "work-page-review-v200"',
+    'id: "work-page-review-v210"',
     'id: "work-explicit-approval-decision"',
     'id: "work-publication-preparation"',
     'id: "work-publication-transaction-plan"',
@@ -47,6 +47,18 @@ test("doctor requires exact triggered Chrome candidate GET request lineage", asy
   ]) assert.ok(source.includes(token), `missing exact-trigger browser lineage token: ${token}`);
 });
 
+test("doctor requires exact trigger-bound browser lineage through page review and approval", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    'SERVER_VERSION = "2.1.0"',
+    "exactTriggeredBrowserRequestBindingRequiredFromAdmission: true",
+    "exactTriggeredBrowserRequestBindingPersistedInPageReceipt: true",
+    "exactTriggeredBrowserRequestBindingReverifiedBeforeApprovalPacket: true",
+    "exactTriggeredBrowserRequestCarriedThroughPageReviewChecked: true",
+    "exactTriggeredBrowserRequestCarriedThroughApprovalChecked: true",
+  ]) assert.ok(source.includes(token), `missing page/approval trigger-bound lineage token: ${token}`);
+});
+
 test("doctor requires bounded literal Work page review inputs", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
@@ -58,7 +70,7 @@ test("doctor requires bounded literal Work page review inputs", async () => {
 test("doctor requires read-only approval packet verification and recomputation", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "2.0.0"', "selectionReceiptShaAndLengthBound: true", "candidateReviewReceiptShaAndLengthBound: true",
+    'SERVER_VERSION = "2.1.0"', "selectionReceiptShaAndLengthBound: true", "candidateReviewReceiptShaAndLengthBound: true",
     "previewAdmissionReceiptShaAndLengthBound: true", "previewManifestShaAndLengthBound: true", "pageSourceBindingsShaAndLengthReverified: true",
     "fullReceiptLineageVerifiedBeforeApprovalPacket: true", "approvalPacketReverificationAvailable: true", "approvalPacketCoreRecomputedDuringVerification: true",
     "staleApprovalPacketLineageRejected: true", "evavo_verify_work_header_approval_packet", "approvalPacketRecomputedAndMatched: true",
