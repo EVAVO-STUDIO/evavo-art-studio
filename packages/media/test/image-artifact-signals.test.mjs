@@ -26,7 +26,7 @@ test("pixel-art profile does not flag nearest-neighbour repetition as an upscale
   assert.ok(!result.warnings.some((warning) => warning.startsWith("nearest-neighbour-upscale-fingerprint")));
 });
 
-test("photo profile flags strong repeated 2x resampling fingerprint", async () => {
+test("photo profile flags strong two-axis 2x resampling fingerprint with phase separation", async () => {
   const image = await rgbaPng(128, 128, (x, y) => {
     const cellX = Math.floor(x / 2);
     const cellY = Math.floor(y / 2);
@@ -34,8 +34,36 @@ test("photo profile flags strong repeated 2x resampling fingerprint", async () =
     return [value, (value * 3) % 256, (value * 7) % 256, 255];
   });
   const result = await detectImageArtifactSignals(image, { profile: "photo" });
+  assert.equal(result.contract, "evavo.image-artifact-signals.v1_1");
   assert.equal(result.nearestNeighbourUpscaleRisk, true);
-  assert.ok(result.nearestNeighbourPairAgreement > 0.82);
+  assert.ok(result.horizontalPairAgreement > 0.84);
+  assert.ok(result.verticalPairAgreement > 0.84);
+  assert.ok(result.horizontalPhaseSeparation > 0.24);
+  assert.ok(result.verticalPhaseSeparation > 0.24);
+});
+
+test("large flat photographic regions do not look like 2x nearest-neighbour scaling without phase separation", async () => {
+  const image = await rgbaPng(128, 128, (x, y) => {
+    const value = x < 64 ? 40 : 190;
+    return [value, value, value, 255];
+  });
+  const result = await detectImageArtifactSignals(image, { profile: "photo" });
+  assert.ok(result.horizontalPairAgreement > 0.9);
+  assert.ok(result.verticalPairAgreement > 0.9);
+  assert.ok(result.horizontalPhaseSeparation < 0.1 || result.verticalPhaseSeparation < 0.1);
+  assert.equal(result.nearestNeighbourUpscaleRisk, false);
+});
+
+test("one-axis repeated striping alone is insufficient for a hard upscale fingerprint", async () => {
+  const image = await rgbaPng(128, 128, (x) => {
+    const cellX = Math.floor(x / 2);
+    const value = (cellX * 31) % 256;
+    return [value, value, value, 255];
+  });
+  const result = await detectImageArtifactSignals(image, { profile: "web-hero" });
+  assert.ok(result.horizontalPhaseSeparation > 0.24);
+  assert.ok(result.verticalPhaseSeparation < 0.1);
+  assert.equal(result.nearestNeighbourUpscaleRisk, false);
 });
 
 test("artifact signals ignore fully transparent hidden RGB for visible pixel counts", async () => {
