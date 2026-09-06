@@ -1,0 +1,59 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "local-smoke-cel-animation-v1",
+  "contentClass": "general",
+  "batch_size": 1,
+  "generation_mode": "independent",
+  "consistency_mode": "strict",
+  "quality_profile": "cinematic_stills",
+  "quality_overrides": {
+    "width": 1024,
+    "height": 1024,
+    "steps": 36,
+    "cfg": 5.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "denoise": 1,
+    "outputFormat": "png"
+  },
+  "character": {
+    "id": "cel-effects-scene",
+    "description": "A hand-drawn science-fiction street action scene used to validate illustrated cel-animation effects",
+    "face": "not applicable; avoid portrait emphasis",
+    "hair": "not applicable",
+    "build": "background human silhouettes only",
+    "costume": "restrained late-1980s to early-1990s Japanese science-fiction police and utility clothing",
+    "palette": ["muted industrial greys", "weathered blue-grey", "warm orange fire accents"],
+    "signatureDetails": ["drawn ink-and-paint effect shapes", "readable hand-animated smoke and fire silhouettes"]
+  },
+  "style": {
+    "name": "hand-drawn-cel-animation-effects",
+    "description": "High-quality hand-drawn cel animation still inspired by serious late-1980s and 1990s Japanese science-fiction animation, with illustrated smoke, fire, sparks and rain that read as authored animation drawings rather than 3D particles or volumetric simulation",
+    "medium": "traditional cel-animation style ink linework and painted animation backgrounds",
+    "period": "late-1980s to 1990s analogue animation production language",
+    "lighting": "overcast rainy night with motivated sodium streetlight and fire illumination",
+    "palette": ["restrained cool city greys", "dirty blue", "warm amber", "controlled orange-red fire"],
+    "materials": ["wet asphalt", "painted concrete", "metal utility fixtures", "drawn smoke shapes", "painted flame shapes"],
+    "lineTreatment": ["confident hand-drawn contour lines", "selective interior linework", "clear animation-shape grouping"],
+    "mustHave": ["illustrated smoke curls", "hand-drawn flame tongues", "graphic muzzle-flash-like burst shapes", "rain streaks drawn as animation lines", "puddled reflections painted into the background", "strong cinematic composition"],
+    "mustAvoid": ["3D render", "CG particle simulation", "photoreal smoke", "volumetric fog renderer", "generic anime character portrait", "glossy game-engine effects", "AI-generated text"]
+  },
+  "continuity_locks": ["preserve a coherent hand-drawn cel-animation visual language across every effect element"],
+  "quality_prompt": ["authored animation key-frame quality", "specific hand-drawn effect design", "clean readable effect silhouettes", "production animation background quality"],
+  "negative": ["3D particles", "photorealistic fire", "volumetric simulation", "plastic surfaces", "generic anime face", "text", "watermark", "duplicate objects", "melted geometry"],
+  "seed_strategy": {"base": 905100, "stride": 1},
+  "output_rules": {"exactCount": true, "requireUniqueHashes": true, "requireNonZeroBytes": true, "requireDimensions": true, "writeImageMetadata": true, "preserveAttempts": false},
+  "retry_rules": {"maxShotAttempts": 3, "retryMissing": true, "retryInvalidFile": true, "retryDimensionMismatch": true, "retryDuplicate": true, "seedBump": 1009},
+  "provider": {"baseUrl": "http://127.0.0.1:8192", "adapterId": "comfyui:sdxl-base-local-cinematic_stills"},
+  "shots": [
+    {
+      "id": "001-cel-effects",
+      "description": "Rainy industrial city street immediately after a small mechanical explosion, with smoke, flame, sparks, rain, wet pavement and drifting steam all visibly illustrated as hand-drawn cel-animation effects",
+      "pose": "no hero pose; environmental action composition",
+      "camera": "eye-level cinematic wide shot, natural perspective, strong foreground-midground-background separation",
+      "expression": "tense environmental aftermath rather than character portrait emotion",
+      "background": "dense but readable industrial Japanese science-fiction street with utility poles, concrete facades, drainage, rain and wet asphalt",
+      "framing": "wide environmental composition with comfortable margins around the main smoke and fire shapes"
+    }
+  ]
+}
