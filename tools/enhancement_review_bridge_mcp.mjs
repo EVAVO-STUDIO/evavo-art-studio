@@ -8,7 +8,7 @@ import { admitEnhancementStudioReviewManifest } from "../packages/media/dist/ind
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-enhancement-review-bridge";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 
@@ -18,8 +18,11 @@ const assertAllowed = (filePath) => assertAllowedLocalPath(filePath, {
   label: "enhancement review bridge",
 });
 
-async function sha256(filePath) {
-  return createHash("sha256").update(await readFile(filePath)).digest("hex");
+async function bind(filePath) {
+  const resolved = await assertAllowed(filePath);
+  const bytes = await readFile(resolved);
+  if (!bytes.length) throw new Error(`Bound file is empty: ${resolved}`);
+  return { path: resolved, sha256: createHash("sha256").update(bytes).digest("hex"), byteLength: bytes.length };
 }
 
 async function admit(args) {
@@ -28,22 +31,21 @@ async function admit(args) {
   const raw = JSON.parse(await readFile(manifestPath, "utf8"));
   const admitted = admitEnhancementStudioReviewManifest(raw);
 
-  const sourcePath = await assertAllowed(raw.source_path);
-  const candidatePath = await assertAllowed(raw.candidate_path);
-  const [sourceSha256, candidateSha256] = await Promise.all([sha256(sourcePath), sha256(candidatePath)]);
-  if (sourceSha256 !== admitted.sourceSha256) throw new Error("Enhancement review source bytes do not match the bound source SHA-256.");
-  if (candidateSha256 !== admitted.candidateSha256) throw new Error("Enhancement review candidate bytes do not match the bound candidate SHA-256.");
+  const [source, candidate] = await Promise.all([bind(raw.source_path), bind(raw.candidate_path)]);
+  if (source.sha256 !== admitted.sourceSha256) throw new Error("Enhancement review source bytes do not match the bound source SHA-256.");
+  if (candidate.sha256 !== admitted.candidateSha256) throw new Error("Enhancement review candidate bytes do not match the bound candidate SHA-256.");
 
   return Object.freeze({
     ok: true,
     manifestPath,
-    sourcePath,
-    candidatePath,
+    sourceBinding: Object.freeze(source),
+    candidateBinding: Object.freeze(candidate),
     sourceBytesVerified: true,
     candidateBytesVerified: true,
     admitted,
     nextRequiredActions: Object.freeze([
-      "Run the Art Studio existing-image quality review using the admitted profile.",
+      "Create evavo.image-review-session.v1 for the exact candidate bytes using the admitted Art Studio profile, then reverify that durable receipt before downstream review.",
+      "Use the durable review-session evidence to inspect alpha-aware quality, ranked connected defect regions, ringing/posterization and suspicious resampling signals.",
       "Run source-vs-candidate edit regression review and multi-scale inspection proof.",
       ...(admitted.intendedRole === "work-header"
         ? ["Run the Work header crop reviewer and inspect desktop/laptop/mobile proofs."]
@@ -55,6 +57,7 @@ async function admit(args) {
     ]),
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
+    websiteMutationAllowed: false,
     automaticCreativeApproval: false,
   });
 }
@@ -62,12 +65,12 @@ async function admit(args) {
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_enhancement_review_bridge_capabilities",
-    description: "Describe the governed handoff from Image Enhancement Studio into Art Studio review.",
+    description: "Describe the governed handoff from Image Enhancement Studio into durable Art Studio review.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
     name: "evavo_admit_enhancement_review_candidate",
-    description: "Admit an Image Enhancement Studio candidate as source-bound Art Studio review material. Verifies physical source/candidate SHA-256 values and preserves publication/Cloudinary blocks until technical, visual and page-context review complete.",
+    description: "Admit an Image Enhancement Studio candidate as source-bound Art Studio review material. Verifies physical source/candidate SHA-256 and byte lengths and requires the next stage to create and reverify a durable unified image-review session before end-to-end enhancement review.",
     inputSchema: {
       type: "object",
       properties: { manifestPath: { type: "string", minLength: 1 } },
@@ -80,10 +83,13 @@ const tools = Object.freeze([
 function capabilities() {
   return Object.freeze({
     contract: "evavo.enhancement-art-review.v1",
+    serverVersion: SERVER_VERSION,
     allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
-    verifies: ["manifest-contract", "source-sha256", "candidate-sha256", "authority-boundary", "review-profile", "page-context-requirement"],
+    verifies: ["manifest-contract", "source-sha256-and-length", "candidate-sha256-and-length", "authority-boundary", "review-profile", "durable-image-review-session-requirement", "page-context-requirement"],
+    durableImageReviewSessionRequired: true,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
+    websiteMutationAllowed: false,
     automaticCreativeApproval: false,
   });
 }
