@@ -28,7 +28,7 @@ function manifest(overrides = {}) {
       "evavo_record_work_header_visual_critique",
       "evavo_resolve_work_header_selection",
     ],
-    mandatory_visual_checks: ["inspect source vs candidate", "inspect actual page crops", "compare viable header options side-by-side", "retain current header unless replacement proves material advantage"],
+    mandatory_visual_checks: ["inspect source vs candidate", "inspect actual page crops", "compare viable header options side-by-side", "retain current header unless replacement proves material advantage", "require semantic project brief"],
     approval_state: "unapproved",
     source_immutable: true,
     candidate_is_review_only: true,
@@ -36,6 +36,7 @@ function manifest(overrides = {}) {
     page_context_review_required: true,
     comparative_candidate_review_required: true,
     current_header_baseline_required: true,
+    semantic_review_brief_required: true,
     publication_allowed: false,
     cloud_overwrite_allowed: false,
     automatic_creative_approval: false,
@@ -52,6 +53,7 @@ test("admits a source-bound Work header enhancement only as review material", ()
   assert.equal(admitted.pageContextReviewRequired, true);
   assert.equal(admitted.comparativeCandidateReviewRequired, true);
   assert.equal(admitted.currentHeaderBaselineRequired, true);
+  assert.equal(admitted.semanticReviewBriefRequired, true);
   assert.equal(admitted.publicationAllowed, false);
   assert.equal(admitted.cloudOverwriteAllowed, false);
   assert.equal(admitted.finalApprovalRequired, true);
@@ -71,6 +73,10 @@ test("rejects Work header manifests that omit comparative candidate review", () 
 
 test("rejects Work header manifests that omit current-header baseline review", () => {
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ current_header_baseline_required: false })), /current-header baseline review/u);
+});
+
+test("rejects Work header manifests that omit semantic project review brief", () => {
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ semantic_review_brief_required: false })), /semantic project review brief/u);
 });
 
 test("rejects Work header manifests with a weaker review profile", () => {
