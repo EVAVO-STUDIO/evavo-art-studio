@@ -7,16 +7,31 @@ const read = (name) => readFile(new URL(name, import.meta.url), "utf8");
 test("preview admission writes durable rollback-safe source-bound receipt", async () => {
   const source = await read("./work_header_preview_admission_mcp.mjs");
   for (const token of [
+    'SERVER_VERSION = "1.3.0"',
     'contract: "evavo.work-header-preview-admission.v1"',
     "writeCreateOnlyBundle",
     "rollbackSafeReceiptWrite: true",
-    "manifestSha256",
+    "manifestSha256AndLengthBound: true",
     "screenshotBindings",
+    "atomicPreviewEvidenceBundleVerified: true",
     'approvalState: "unapproved"',
     "publicationAllowed: false",
     "cloudOverwriteAllowed: false",
     "websiteMutationAllowed: false",
   ]) assert.ok(source.includes(token), `missing preview-admission token: ${token}`);
+});
+
+test("preview admission has read-only stale-evidence reverification", async () => {
+  const source = await read("./work_header_preview_admission_mcp.mjs");
+  for (const token of [
+    "evavo_verify_work_header_preview_admission",
+    "previewAdmissionReverificationAvailable: true",
+    "staleManifestOrScreenshotEvidenceRejected: true",
+    "admissionRecomputedDuringReverification: true",
+    "Preview manifest bytes changed after Art Studio admission.",
+    "screenshot bytes changed after preview capture.",
+    "atomicEvidenceBundleVerified",
+  ]) assert.ok(source.includes(token), `missing preview reverification token: ${token}`);
 });
 
 test("page render accepts screenshots only through a reverified preview admission receipt", async () => {
