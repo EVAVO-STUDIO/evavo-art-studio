@@ -35,6 +35,7 @@ export interface EnhancementStudioReviewManifest {
   readonly candidate_is_review_only: boolean;
   readonly art_studio_visual_review_required: boolean;
   readonly page_context_review_required: boolean;
+  readonly comparative_candidate_review_required?: boolean;
   readonly publication_allowed: boolean;
   readonly cloud_overwrite_allowed: boolean;
   readonly automatic_creative_approval: boolean;
@@ -48,6 +49,7 @@ export interface AdmittedEnhancementStudioReview {
   readonly candidateSha256: string;
   readonly learnedCandidate: boolean;
   readonly pageContextReviewRequired: boolean;
+  readonly comparativeCandidateReviewRequired: boolean;
   readonly requiredTools: readonly string[];
   readonly visualChecks: readonly string[];
   readonly publicationAllowed: false;
@@ -77,90 +79,62 @@ const REQUIRED_ROLE_PROFILE: Readonly<Partial<Record<AdmittedEnhancementStudioRe
 });
 
 function sha(value: unknown, label: string): string {
-  if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) {
-    throw new Error(`${label} must be a lowercase SHA-256 hex digest.`);
-  }
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) throw new Error(`${label} must be a lowercase SHA-256 hex digest.`);
   return value;
 }
 
 function positiveInteger(value: unknown, label: string): number {
-  if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 32768) {
-    throw new Error(`${label} must be an integer from 1 through 32768.`);
-  }
+  if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 32768) throw new Error(`${label} must be an integer from 1 through 32768.`);
   return Number(value);
 }
 
 function strings(value: unknown, label: string): readonly string[] {
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) {
-    throw new Error(`${label} must be an array of non-empty strings.`);
-  }
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || !item.trim())) throw new Error(`${label} must be an array of non-empty strings.`);
   return Object.freeze([...new Set(value)]);
 }
 
-export function admitEnhancementStudioReviewManifest(
-  value: EnhancementStudioReviewManifest,
-): AdmittedEnhancementStudioReview {
+export function admitEnhancementStudioReviewManifest(value: EnhancementStudioReviewManifest): AdmittedEnhancementStudioReview {
   if (!value || typeof value !== "object") throw new Error("Enhancement Studio review manifest is required.");
-  if (value.contract !== ENHANCEMENT_ART_REVIEW_CONTRACT) {
-    throw new Error(`Unsupported Enhancement Studio review contract ${JSON.stringify(value.contract)}.`);
-  }
-  if (value.source_immutable !== true || value.candidate_is_review_only !== true) {
-    throw new Error("Enhancement Studio manifest must preserve immutable-source and review-candidate boundaries.");
-  }
-  if (value.art_studio_visual_review_required !== true) {
-    throw new Error("Enhancement Studio candidate cannot bypass Art Studio visual review.");
-  }
-  if (
-    value.publication_allowed !== false ||
-    value.cloud_overwrite_allowed !== false ||
-    value.automatic_creative_approval !== false ||
-    value.automatic_release_approval !== false
-  ) {
+  if (value.contract !== ENHANCEMENT_ART_REVIEW_CONTRACT) throw new Error(`Unsupported Enhancement Studio review contract ${JSON.stringify(value.contract)}.`);
+  if (value.source_immutable !== true || value.candidate_is_review_only !== true) throw new Error("Enhancement Studio manifest must preserve immutable-source and review-candidate boundaries.");
+  if (value.art_studio_visual_review_required !== true) throw new Error("Enhancement Studio candidate cannot bypass Art Studio visual review.");
+  if (value.publication_allowed !== false || value.cloud_overwrite_allowed !== false || value.automatic_creative_approval !== false || value.automatic_release_approval !== false) {
     throw new Error("Enhancement Studio manifest attempted to carry forbidden publication/approval authority.");
   }
-  if (value.approval_state !== "unapproved") {
-    throw new Error("Enhancement Studio candidates must enter Art Studio in the unapproved state.");
-  }
+  if (value.approval_state !== "unapproved") throw new Error("Enhancement Studio candidates must enter Art Studio in the unapproved state.");
 
   const profile = value.art_studio_review_profile as ImageReviewProfileName;
-  if (!REVIEW_PROFILES.has(profile)) {
-    throw new Error(`Unknown Art Studio review profile ${JSON.stringify(value.art_studio_review_profile)}.`);
-  }
+  if (!REVIEW_PROFILES.has(profile)) throw new Error(`Unknown Art Studio review profile ${JSON.stringify(value.art_studio_review_profile)}.`);
   const role = ROLE_MAP[value.intended_role];
   if (!role) throw new Error(`Unknown Enhancement Studio intended role ${JSON.stringify(value.intended_role)}.`);
   const requiredProfile = REQUIRED_ROLE_PROFILE[role];
-  if (requiredProfile && profile !== requiredProfile) {
-    throw new Error(`Enhancement Studio role ${role} requires Art Studio profile ${requiredProfile}, received ${profile}.`);
-  }
+  if (requiredProfile && profile !== requiredProfile) throw new Error(`Enhancement Studio role ${role} requires Art Studio profile ${requiredProfile}, received ${profile}.`);
 
   const sourceWidth = positiveInteger(value.source_width, "source_width");
   const sourceHeight = positiveInteger(value.source_height, "source_height");
   const candidateWidth = positiveInteger(value.candidate_width, "candidate_width");
   const candidateHeight = positiveInteger(value.candidate_height, "candidate_height");
-  if (candidateWidth < sourceWidth || candidateHeight < sourceHeight) {
-    throw new Error("Enhancement Studio candidate dimensions cannot be smaller than the immutable source dimensions.");
-  }
+  if (candidateWidth < sourceWidth || candidateHeight < sourceHeight) throw new Error("Enhancement Studio candidate dimensions cannot be smaller than the immutable source dimensions.");
 
   const requiredTools = strings(value.mandatory_art_studio_tools, "mandatory_art_studio_tools");
   const visualChecks = strings(value.mandatory_visual_checks, "mandatory_visual_checks");
   if (visualChecks.length < 1) throw new Error("Enhancement Studio review manifest must include visual review checks.");
 
-  const expectedTools = [
-    "evavo_review_existing_image_quality",
-    "evavo_review_existing_image_edit",
-    "evavo_create_existing_image_inspection_proof",
-  ];
-  for (const tool of expectedTools) {
+  for (const tool of ["evavo_review_existing_image_quality", "evavo_review_existing_image_edit", "evavo_create_existing_image_inspection_proof"]) {
     if (!requiredTools.includes(tool)) throw new Error(`Enhancement Studio review manifest omitted required Art Studio tool ${tool}.`);
   }
   if (role === "work-header") {
-    for (const tool of ["evavo_review_work_header_image", "evavo_review_image_for_intended_use"]) {
+    if (value.comparative_candidate_review_required !== true) throw new Error("Work-header enhancement candidates must require comparative candidate review.");
+    for (const tool of [
+      "evavo_review_work_header_image",
+      "evavo_review_image_for_intended_use",
+      "evavo_compare_work_header_candidates",
+      "evavo_record_work_header_visual_critique",
+    ]) {
       if (!requiredTools.includes(tool)) throw new Error(`Work-header enhancement candidates must require ${tool}.`);
     }
   }
-  if (["work-header", "support-image", "tile"].includes(role) && value.page_context_review_required !== true) {
-    throw new Error("Website media enhancement candidates must require page-context review.");
-  }
+  if (["work-header", "support-image", "tile"].includes(role) && value.page_context_review_required !== true) throw new Error("Website media enhancement candidates must require page-context review.");
 
   return Object.freeze({
     profile,
@@ -169,6 +143,7 @@ export function admitEnhancementStudioReviewManifest(
     candidateSha256: sha(value.candidate_sha256, "candidate_sha256"),
     learnedCandidate: value.learned_candidate === true,
     pageContextReviewRequired: value.page_context_review_required === true,
+    comparativeCandidateReviewRequired: value.comparative_candidate_review_required === true,
     requiredTools,
     visualChecks,
     publicationAllowed: false,
