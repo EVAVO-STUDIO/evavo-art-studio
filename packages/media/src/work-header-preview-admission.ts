@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 
 export const WORK_HEADER_PREVIEW_ADMISSION_CONTRACT = "evavo.work-header-preview-admission.v1" as const;
-export const WORK_HEADER_PREVIEW_CAPTURE_CONTRACT = "evavo.work-header-candidate-preview-capture.v7" as const;
+export const WORK_HEADER_PREVIEW_CAPTURE_CONTRACT = "evavo.work-header-candidate-preview-capture.v8" as const;
 
 export interface WorkHeaderPreviewScreenshotBinding { readonly path: string; readonly sha256: string; readonly bytes: number }
 export interface WorkHeaderBrowserResponseBinding {
-  readonly url: string; readonly status: number; readonly mimeType: string; readonly sha256: string; readonly byteLength: number;
+  readonly requestId?: string; readonly url: string; readonly method?: string; readonly requestStartedAfterTrigger?: boolean; readonly exactTriggeredRequestBound?: boolean;
+  readonly initiatorType?: string; readonly documentUrl?: string; readonly status: number; readonly mimeType: string; readonly sha256: string; readonly byteLength: number;
   readonly protocol?: string | null; readonly fromDiskCache?: boolean; readonly fromServiceWorker?: boolean;
   readonly encodedDataLength?: number; readonly bodyBase64EncodedByCdp?: boolean;
 }
@@ -26,12 +27,12 @@ export interface WorkHeaderCandidatePreviewManifest {
   readonly candidateContentArtifact: Readonly<{ path: string; sha256: string; bytes: number; contentType: string; immutableEvidence: boolean }>;
   readonly browserCandidateResponseIdentity: Readonly<{
     desktopSha256: string; desktopByteLength: number; mobileSha256: string; mobileByteLength: number;
-    matchesImmutableCandidateArtifact: boolean; stableAcrossProfiles: boolean;
+    matchesImmutableCandidateArtifact: boolean; stableAcrossProfiles: boolean; exactTriggeredRequestsBoundAcrossProfiles: boolean;
   }>;
   readonly captures: readonly WorkHeaderPreviewCapture[];
   readonly pageRenderReviewInput: Readonly<{
     pageSlug: string; candidateId: string; candidateContentSha256: string; candidateContentByteLength: number; candidateContentArtifactPath: string;
-    browserCandidateResponseSha256: string; browserCandidateResponseByteLength: number;
+    browserCandidateResponseSha256: string; browserCandidateResponseByteLength: number; browserCandidateRequestBindingRequired: boolean;
     currentDesktopPath: string; candidateDesktopPath: string; currentMobilePath: string; candidateMobilePath: string;
   }>;
   readonly previewIntegrity: Readonly<Record<string, boolean>>;
@@ -46,6 +47,7 @@ export interface WorkHeaderPreviewAdmissionResult {
   readonly candidateSourceUrlSha256: string; readonly candidateContentSha256: string; readonly candidateContentByteLength: number; readonly candidateContentArtifactPath: string;
   readonly naturalWidth: number; readonly naturalHeight: number; readonly screenshotHashesVerified: boolean; readonly candidateContentBytesVerified: boolean;
   readonly immutableCandidateContentArtifactVerified: boolean; readonly browserResponseBodyIdentityVerified: boolean; readonly browserResponseMetadataBound: boolean;
+  readonly exactTriggeredBrowserRequestBindingVerified: boolean;
   readonly browserResponseBindings: Readonly<{ desktop: WorkHeaderBrowserResponseBinding; mobile: WorkHeaderBrowserResponseBinding }>;
   readonly responsiveSourceIdentityVerified: boolean; readonly browserOnlyPreviewVerified: boolean; readonly atomicEvidenceBundleVerified: boolean;
   readonly candidateRenderDifferenceVerified: boolean; readonly titleSubtitleIdentityVerified: boolean;
@@ -68,9 +70,16 @@ function verifyBrowserResponse(capture: WorkHeaderPreviewCapture, candidateSrc: 
   const response = capture.browserCandidateResponse;
   if (!response || response.url !== candidateSrc || response.sha256 !== sha || response.byteLength !== bytes) throw new Error(`${capture.profile} Chrome response-body identity does not match immutable candidate bytes.`);
   if (!Number.isFinite(response.status) || response.status < 200 || response.status >= 400 || !response.mimeType?.toLowerCase().startsWith("image/")) throw new Error(`${capture.profile} Chrome response metadata is invalid.`);
+  if (response.method !== "GET" || response.requestStartedAfterTrigger !== true || response.exactTriggeredRequestBound !== true || typeof response.requestId !== "string" || !response.requestId) throw new Error(`${capture.profile} Chrome response is not bound to the exact GET request started by candidate substitution.`);
   if (response.encodedDataLength !== undefined && (!Number.isFinite(response.encodedDataLength) || response.encodedDataLength < 0)) throw new Error(`${capture.profile} Chrome encoded response length is invalid.`);
   return Object.freeze({
+    requestId: response.requestId,
     url: response.url,
+    method: response.method,
+    requestStartedAfterTrigger: true,
+    exactTriggeredRequestBound: true,
+    initiatorType: response.initiatorType ?? "unknown",
+    documentUrl: response.documentUrl ?? "",
     status: response.status,
     mimeType: response.mimeType,
     sha256: response.sha256,
@@ -102,7 +111,7 @@ export function admitWorkHeaderCandidatePreviewManifest(manifest: WorkHeaderCand
   if (!Buffer.isBuffer(buffers.candidateContent) || buffers.candidateContent.length < 1 || sha256(buffers.candidateContent) !== artifact.sha256 || buffers.candidateContent.length !== artifact.bytes) throw new Error("Work-header preview immutable candidate-content artifact bytes changed after capture.");
 
   const browserIdentity = manifest.browserCandidateResponseIdentity;
-  if (!browserIdentity || browserIdentity.desktopSha256 !== source.contentSha256 || browserIdentity.mobileSha256 !== source.contentSha256 || browserIdentity.desktopByteLength !== source.contentByteLength || browserIdentity.mobileByteLength !== source.contentByteLength || browserIdentity.matchesImmutableCandidateArtifact !== true || browserIdentity.stableAcrossProfiles !== true) throw new Error("Work-header preview browser response-body identity is invalid or does not match immutable candidate bytes.");
+  if (!browserIdentity || browserIdentity.desktopSha256 !== source.contentSha256 || browserIdentity.mobileSha256 !== source.contentSha256 || browserIdentity.desktopByteLength !== source.contentByteLength || browserIdentity.mobileByteLength !== source.contentByteLength || browserIdentity.matchesImmutableCandidateArtifact !== true || browserIdentity.stableAcrossProfiles !== true || browserIdentity.exactTriggeredRequestsBoundAcrossProfiles !== true) throw new Error("Work-header preview browser response-body/request identity is invalid or does not match immutable candidate bytes.");
 
   const desktop = captureByProfile(manifest, "desktop");
   const mobile = captureByProfile(manifest, "mobile");
@@ -119,12 +128,12 @@ export function admitWorkHeaderCandidatePreviewManifest(manifest: WorkHeaderCand
   verifyScreenshot(mobile.candidateScreenshot, buffers.candidateMobile, "mobile candidate");
 
   const integrity = manifest.previewIntegrity ?? {};
-  for (const key of ["desktopCandidateRenderChanged", "mobileCandidateRenderChanged", "titleTextStableAcrossSubstitution", "subtitleTextStableAcrossSubstitution", "candidateResolvedSrcMatchesRequested", "candidateResolvedSrcStableAcrossProfiles", "candidateNaturalDimensionsStableAcrossProfiles", "candidateContentSha256AndLengthBound", "candidateContentStableAcrossCapture", "immutableCandidateContentArtifactPublished", "browserResponseBodyCapturedOnEveryProfile", "browserResponseBodyMatchesImmutableCandidateArtifact", "browserResponseBodyStableAcrossProfiles", "atomicEvidenceBundlePublished"]) if (integrity[key] !== true) throw new Error(`Work-header preview integrity flag ${key} is not verified.`);
+  for (const key of ["desktopCandidateRenderChanged", "mobileCandidateRenderChanged", "titleTextStableAcrossSubstitution", "subtitleTextStableAcrossSubstitution", "candidateResolvedSrcMatchesRequested", "candidateResolvedSrcStableAcrossProfiles", "candidateNaturalDimensionsStableAcrossProfiles", "candidateContentSha256AndLengthBound", "candidateContentStableAcrossCapture", "immutableCandidateContentArtifactPublished", "browserResponseBodyCapturedOnEveryProfile", "browserResponseBodyMatchesImmutableCandidateArtifact", "browserResponseBodyStableAcrossProfiles", "browserResponseBoundToExactTriggeredRequestOnEveryProfile", "atomicEvidenceBundlePublished"]) if (integrity[key] !== true) throw new Error(`Work-header preview integrity flag ${key} is not verified.`);
 
   const input = manifest.pageRenderReviewInput;
   if (!input || input.pageSlug !== manifest.route || input.candidateId !== manifest.candidateId) throw new Error("Work-header page-render input identity does not match preview manifest.");
   if (input.candidateContentSha256 !== source.contentSha256 || input.candidateContentByteLength !== source.contentByteLength || input.candidateContentArtifactPath !== artifact.path) throw new Error("Work-header page-render candidate-byte/artifact binding does not match preview evidence.");
-  if (input.browserCandidateResponseSha256 !== source.contentSha256 || input.browserCandidateResponseByteLength !== source.contentByteLength) throw new Error("Work-header page-render browser-response binding does not match preview evidence.");
+  if (input.browserCandidateResponseSha256 !== source.contentSha256 || input.browserCandidateResponseByteLength !== source.contentByteLength || input.browserCandidateRequestBindingRequired !== true) throw new Error("Work-header page-render browser-response/request binding does not match preview evidence.");
   if (input.currentDesktopPath !== desktop.currentScreenshot.path || input.candidateDesktopPath !== desktop.candidateScreenshot.path || input.currentMobilePath !== mobile.currentScreenshot.path || input.candidateMobilePath !== mobile.candidateScreenshot.path) throw new Error("Work-header page-render paths do not match preview screenshot evidence.");
 
   return Object.freeze({
@@ -132,7 +141,7 @@ export function admitWorkHeaderCandidatePreviewManifest(manifest: WorkHeaderCand
     candidateSourceUrlSha256: source.requestedUrlSha256, candidateContentSha256: source.contentSha256, candidateContentByteLength: source.contentByteLength,
     candidateContentArtifactPath: artifact.path, naturalWidth: source.naturalWidth, naturalHeight: source.naturalHeight,
     screenshotHashesVerified: true, candidateContentBytesVerified: true, immutableCandidateContentArtifactVerified: true,
-    browserResponseBodyIdentityVerified: true, browserResponseMetadataBound: true,
+    browserResponseBodyIdentityVerified: true, browserResponseMetadataBound: true, exactTriggeredBrowserRequestBindingVerified: true,
     browserResponseBindings: Object.freeze({ desktop: desktopBrowserResponse, mobile: mobileBrowserResponse }),
     responsiveSourceIdentityVerified: true, browserOnlyPreviewVerified: true, atomicEvidenceBundleVerified: true,
     candidateRenderDifferenceVerified: true, titleSubtitleIdentityVerified: true,
