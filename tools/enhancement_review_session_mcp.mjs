@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
-import { readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import readline from "node:readline";
 
 import { reviewEnhancementStudioCandidate } from "../packages/media/dist/index.js";
+import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-enhancement-review-session";
-const SERVER_VERSION = "1.2.0";
+const SERVER_VERSION = "1.3.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES";
@@ -18,28 +20,73 @@ const allowed = (path, output = false) => assertAllowedLocalPath(path, {
   label: "enhancement review session",
 });
 const writesEnabled = () => ["1", "true", "yes", "on"].includes(String(process.env[WRITES_ENV] ?? "").toLowerCase());
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+async function bound(path, label = "file") {
+  const resolved = await allowed(path, false);
+  const bytes = await readFile(resolved);
+  if (!bytes.length) throw new Error(`${label} is empty.`);
+  return { path: resolved, bytes, sha256: sha256(bytes), byteLength: bytes.length };
+}
 
 async function optionalBuffer(path) {
   if (!path) return undefined;
-  return readFile(await allowed(path, false));
+  return (await bound(path, "optional image")).bytes;
+}
+
+async function verifyImageReviewSessionReceipt(path, manifest, candidateFile) {
+  const receipt = await bound(path, "imageReviewSessionReceiptPath");
+  const value = JSON.parse(receipt.bytes.toString("utf8"));
+  if (value.contract !== "evavo.image-review-session.v1") throw new Error("imageReviewSessionReceiptPath must point to an evavo.image-review-session.v1 receipt.");
+  if (value.reviewEngineContract !== "evavo_image_review_orchestrator_v1_2") throw new Error("Image-review receipt was produced by an unsupported review engine contract.");
+  if (value.approvalState !== "unapproved" || value.publicationAllowed !== false || value.cloudOverwriteAllowed !== false || value.websiteMutationAllowed !== false) {
+    throw new Error("Image-review receipt carries forbidden approval or mutation authority.");
+  }
+  if (value.visualReviewRequired !== true) throw new Error("Image-review receipt must preserve mandatory visual review.");
+  const binding = value.sourceBinding;
+  if (!binding || typeof binding.path !== "string" || typeof binding.sha256 !== "string" || !Number.isInteger(binding.byteLength)) throw new Error("Image-review receipt source binding is malformed.");
+  const rebound = await bound(binding.path, "image review source binding");
+  if (rebound.sha256 !== binding.sha256 || rebound.byteLength !== binding.byteLength) throw new Error("Image-review receipt source bytes changed after review.");
+  if (rebound.path !== candidateFile.path || rebound.sha256 !== candidateFile.sha256 || rebound.byteLength !== candidateFile.byteLength) throw new Error("Durable image-review session is not bound to the exact enhancement candidate bytes.");
+  if (binding.sha256 !== manifest.candidate_sha256) throw new Error("Durable image-review session candidate SHA does not match Enhancement Studio manifest.");
+  if (value.resolvedProfile !== manifest.art_studio_review_profile) throw new Error("Durable image-review session profile does not match Enhancement Studio manifest review profile.");
+
+  for (const item of value.comparisonBindings ?? []) {
+    if (!item || typeof item.id !== "string" || typeof item.path !== "string") throw new Error("Image-review comparison binding is malformed.");
+    const comparison = await bound(item.path, `comparisonBinding:${item.id}`);
+    if (comparison.sha256 !== item.sha256 || comparison.byteLength !== item.byteLength) throw new Error(`Image-review comparison source ${JSON.stringify(item.id)} changed after review.`);
+  }
+
+  return { path: receipt.path, sha256: receipt.sha256, value };
 }
 
 async function runReview(args) {
   if (typeof args.manifestPath !== "string") throw new Error("manifestPath is required.");
+  if (typeof args.imageReviewSessionReceiptPath !== "string") throw new Error("imageReviewSessionReceiptPath is required.");
   if (typeof args.outputPrefix !== "string") throw new Error("outputPrefix is required.");
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
 
   const manifestPath = await allowed(args.manifestPath, false);
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const manifestFile = await bound(manifestPath, "manifestPath");
+  const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
+  if (manifest.durable_image_review_session_required !== true) throw new Error("Enhancement Studio manifest does not require the durable image-review session boundary.");
   const sourcePath = await allowed(manifest.source_path, false);
   const candidatePath = await allowed(manifest.candidate_path, false);
+  const [sourceFile, candidateFile] = await Promise.all([
+    bound(sourcePath, "source image"),
+    bound(candidatePath, "candidate image"),
+  ]);
+  if (sourceFile.sha256 !== manifest.source_sha256) throw new Error("Physical source bytes do not match Enhancement Studio manifest.");
+  if (candidateFile.sha256 !== manifest.candidate_sha256) throw new Error("Physical candidate bytes do not match Enhancement Studio manifest.");
+
+  const imageReviewSession = await verifyImageReviewSessionReceipt(args.imageReviewSessionReceiptPath, manifest, candidateFile);
   const prefix = await allowed(args.outputPrefix, true);
 
   const result = await reviewEnhancementStudioCandidate({
     manifest,
-    source: await readFile(sourcePath),
-    candidate: await readFile(candidatePath),
+    source: sourceFile.bytes,
+    candidate: candidateFile.bytes,
     header: await optionalBuffer(args.headerPath),
     support: await optionalBuffer(args.supportPath),
     tile: await optionalBuffer(args.tilePath),
@@ -52,14 +99,15 @@ async function runReview(args) {
   const pageProofPath = result.pageProofPng ? `${prefix}.page-proof.png` : null;
   const receiptPath = `${prefix}.receipt.json`;
 
-  await writeFile(qualityProofPath, result.qualityProofPng, { flag: "wx" });
-  await writeFile(differenceProofPath, result.differenceProofPng, { flag: "wx" });
-  if (result.pageProofPng && pageProofPath) await writeFile(pageProofPath, result.pageProofPng, { flag: "wx" });
-  await writeFile(receiptPath, `${JSON.stringify({
-    contract: "evavo.enhancement-art-review-session.v1",
-    manifestPath,
-    sourcePath,
-    candidatePath,
+  const receipt = {
+    contract: "evavo.enhancement-art-review-session.v1_1",
+    manifestPath: manifestFile.path,
+    manifestSha256: manifestFile.sha256,
+    sourceBinding: { path: sourceFile.path, sha256: sourceFile.sha256, byteLength: sourceFile.byteLength },
+    candidateBinding: { path: candidateFile.path, sha256: candidateFile.sha256, byteLength: candidateFile.byteLength },
+    imageReviewSessionReceiptPath: imageReviewSession.path,
+    imageReviewSessionReceiptSha256: imageReviewSession.sha256,
+    imageReviewSessionVerified: true,
     qualityProofPath,
     differenceProofPath,
     pageProofPath,
@@ -67,8 +115,16 @@ async function runReview(args) {
     approvalState: "unapproved",
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
+    websiteMutationAllowed: false,
     finalVisualApprovalRequired: true,
-  }, null, 2)}\n`, { flag: "wx" });
+  };
+  const outputs = [
+    { path: qualityProofPath, data: result.qualityProofPng },
+    { path: differenceProofPath, data: result.differenceProofPng },
+    ...(result.pageProofPng && pageProofPath ? [{ path: pageProofPath, data: result.pageProofPng }] : []),
+    { path: receiptPath, data: `${JSON.stringify(receipt, null, 2)}\n`, encoding: "utf8" },
+  ];
+  await writeCreateOnlyBundle(outputs);
 
   return {
     ok: true,
@@ -76,6 +132,8 @@ async function runReview(args) {
     qualityProofPath,
     differenceProofPath,
     pageProofPath,
+    imageReviewSessionReceiptPath: imageReviewSession.path,
+    imageReviewSessionReceiptSha256: imageReviewSession.sha256,
     evidence: result.evidence,
   };
 }
@@ -83,16 +141,17 @@ async function runReview(args) {
 const tools = [
   {
     name: "evavo_enhancement_review_session_capabilities",
-    description: "Describe the end-to-end Art Studio receiving review for Enhancement Studio candidates.",
+    description: "Describe the end-to-end Art Studio receiving review for Enhancement Studio candidates with durable unified-review lineage.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "evavo_review_enhancement_candidate_end_to_end",
-    description: "Verify a source-bound Enhancement Studio candidate, prove material technical benefit, review native/source-space quality and page context, and create review artifacts. Missing responsive page context remains incomplete; learned candidates without proven benefit are rejected. Never grants publication or Cloudinary overwrite authority.",
+    description: "Verify a source-bound Enhancement Studio candidate and a durable Art Studio image-review receipt bound to the exact candidate bytes, then prove material technical benefit, review native/source-space quality and page context, and create rollback-safe review artifacts. Never grants publication or Cloudinary overwrite authority.",
     inputSchema: {
       type: "object",
       properties: {
         manifestPath: { type: "string", minLength: 1 },
+        imageReviewSessionReceiptPath: { type: "string", minLength: 1 },
         outputPrefix: { type: "string", minLength: 1 },
         headerPath: { type: "string" },
         supportPath: { type: "string" },
@@ -101,7 +160,7 @@ const tools = [
         mobileScreenshotPath: { type: "string" },
         confirmLocalWrite: { type: "boolean" },
       },
-      required: ["manifestPath", "outputPrefix", "confirmLocalWrite"],
+      required: ["manifestPath", "imageReviewSessionReceiptPath", "outputPrefix", "confirmLocalWrite"],
       additionalProperties: false,
     },
   },
@@ -109,9 +168,14 @@ const tools = [
 
 function capabilities() {
   return {
-    contract: "evavo.enhancement-art-review-session.v1",
+    contract: "evavo.enhancement-art-review-session.v1_1",
+    serverVersion: SERVER_VERSION,
     allowedRootCount: configuredLocalRootCount(ROOTS_ENV),
     writesEnabled: writesEnabled(),
+    durableImageReviewSessionRequired: true,
+    exactCandidateReviewSessionBindingRequired: true,
+    imageReviewSessionProfileMustMatchManifest: true,
+    staleImageReviewSessionRejected: true,
     verifiesPhysicalBytes: true,
     verifiesDimensions: true,
     nativeCandidateReview: true,
@@ -122,7 +186,7 @@ function capabilities() {
     workHeaderContextReview: true,
     supportImageContextReview: true,
     tileContextReview: true,
-    createOnlyProofs: true,
+    rollbackSafeReviewArtifactBundle: true,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
     automaticCreativeApproval: false,
