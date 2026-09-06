@@ -36,6 +36,7 @@ export interface EnhancementStudioReviewManifest {
   readonly art_studio_visual_review_required: boolean;
   readonly page_context_review_required: boolean;
   readonly comparative_candidate_review_required?: boolean;
+  readonly current_header_baseline_required?: boolean;
   readonly publication_allowed: boolean;
   readonly cloud_overwrite_allowed: boolean;
   readonly automatic_creative_approval: boolean;
@@ -50,6 +51,7 @@ export interface AdmittedEnhancementStudioReview {
   readonly learnedCandidate: boolean;
   readonly pageContextReviewRequired: boolean;
   readonly comparativeCandidateReviewRequired: boolean;
+  readonly currentHeaderBaselineRequired: boolean;
   readonly requiredTools: readonly string[];
   readonly visualChecks: readonly string[];
   readonly publicationAllowed: false;
@@ -125,11 +127,13 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   }
   if (role === "work-header") {
     if (value.comparative_candidate_review_required !== true) throw new Error("Work-header enhancement candidates must require comparative candidate review.");
+    if (value.current_header_baseline_required !== true) throw new Error("Work-header enhancement candidates must require current-header baseline review before replacement recommendation.");
     for (const tool of [
       "evavo_review_work_header_image",
       "evavo_review_image_for_intended_use",
       "evavo_compare_work_header_candidates",
       "evavo_record_work_header_visual_critique",
+      "evavo_resolve_work_header_selection",
     ]) {
       if (!requiredTools.includes(tool)) throw new Error(`Work-header enhancement candidates must require ${tool}.`);
     }
@@ -144,6 +148,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
     learnedCandidate: value.learned_candidate === true,
     pageContextReviewRequired: value.page_context_review_required === true,
     comparativeCandidateReviewRequired: value.comparative_candidate_review_required === true,
+    currentHeaderBaselineRequired: value.current_header_baseline_required === true,
     requiredTools,
     visualChecks,
     publicationAllowed: false,
