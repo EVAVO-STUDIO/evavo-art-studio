@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers fail-closed page review and approval-packet reverification", async () => {
+test("image quality doctor covers fail-closed page review, approval packets and explicit reviewer decisions", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_17"',
-    'SERVER_VERSION = "1.17.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_18"',
+    'SERVER_VERSION = "1.18.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -19,6 +19,7 @@ test("image quality doctor covers fail-closed page review and approval-packet re
     'id: "work-preview-mcp-v170"',
     'id: "work-page-review-input-safety"',
     'id: "work-page-review-v200"',
+    'id: "work-explicit-approval-decision"',
     'id: "durable-review"',
     'id: "safe-bundle"',
     'id: "mcp-registration"',
@@ -60,7 +61,24 @@ test("doctor requires read-only approval packet verification and recomputation",
   ]) assert.ok(source.includes(token), `missing approval verification token: ${token}`);
 });
 
+test("doctor requires a non-automatic explicit reviewer decision receipt", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    'SERVER_VERSION = "1.0.0"',
+    'CONTRACT = "evavo.work-header-approval-decision.v1"',
+    "explicitReviewerDecisionRequired: true",
+    "automaticDecisionAllowed: false",
+    "approvalPacketReverificationRequired: true",
+    "fullReceiptLineageRequired: true",
+    "evidenceIdentityDigestRequired: true",
+    "approvedDecisionAllowsPublicationPreparationOnly: true",
+    "evavo_record_work_header_approval_decision",
+    "evavo_verify_work_header_approval_decision",
+    "explicitReviewerDecisionBoundaryChecked: true",
+  ]) assert.ok(source.includes(token), `missing explicit-decision doctor token: ${token}`);
+});
+
 test("MCP configuration exposes hardened image-review chain", async () => {
   const config = await read("../.mcp.json");
-  for (const token of ['"evavo-image-quality-pipeline-doctor-v1"', '"evavo-image-review-session-v1"', '"evavo-enhancement-review-session-v1"', '"evavo-work-header-preview-admission-v1"', '"evavo-work-header-page-render-review-v1"']) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
+  for (const token of ['"evavo-image-quality-pipeline-doctor-v1"', '"evavo-image-review-session-v1"', '"evavo-enhancement-review-session-v1"', '"evavo-work-header-preview-admission-v1"', '"evavo-work-header-page-render-review-v1"', '"evavo-work-header-approval-decision-v1"']) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
 });
