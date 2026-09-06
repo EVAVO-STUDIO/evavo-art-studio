@@ -109,3 +109,38 @@ test("page-render review rejects an unchanged candidate render on mobile", async
   assert.ok(result.evidence.disqualifiers.includes("mobile-candidate-render-identical-to-current"));
   assert.equal(result.evidence.verdict, "reject");
 });
+
+test("page-render review rejects routes outside canonical Work detail pages", async () => {
+  await assert.rejects(
+    reviewWorkHeaderPageRender(await base({ pageSlug: "/about" })),
+    /canonical Work detail route/u,
+  );
+});
+
+test("page-render review requires literal boolean visual risk flags", async () => {
+  await assert.rejects(
+    reviewWorkHeaderPageRender(await base({ titleObscured: "false" })),
+    /titleObscured must be boolean/u,
+  );
+});
+
+test("page-render review rejects excessive note count", async () => {
+  await assert.rejects(
+    reviewWorkHeaderPageRender(await base({ notes: Array.from({ length: 25 }, (_, index) => `note ${index}`) })),
+    /at most 24 entries/u,
+  );
+});
+
+test("page-render review rejects oversized individual notes", async () => {
+  await assert.rejects(
+    reviewWorkHeaderPageRender(await base({ notes: ["x".repeat(501)] })),
+    /1-500 characters/u,
+  );
+});
+
+test("page-render review rejects aggregate note payloads over the review budget", async () => {
+  await assert.rejects(
+    reviewWorkHeaderPageRender(await base({ notes: Array.from({ length: 9 }, (_, index) => `${index}:${"x".repeat(498)}`) })),
+    /4000-character review limit/u,
+  );
+});
