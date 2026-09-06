@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import sharp, { type OverlayOptions } from "sharp";
 
-export const WORK_HEADER_PAGE_RENDER_REVIEW_CONTRACT = "evavo.work-header-page-render-review.v1" as const;
+export const WORK_HEADER_PAGE_RENDER_REVIEW_CONTRACT = "evavo.work-header-page-render-review.v2" as const;
 
 export interface WorkHeaderPageRenderReviewSpec {
   readonly pageSlug: string;
@@ -17,6 +17,8 @@ export interface WorkHeaderPageRenderReviewSpec {
   readonly hierarchyQuality: number;
   readonly responsiveConsistency: number;
   readonly overallPageQuality: number;
+  readonly currentPageQuality: number;
+  readonly minimumPageQualityAdvantage?: number;
   readonly titleObscured: boolean;
   readonly textContrastFailure: boolean;
   readonly importantSubjectCropped: boolean;
@@ -53,6 +55,11 @@ export interface WorkHeaderPageRenderReviewResult {
       dimensionsMatch: boolean;
       screenshotsDiffer: boolean;
     }>;
+    currentPageQuality: number;
+    candidatePageQuality: number;
+    pageQualityAdvantage: number;
+    minimumPageQualityAdvantage: number;
+    materialPageQualityAdvantageVerified: boolean;
     visualScore: number;
     disqualifiers: readonly string[];
     verdict: "reject" | "rework" | "page-shortlist";
@@ -72,6 +79,12 @@ function sha256(buffer: Buffer): string {
 
 function rating(value: unknown, label: string): number {
   if (!Number.isFinite(value) || Number(value) < 0 || Number(value) > 5) throw new Error(`${label} must be a number from 0 through 5.`);
+  return Number(value);
+}
+
+function bounded(value: unknown, fallback: number, min: number, max: number, label: string): number {
+  if (value == null) return fallback;
+  if (!Number.isFinite(value) || Number(value) < min || Number(value) > max) throw new Error(`${label} must be a number from ${min} through ${max}.`);
   return Number(value);
 }
 
@@ -136,11 +149,18 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
     rating(spec.responsiveConsistency, "responsiveConsistency"),
     rating(spec.overallPageQuality, "overallPageQuality"),
   ];
+  const currentPageQuality = rating(spec.currentPageQuality, "currentPageQuality");
+  const candidatePageQuality = values[4]!;
+  const minimumPageQualityAdvantage = bounded(spec.minimumPageQualityAdvantage, 0.25, 0, 2, "minimumPageQualityAdvantage");
+  const pageQualityAdvantage = candidatePageQuality - currentPageQuality;
+  const materialPageQualityAdvantageVerified = pageQualityAdvantage >= minimumPageQualityAdvantage;
+
   const disqualifiers: string[] = [];
   if (!desktopDimensionsMatch) disqualifiers.push("desktop-current-candidate-viewport-mismatch");
   if (!mobileDimensionsMatch) disqualifiers.push("mobile-current-candidate-viewport-mismatch");
   if (!desktopScreenshotsDiffer) disqualifiers.push("desktop-candidate-render-identical-to-current");
   if (!mobileScreenshotsDiffer) disqualifiers.push("mobile-candidate-render-identical-to-current");
+  if (!materialPageQualityAdvantageVerified) disqualifiers.push("candidate-page-lacks-material-advantage-over-current");
   if (spec.titleObscured) disqualifiers.push("title-obscured");
   if (spec.textContrastFailure) disqualifiers.push("text-contrast-failure");
   if (spec.importantSubjectCropped) disqualifiers.push("important-subject-cropped");
@@ -156,8 +176,8 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
       : "page-shortlist";
 
   const [currentDesktopPanel, candidateDesktopPanel, currentMobilePanel, candidateMobilePanel] = await Promise.all([
-    panel(spec.currentDesktop, "CURRENT PAGE • DESKTOP", 700),
-    panel(spec.candidateDesktop, `CANDIDATE ${candidateId} • DESKTOP`, 700),
+    panel(spec.currentDesktop, `CURRENT PAGE • DESKTOP • quality ${currentPageQuality.toFixed(1)}/5`, 700),
+    panel(spec.candidateDesktop, `CANDIDATE ${candidateId} • DESKTOP • quality ${candidatePageQuality.toFixed(1)}/5`, 700),
     panel(spec.currentMobile, "CURRENT PAGE • MOBILE", 700),
     panel(spec.candidateMobile, `CANDIDATE ${candidateId} • MOBILE`, 700),
   ]);
@@ -186,22 +206,13 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
       candidateDesktopSha256: candidateDesktopSha,
       currentMobileSha256: currentMobileSha,
       candidateMobileSha256: candidateMobileSha,
-      desktopViewport: Object.freeze({
-        currentWidth: currentDesktopMeta.width,
-        currentHeight: currentDesktopMeta.height,
-        candidateWidth: candidateDesktopMeta.width,
-        candidateHeight: candidateDesktopMeta.height,
-        dimensionsMatch: desktopDimensionsMatch,
-        screenshotsDiffer: desktopScreenshotsDiffer,
-      }),
-      mobileViewport: Object.freeze({
-        currentWidth: currentMobileMeta.width,
-        currentHeight: currentMobileMeta.height,
-        candidateWidth: candidateMobileMeta.width,
-        candidateHeight: candidateMobileMeta.height,
-        dimensionsMatch: mobileDimensionsMatch,
-        screenshotsDiffer: mobileScreenshotsDiffer,
-      }),
+      desktopViewport: Object.freeze({ currentWidth: currentDesktopMeta.width, currentHeight: currentDesktopMeta.height, candidateWidth: candidateDesktopMeta.width, candidateHeight: candidateDesktopMeta.height, dimensionsMatch: desktopDimensionsMatch, screenshotsDiffer: desktopScreenshotsDiffer }),
+      mobileViewport: Object.freeze({ currentWidth: currentMobileMeta.width, currentHeight: currentMobileMeta.height, candidateWidth: candidateMobileMeta.width, candidateHeight: candidateMobileMeta.height, dimensionsMatch: mobileDimensionsMatch, screenshotsDiffer: mobileScreenshotsDiffer }),
+      currentPageQuality,
+      candidatePageQuality,
+      pageQualityAdvantage,
+      minimumPageQualityAdvantage,
+      materialPageQualityAdvantageVerified,
       visualScore,
       disqualifiers: Object.freeze(disqualifiers),
       verdict,
