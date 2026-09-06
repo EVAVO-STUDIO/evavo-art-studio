@@ -54,15 +54,17 @@ function manifest(source, candidate, width, height, role = "illustration", profi
         "evavo_review_image_for_intended_use",
         "evavo_compare_work_header_candidates",
         "evavo_record_work_header_visual_critique",
+        "evavo_resolve_work_header_selection",
       ] : []),
     ],
-    mandatory_visual_checks: ["review candidate visually", ...(workHeader ? ["compare viable candidates side-by-side"] : [])],
+    mandatory_visual_checks: ["review candidate visually", ...(workHeader ? ["compare viable candidates side-by-side", "retain current header unless replacement proves material advantage"] : [])],
     approval_state: "unapproved",
     source_immutable: true,
     candidate_is_review_only: true,
     art_studio_visual_review_required: true,
     page_context_review_required: ["work-header", "support-image", "catalogue-tile"].includes(role),
     comparative_candidate_review_required: workHeader,
+    current_header_baseline_required: workHeader,
     publication_allowed: false,
     cloud_overwrite_allowed: false,
     automatic_creative_approval: false,
@@ -91,18 +93,33 @@ test("rejects candidate bytes that do not match manifest", async () => {
   await assert.rejects(() => reviewEnhancementStudioCandidate({ manifest: manifest(source, candidate, 64, 64), source, candidate: wrong }), /candidate bytes do not match/i);
 });
 
-test("work header review carries page-context requirement and page proof", async () => {
+test("work header review requires current header baseline and responsive page proof", async () => {
   const source = await makePng(1600, 900, [70, 90, 110, 255]);
   const candidate = await makePng(1600, 900, [72, 92, 112, 255]);
+  const currentHeader = await makePng(1600, 900, [60, 80, 100, 255]);
   const support = await makePng(900, 1200, [150, 80, 40, 255]);
   const desktop = await makePng(1440, 900, [20, 20, 20, 255]);
   const mobile = await makePng(390, 844, [22, 22, 22, 255]);
   const m = manifest(source, candidate, 1600, 900, "work-header", "web-hero");
-  const result = await reviewEnhancementStudioCandidate({ manifest: m, source, candidate, support, desktopScreenshot: desktop, mobileScreenshot: mobile });
+  const result = await reviewEnhancementStudioCandidate({ manifest: m, source, candidate, header: currentHeader, support, desktopScreenshot: desktop, mobileScreenshot: mobile });
   assert.ok(result.evidence.pageContextReview);
   assert.ok(result.pageProofPng);
+  assert.equal(result.evidence.currentHeaderBaselineComplete, true);
   assert.equal(result.evidence.pageContextComplete, true);
   assert.equal(result.evidence.publicationAllowed, false);
+});
+
+test("work header review stays incomplete when current header baseline is missing", async () => {
+  const source = await makePatternPng(1600, 900);
+  const candidate = await sharp(source).modulate({ brightness: 1.01 }).png().toBuffer();
+  const desktop = await makePng(1440, 900, [20, 20, 20, 255]);
+  const mobile = await makePng(390, 844, [22, 22, 22, 255]);
+  const m = manifest(source, candidate, 1600, 900, "work-header", "web-hero");
+  const result = await reviewEnhancementStudioCandidate({ manifest: m, source, candidate, desktopScreenshot: desktop, mobileScreenshot: mobile });
+  assert.equal(result.evidence.currentHeaderBaselineComplete, false);
+  assert.equal(result.evidence.pageContextComplete, false);
+  assert.notEqual(result.evidence.decision, "ready-for-human-visual-review");
+  assert.ok(result.evidence.warnings.includes("current-header-baseline-missing"));
 });
 
 test("support image review uses current header for page relationship QA", async () => {
@@ -130,9 +147,10 @@ test("learned candidate with no proven source-space benefit is blocked", async (
 test("website media cannot become visual-review ready without desktop and mobile context", async () => {
   const source = await makePatternPng(1600, 900);
   const candidate = await sharp(source).modulate({ brightness: 1.01 }).png().toBuffer();
+  const currentHeader = await makePatternPng(1600, 900);
   const support = await makePatternPng(900, 1200);
   const m = manifest(source, candidate, 1600, 900, "work-header", "web-hero");
-  const result = await reviewEnhancementStudioCandidate({ manifest: m, source, candidate, support });
+  const result = await reviewEnhancementStudioCandidate({ manifest: m, source, candidate, header: currentHeader, support });
   assert.equal(result.evidence.pageContextComplete, false);
   assert.notEqual(result.evidence.decision, "ready-for-human-visual-review");
   assert.ok(result.evidence.warnings.includes("desktop-page-context-missing"));
