@@ -7,16 +7,16 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 test("image quality doctor covers fail-closed review through explicit execution authorization", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_21"',
-    'SERVER_VERSION = "1.21.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_22"',
+    'SERVER_VERSION = "1.22.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
     'id: "finishing-plan"',
     'id: "artifact-signals"',
     'id: "enhancement-session"',
-    'id: "work-preview-core-v7"',
-    'id: "work-preview-mcp-v170"',
+    'id: "work-preview-core-v8"',
+    'id: "work-preview-mcp-v180"',
     'id: "work-page-review-input-safety"',
     'id: "work-page-review-v200"',
     'id: "work-explicit-approval-decision"',
@@ -31,6 +31,20 @@ test("image quality doctor covers fail-closed review through explicit execution 
     "runtimeExecutionPerformed: false",
     "sourceMutationPerformed: false",
   ]) assert.ok(source.includes(token), `missing doctor contract token: ${token}`);
+});
+
+test("doctor requires exact triggered Chrome candidate GET request lineage", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    "evavo.work-header-candidate-preview-capture.v8",
+    "exactTriggeredBrowserRequestBindingVerified",
+    "exactTriggeredRequestsBoundAcrossProfiles",
+    "browserCandidateRequestBindingRequired",
+    'SERVER_VERSION = "1.8.0"',
+    "exactTriggeredBrowserRequestBindingRequired: true",
+    'exactTriggeredBrowserRequestMethod: "GET"',
+    "exactTriggeredBrowserRequestBindingChecked: true",
+  ]) assert.ok(source.includes(token), `missing exact-trigger browser lineage token: ${token}`);
 });
 
 test("doctor requires bounded literal Work page review inputs", async () => {
