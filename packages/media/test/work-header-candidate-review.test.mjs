@@ -18,10 +18,17 @@ async function image(width, height, seed) {
   return sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
-test("candidate board creates a technical shortlist but never a creative winner", async () => {
+test("candidate board includes current technical baseline but never a creative winner", async () => {
+  const current = await image(1920, 1080, 2);
   const a = await image(1920, 1080, 10);
   const b = await image(1920, 1080, 80);
-  const result = await compareWorkHeaderCandidates({ candidates: [{ id: "a", image: a }, { id: "b", image: b }] });
+  const result = await compareWorkHeaderCandidates({
+    candidates: [{ id: "a", image: a }, { id: "b", image: b }],
+    currentHeader: current,
+  });
+  assert.ok(result.evidence.currentHeader);
+  assert.equal(typeof result.evidence.currentHeader.technicalScore, "number");
+  assert.equal(result.evidence.currentHeaderBaselineRequiredForReplacement, true);
   assert.equal(result.evidence.creativeWinner, null);
   assert.equal(result.evidence.finalSelectionAllowed, false);
   assert.equal(result.evidence.visualCritiqueRequired, true);
