@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
 
-import { compareWorkHeaderCandidates, judgeWorkHeaderVisualCritique } from "../dist/index.js";
+import {
+  compareWorkHeaderCandidates,
+  digestWorkHeaderCandidateReviewEvidence,
+  judgeWorkHeaderVisualCritique,
+} from "../dist/index.js";
 
 async function image(width, height, seed) {
   const raw = Buffer.alloc(width * height * 4);
@@ -29,6 +33,7 @@ test("candidate board includes hash-bound current technical baseline but never a
   assert.ok(result.evidence.currentHeader);
   assert.match(result.evidence.currentHeader.imageSha256, /^[0-9a-f]{64}$/u);
   assert.match(result.evidence.candidates[0].imageSha256, /^[0-9a-f]{64}$/u);
+  assert.match(digestWorkHeaderCandidateReviewEvidence(result.evidence), /^[0-9a-f]{64}$/u);
   assert.equal(result.evidence.critiqueHashBindingRequired, true);
   assert.equal(typeof result.evidence.currentHeader.technicalScore, "number");
   assert.equal(result.evidence.currentHeaderBaselineRequiredForReplacement, true);
@@ -36,6 +41,19 @@ test("candidate board includes hash-bound current technical baseline but never a
   assert.equal(result.evidence.finalSelectionAllowed, false);
   assert.equal(result.evidence.visualCritiqueRequired, true);
   assert.ok(result.proofPng.length > 0);
+});
+
+test("canonical review digest changes when technical evidence changes", async () => {
+  const a = await image(1920, 1080, 10);
+  const b = await image(1920, 1080, 80);
+  const result = await compareWorkHeaderCandidates({ candidates: [{ id: "a", image: a }, { id: "b", image: b }] });
+  const first = digestWorkHeaderCandidateReviewEvidence(result.evidence);
+  const mutated = {
+    ...result.evidence,
+    candidates: result.evidence.candidates.map((item, index) => index === 0 ? { ...item, technicalScore: item.technicalScore - 1 } : item),
+  };
+  const second = digestWorkHeaderCandidateReviewEvidence(mutated);
+  assert.notEqual(first, second);
 });
 
 test("exact support duplicate is not technically eligible", async () => {
@@ -50,10 +68,11 @@ test("exact support duplicate is not technically eligible", async () => {
   assert.equal(duplicate.technicallyEligibleForVisualReview, false);
 });
 
-test("visual critique rejects AI-looking header and carries exact image hash", () => {
+test("visual critique rejects AI-looking header and carries exact image and review hashes", () => {
   const result = judgeWorkHeaderVisualCritique({
     candidateId: "candidate-a",
     candidateSha256: "a".repeat(64),
+    candidateReviewEvidenceSha256: "b".repeat(64),
     semanticRelevance: 4.5,
     focalPointStrength: 4.5,
     cropStability: 4.5,
@@ -71,7 +90,9 @@ test("visual critique rejects AI-looking header and carries exact image hash", (
     notes: ["Visible AI-like malformed detail in focal area."],
   });
   assert.equal(result.candidateSha256, "a".repeat(64));
+  assert.equal(result.candidateReviewEvidenceSha256, "b".repeat(64));
   assert.equal(result.exactImageHashBound, true);
+  assert.equal(result.exactReviewEvidenceHashBound, true);
   assert.equal(result.verdict, "reject");
   assert.equal(result.eligibleForFinalSelection, false);
   assert.equal(result.automaticPublicationAllowed, false);
