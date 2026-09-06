@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export const WORK_HEADER_PREVIEW_ADMISSION_CONTRACT = "evavo.work-header-preview-admission.v1" as const;
-export const WORK_HEADER_PREVIEW_CAPTURE_CONTRACT = "evavo.work-header-candidate-preview-capture.v3" as const;
+export const WORK_HEADER_PREVIEW_CAPTURE_CONTRACT = "evavo.work-header-candidate-preview-capture.v4" as const;
 
 export interface WorkHeaderPreviewScreenshotBinding {
   readonly path: string;
@@ -46,6 +46,11 @@ export interface WorkHeaderCandidatePreviewManifest {
     candidateMobilePath: string;
   }>;
   readonly previewIntegrity: Readonly<Record<string, boolean>>;
+  readonly evidenceBundle: Readonly<{
+    createOnly: boolean;
+    rollbackSafe: boolean;
+    allScreenshotsAndManifestPublishedTogether: boolean;
+  }>;
   readonly serverMutationPerformed: boolean;
   readonly deploymentMutationPerformed: boolean;
   readonly cloudinaryMutationPerformed: boolean;
@@ -70,6 +75,7 @@ export interface WorkHeaderPreviewAdmissionResult {
   readonly screenshotHashesVerified: boolean;
   readonly responsiveSourceIdentityVerified: boolean;
   readonly browserOnlyPreviewVerified: boolean;
+  readonly atomicEvidenceBundleVerified: boolean;
   readonly candidateRenderDifferenceVerified: boolean;
   readonly titleSubtitleIdentityVerified: boolean;
   readonly pageRenderPaths: Readonly<{
@@ -98,7 +104,7 @@ function captureByProfile(manifest: WorkHeaderCandidatePreviewManifest, profile:
 }
 
 function verifyScreenshot(binding: WorkHeaderPreviewScreenshotBinding, buffer: Buffer, label: string): void {
-  if (!binding || typeof binding.path !== "string" || !/^[0-9a-f]{64}$/u.test(binding.sha256)) throw new Error(`${label} screenshot binding is malformed.`);
+  if (!binding || typeof binding.path !== "string" || !/^[0-9a-f]{64}$/u.test(binding.sha256) || !Number.isInteger(binding.bytes) || binding.bytes < 1) throw new Error(`${label} screenshot binding is malformed.`);
   if (!Buffer.isBuffer(buffer) || buffer.length < 1) throw new Error(`${label} screenshot bytes are required.`);
   if (sha256(buffer) !== binding.sha256) throw new Error(`${label} screenshot bytes do not match preview manifest SHA-256.`);
   if (buffer.length !== binding.bytes) throw new Error(`${label} screenshot byte length does not match preview manifest.`);
@@ -115,6 +121,9 @@ export function admitWorkHeaderCandidatePreviewManifest(
   if (!/^https?:\/\//u.test(manifest.candidateSrc)) throw new Error("Work-header preview candidateSrc must be an absolute http/https URL.");
   if (manifest.serverMutationPerformed !== false || manifest.deploymentMutationPerformed !== false || manifest.cloudinaryMutationPerformed !== false || manifest.browserDomPreviewMutationOnly !== true) {
     throw new Error("Work-header preview manifest violated the browser-only non-destructive boundary.");
+  }
+  if (manifest.evidenceBundle?.createOnly !== true || manifest.evidenceBundle?.rollbackSafe !== true || manifest.evidenceBundle?.allScreenshotsAndManifestPublishedTogether !== true) {
+    throw new Error("Work-header preview manifest does not prove rollback-safe create-only publication of screenshots plus manifest as one evidence bundle.");
   }
 
   const source = manifest.candidateSource;
@@ -146,6 +155,7 @@ export function admitWorkHeaderCandidatePreviewManifest(
     "candidateResolvedSrcMatchesRequested",
     "candidateResolvedSrcStableAcrossProfiles",
     "candidateNaturalDimensionsStableAcrossProfiles",
+    "atomicEvidenceBundlePublished",
   ]) {
     if (integrity[key] !== true) throw new Error(`Work-header preview integrity flag ${key} is not verified.`);
   }
@@ -167,6 +177,7 @@ export function admitWorkHeaderCandidatePreviewManifest(
     screenshotHashesVerified: true,
     responsiveSourceIdentityVerified: true,
     browserOnlyPreviewVerified: true,
+    atomicEvidenceBundleVerified: true,
     candidateRenderDifferenceVerified: true,
     titleSubtitleIdentityVerified: true,
     pageRenderPaths: Object.freeze({
