@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import type { ImageReviewProfileName } from "./image-review-profiles.js";
 
 export type ExistingImageDefectKind =
   | "transparent-rgb-contamination"
@@ -7,8 +8,13 @@ export type ExistingImageDefectKind =
   | "isolated-alpha-speck"
   | "hard-alpha-stair-step";
 
+export type TransparentRgbDetectionMode = "auto" | "off" | "edge-only" | "all";
+
 export interface ExistingImageDefectDetectionSpec {
+  readonly profile?: ImageReviewProfileName;
+  readonly transparentRgbMode?: TransparentRgbDetectionMode;
   readonly haloLumaThreshold?: number;
+  readonly haloColorDistanceThreshold?: number;
   readonly pinholeAlphaMaximum?: number;
   readonly speckAlphaMinimum?: number;
   readonly stairStepMinimumTransitions?: number;
@@ -23,6 +29,8 @@ export interface ExistingImageDefectDetectionResult {
     width: number;
     height: number;
     totalPixels: number;
+    profile: ImageReviewProfileName | null;
+    transparentRgbMode: Exclude<TransparentRgbDetectionMode, "auto">;
     defectPixels: number;
     defectPixelRatio: number;
     maskCoverageRatio: number;
@@ -36,6 +44,12 @@ export interface ExistingImageDefectDetectionResult {
 function boundedByte(value: number | undefined, fallback: number, label: string): number {
   if (value === undefined) return fallback;
   if (!Number.isInteger(value) || value < 0 || value > 255) throw new Error(`${label} must be 0..255.`);
+  return value;
+}
+
+function boundedNumber(value: number | undefined, fallback: number, min: number, max: number, label: string): number {
+  if (value === undefined) return fallback;
+  if (!Number.isFinite(value) || value < min || value > max) throw new Error(`${label} must be ${min}..${max}.`);
   return value;
 }
 
@@ -57,6 +71,10 @@ function idx(width: number, x: number, y: number): number {
 
 function luma(r: number, g: number, b: number): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function rgbDistance(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number): number {
+  return Math.hypot(r1 - r2, g1 - g2, b1 - b2);
 }
 
 function alphaAt(raw: Buffer, width: number, x: number, y: number): number {
@@ -85,26 +103,54 @@ function countTransparentNeighbours(raw: Buffer, width: number, height: number, 
   return count;
 }
 
+function hasVisibleNeighbour(raw: Buffer, width: number, height: number, x: number, y: number, radius = 2): boolean {
+  for (let yy = Math.max(0, y - radius); yy <= Math.min(height - 1, y + radius); yy += 1) {
+    for (let xx = Math.max(0, x - radius); xx <= Math.min(width - 1, x + radius); xx += 1) {
+      if (xx === x && yy === y) continue;
+      if (alphaAt(raw, width, xx, yy) > 8) return true;
+    }
+  }
+  return false;
+}
+
+function resolveTransparentRgbMode(spec: ExistingImageDefectDetectionSpec): Exclude<TransparentRgbDetectionMode, "auto"> {
+  const requested = spec.transparentRgbMode ?? "auto";
+  if (!new Set(["auto", "off", "edge-only", "all"]).has(requested)) throw new Error("transparentRgbMode is invalid.");
+  if (requested !== "auto") return requested;
+  if (spec.profile === "logo-transparent" || spec.profile === "product-cutout") return "all";
+  return "edge-only";
+}
+
 function dilateMask(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {
   if (radius <= 0) return mask;
+  const horizontal = new Uint8Array(mask.length);
   const out = new Uint8Array(mask.length);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      if (!mask[y * width + x]) continue;
-      for (let yy = Math.max(0, y - radius); yy <= Math.min(height - 1, y + radius); yy += 1) {
-        for (let xx = Math.max(0, x - radius); xx <= Math.min(width - 1, x + radius); xx += 1) {
-          out[yy * width + xx] = 255;
-        }
+      let marked = false;
+      for (let xx = Math.max(0, x - radius); xx <= Math.min(width - 1, x + radius); xx += 1) {
+        if (mask[y * width + xx]) { marked = true; break; }
       }
+      if (marked) horizontal[y * width + x] = 255;
+    }
+  }
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let marked = false;
+      for (let yy = Math.max(0, y - radius); yy <= Math.min(height - 1, y + radius); yy += 1) {
+        if (horizontal[yy * width + x]) { marked = true; break; }
+      }
+      if (marked) out[y * width + x] = 255;
     }
   }
   return out;
 }
 
 /**
- * Deterministic defect proposal for existing raster artwork. It does not alter
- * the source. Instead it finds suspicious alpha/transparency edge pixels and
- * returns a conservative repair-mask proposal plus an inspection overlay.
+ * Deterministic defect proposal for existing raster artwork. It never alters the
+ * source. Hidden transparent RGB is edge-aware by default to avoid giant false
+ * positives in matte-filled transparent canvases; transparent logos/cutouts can
+ * opt into strict whole-canvas cleanup through their review profile or mode.
  */
 export async function detectExistingImageDefects(
   encoded: Buffer,
@@ -116,10 +162,12 @@ export async function detectExistingImageDefects(
   const height = decoded.info.height;
   const raw = decoded.data;
 
+  const transparentRgbMode = resolveTransparentRgbMode(spec);
   const haloLumaThreshold = boundedByte(spec.haloLumaThreshold, 220, "haloLumaThreshold");
+  const haloColorDistanceThreshold = boundedNumber(spec.haloColorDistanceThreshold, 90, 1, 442, "haloColorDistanceThreshold");
   const pinholeAlphaMaximum = boundedByte(spec.pinholeAlphaMaximum, 70, "pinholeAlphaMaximum");
   const speckAlphaMinimum = boundedByte(spec.speckAlphaMinimum, 80, "speckAlphaMinimum");
-  const stairStepMinimumTransitions = boundedInteger(spec.stairStepMinimumTransitions, 3, 2, 8, "stairStepMinimumTransitions");
+  const stairStepMinimumTransitions = boundedInteger(spec.stairStepMinimumTransitions, 3, 2, 4, "stairStepMinimumTransitions");
   const maskPadding = boundedInteger(spec.maskPadding, 2, 0, 24, "maskPadding");
   const maximumMaskCoverageRatio = boundedRatio(spec.maximumMaskCoverageRatio, 0.2);
 
@@ -155,36 +203,51 @@ export async function detectExistingImageDefects(
       const opaqueN = countOpaqueNeighbours(raw, width, height, x, y);
       const transparentN = countTransparentNeighbours(raw, width, height, x, y);
 
-      if (a === 0 && (r !== 0 || g !== 0 || b !== 0)) mark(x, y, "transparent-rgb-contamination");
+      if (a === 0 && (r !== 0 || g !== 0 || b !== 0) && transparentRgbMode !== "off") {
+        if (transparentRgbMode === "all" || hasVisibleNeighbour(raw, width, height, x, y)) mark(x, y, "transparent-rgb-contamination");
+      }
 
-      if (a > 0 && a < 230 && opaqueN > 0 && luma(r, g, b) >= haloLumaThreshold) {
-        let donorLuma = 0;
+      if (a > 0 && a < 230 && opaqueN > 0) {
+        let donorR = 0;
+        let donorG = 0;
+        let donorB = 0;
         let donorCount = 0;
         for (let yy = Math.max(0, y - 1); yy <= Math.min(height - 1, y + 1); yy += 1) {
           for (let xx = Math.max(0, x - 1); xx <= Math.min(width - 1, x + 1); xx += 1) {
             if (xx === x && yy === y) continue;
             const di = idx(width, xx, yy);
             if (raw[di + 3]! < 220) continue;
-            donorLuma += luma(raw[di]!, raw[di + 1]!, raw[di + 2]!);
+            donorR += raw[di]!;
+            donorG += raw[di + 1]!;
+            donorB += raw[di + 2]!;
             donorCount += 1;
           }
         }
-        if (donorCount && luma(r, g, b) - donorLuma / donorCount > 45) mark(x, y, "edge-halo-risk");
+        if (donorCount) {
+          const dr = donorR / donorCount;
+          const dg = donorG / donorCount;
+          const db = donorB / donorCount;
+          const colourDistance = rgbDistance(r, g, b, dr, dg, db);
+          const lumaDelta = Math.abs(luma(r, g, b) - luma(dr, dg, db));
+          const legacyBrightHalo = luma(r, g, b) >= haloLumaThreshold && luma(r, g, b) - luma(dr, dg, db) > 45;
+          if (colourDistance >= haloColorDistanceThreshold || lumaDelta > 70 || legacyBrightHalo) mark(x, y, "edge-halo-risk");
+        }
       }
 
       if (a > 0 && a <= pinholeAlphaMaximum && opaqueN >= 5) mark(x, y, "alpha-pinhole");
       if (a >= speckAlphaMinimum && a < 255 && transparentN >= 7) mark(x, y, "isolated-alpha-speck");
 
       if (a > 0 && a < 255) {
-        let transitions = 0;
         const neighbours = [
           x > 0 ? alphaAt(raw, width, x - 1, y) : a,
           x + 1 < width ? alphaAt(raw, width, x + 1, y) : a,
           y > 0 ? alphaAt(raw, width, x, y - 1) : a,
           y + 1 < height ? alphaAt(raw, width, x, y + 1) : a,
         ];
-        for (const n of neighbours) if ((n <= 8 && a >= 220) || (n >= 220 && a <= 8)) transitions += 1;
-        if (transitions >= stairStepMinimumTransitions) mark(x, y, "hard-alpha-stair-step");
+        const hardJumps = neighbours.filter((n) => Math.abs(n - a) >= 160).length;
+        const lower = neighbours.filter((n) => n <= 24).length;
+        const higher = neighbours.filter((n) => n >= 231).length;
+        if (hardJumps >= stairStepMinimumTransitions && lower > 0 && higher > 0) mark(x, y, "hard-alpha-stair-step");
       }
     }
   }
@@ -231,6 +294,8 @@ export async function detectExistingImageDefects(
       width,
       height,
       totalPixels,
+      profile: spec.profile ?? null,
+      transparentRgbMode,
       defectPixels,
       defectPixelRatio: defectPixels / totalPixels,
       maskCoverageRatio,
