@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.invalid/contracts/work-header-publication-preparation-v1.schema.json",
+  "title": "EVAVO Work Header Publication Preparation Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "schemaSha256",
+    "preparationState",
+    "targetKind",
+    "targetIdentifier",
+    "preparationNote",
+    "preparedAt",
+    "preparationIdentity",
+    "preparationIdentitySha256",
+    "approvalDecisionReverifiedBeforePreparation",
+    "explicitReviewerApprovalRequiredAndVerified",
+    "fullReceiptLineageVerified",
+    "browserResponseMetadataVerified",
+    "candidateBytesVerified",
+    "backupRequiredBeforeExecution",
+    "rollbackEvidenceRequiredBeforeExecution",
+    "stableUrlOrPublicIdPreservationRequired",
+    "sourceCodeBackupOrRevertPointRequired",
+    "executionAllowed",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed",
+    "nextRequiredAction"
+  ],
+  "properties": {
+    "contract": {
+      "const": "evavo.work-header-publication-preparation.v1"
+    },
+    "schemaSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "preparationState": {
+      "const": "prepared-unexecuted"
+    },
+    "targetKind": {
+      "enum": [
+        "website-header-source-update",
+        "cloudinary-stable-id-replacement"
+      ]
+    },
+    "targetIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "preparationNote": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "preparedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "preparationIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approvalDecisionPath",
+        "approvalDecisionSha256",
+        "approvalDecisionByteLength",
+        "approvalPacketSha256",
+        "pageRenderReceiptSha256",
+        "selectionReceiptSha256",
+        "candidateReviewReceiptSha256",
+        "previewAdmissionReceiptSha256",
+        "candidateSha256",
+        "candidateByteLength",
+        "route",
+        "candidateId",
+        "targetKind",
+        "targetIdentifier"
+      ],
+      "properties": {
+        "approvalDecisionPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvalDecisionSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approvalDecisionByteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "approvalPacketSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "pageRenderReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "selectionReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidateReviewReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "previewAdmissionReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidateSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidateByteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^/work/[a-z0-9-]+$"
+        },
+        "candidateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetKind": {
+          "enum": [
+            "website-header-source-update",
+            "cloudinary-stable-id-replacement"
+          ]
+        },
+        "targetIdentifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "preparationIdentitySha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "approvalDecisionReverifiedBeforePreparation": {
+      "const": true
+    },
+    "explicitReviewerApprovalRequiredAndVerified": {
+      "const": true
+    },
+    "fullReceiptLineageVerified": {
+      "const": true
+    },
+    "browserResponseMetadataVerified": {
+      "const": true
+    },
+    "candidateBytesVerified": {
+      "const": true
+    },
+    "backupRequiredBeforeExecution": {
+      "const": true
+    },
+    "rollbackEvidenceRequiredBeforeExecution": {
+      "const": true
+    },
+    "stableUrlOrPublicIdPreservationRequired": {
+      "type": "boolean"
+    },
+    "sourceCodeBackupOrRevertPointRequired": {
+      "type": "boolean"
+    },
+    "executionAllowed": {
+      "const": false
+    },
+    "publicationAllowed": {
+      "const": false
+    },
+    "cloudOverwriteAllowed": {
+      "const": false
+    },
+    "websiteMutationAllowed": {
+      "const": false
+    },
+    "nextRequiredAction": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "targetKind": {
+            "const": "cloudinary-stable-id-replacement"
+          }
+        },
+        "required": [
+          "targetKind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stableUrlOrPublicIdPreservationRequired": {
+            "const": true
+          },
+          "sourceCodeBackupOrRevertPointRequired": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "targetKind": {
+            "const": "website-header-source-update"
+          }
+        },
+        "required": [
+          "targetKind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stableUrlOrPublicIdPreservationRequired": {
+            "const": false
+          },
+          "sourceCodeBackupOrRevertPointRequired": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}
