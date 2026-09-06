@@ -14,7 +14,7 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-image-review-orchestrator";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 
@@ -30,9 +30,7 @@ async function review(args) {
   const inputPath = await assertAllowed(args.inputPath);
   const compareAgainst = [];
   for (const item of args.compareAgainst ?? []) {
-    if (!item || typeof item.id !== "string" || typeof item.path !== "string") {
-      throw new Error("Each compareAgainst entry requires id and path.");
-    }
+    if (!item || typeof item.id !== "string" || typeof item.path !== "string") throw new Error("Each compareAgainst entry requires id and path.");
     const candidatePath = await assertAllowed(item.path);
     compareAgainst.push({ id: item.id, image: await readFile(candidatePath) });
   }
@@ -47,7 +45,7 @@ async function review(args) {
     inputPath,
     ...result,
     publicationAllowed: false,
-    instruction: "Use this result to route work. Technical PASS only advances to visual review; it never publishes an asset automatically.",
+    instruction: "Use this result to route work. Technical PASS only advances to visual review; ranked defect regions must be inspected before finishing and this tool never publishes an asset automatically.",
   });
 }
 
@@ -59,7 +57,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_image_for_intended_use",
-    description: "Run the unified review pipeline for an existing image. Auto-selects or accepts an asset QA profile, checks technical quality, optionally performs Work-header crop QA, compares against adjacent images for duplicate/repetitive storytelling, and routes the result to reject, finishing, or mandatory visual review.",
+    description: "Run unified review for an existing image. Uses alpha-weighted visible-pixel quality metrics, profile-aware defect detection with ranked connected defect regions, optional Work-header crop QA, and adjacent-image similarity checks before routing to reject, finishing or mandatory visual review.",
     inputSchema: {
       type: "object",
       properties: {
@@ -92,16 +90,22 @@ const tools = Object.freeze([
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_image_review_orchestrator_v1",
+    contract: "evavo_image_review_orchestrator_v1_1",
+    serverVersion: SERVER_VERSION,
     allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
     profiles: IMAGE_REVIEW_PROFILE_NAMES,
     routes: ["reject", "needs-finishing", "pass-to-visual-review"],
+    alphaWeightedVisiblePixelMetrics: true,
+    profileAwareDefectDetection: true,
+    rankedConnectedDefectRegions: true,
+    sourceMutation: false,
     checks: [
       "asset-aware-profile-selection",
-      "sharpness-and-detail",
-      "contrast-and-clipping",
-      "alpha-contamination-and-halo-risk",
-      "alpha-pinhole-risk",
+      "alpha-weighted-visible-sharpness-and-detail",
+      "alpha-weighted-visible-contrast-and-clipping",
+      "profile-aware-alpha-contamination-and-halo-risk",
+      "alpha-pinhole-and-discontinuity-risk",
+      "ranked-connected-defect-regions",
       "compression-blockiness-risk",
       "work-header-resolution-and-crop-safety",
       "near-duplicate-and-repetition-detection",
