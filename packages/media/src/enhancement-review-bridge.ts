@@ -67,6 +67,15 @@ const ROLE_MAP: Readonly<Record<string, AdmittedEnhancementStudioReview["intende
   texture: "texture",
 });
 
+const REQUIRED_ROLE_PROFILE: Readonly<Partial<Record<AdmittedEnhancementStudioReview["intendedRole"], ImageReviewProfileName>>> = Object.freeze({
+  "work-header": "web-hero",
+  logo: "logo-transparent",
+  ui: "ui-screenshot",
+  photo: "photo",
+  sprite: "pixel-art",
+  texture: "texture",
+});
+
 function sha(value: unknown, label: string): string {
   if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) {
     throw new Error(`${label} must be a lowercase SHA-256 hex digest.`);
@@ -88,12 +97,6 @@ function strings(value: unknown, label: string): readonly string[] {
   return Object.freeze([...new Set(value)]);
 }
 
-/**
- * Admits an Enhancement Studio review manifest into Art Studio without trusting
- * it as an approval. This intentionally fails closed on every authority field:
- * enhancement candidates remain source-bound review material until Art Studio's
- * technical AND actual visual/page-context review has completed.
- */
 export function admitEnhancementStudioReviewManifest(
   value: EnhancementStudioReviewManifest,
 ): AdmittedEnhancementStudioReview {
@@ -125,13 +128,22 @@ export function admitEnhancementStudioReviewManifest(
   }
   const role = ROLE_MAP[value.intended_role];
   if (!role) throw new Error(`Unknown Enhancement Studio intended role ${JSON.stringify(value.intended_role)}.`);
+  const requiredProfile = REQUIRED_ROLE_PROFILE[role];
+  if (requiredProfile && profile !== requiredProfile) {
+    throw new Error(`Enhancement Studio role ${role} requires Art Studio profile ${requiredProfile}, received ${profile}.`);
+  }
 
-  positiveInteger(value.source_width, "source_width");
-  positiveInteger(value.source_height, "source_height");
-  positiveInteger(value.candidate_width, "candidate_width");
-  positiveInteger(value.candidate_height, "candidate_height");
+  const sourceWidth = positiveInteger(value.source_width, "source_width");
+  const sourceHeight = positiveInteger(value.source_height, "source_height");
+  const candidateWidth = positiveInteger(value.candidate_width, "candidate_width");
+  const candidateHeight = positiveInteger(value.candidate_height, "candidate_height");
+  if (candidateWidth < sourceWidth || candidateHeight < sourceHeight) {
+    throw new Error("Enhancement Studio candidate dimensions cannot be smaller than the immutable source dimensions.");
+  }
+
   const requiredTools = strings(value.mandatory_art_studio_tools, "mandatory_art_studio_tools");
   const visualChecks = strings(value.mandatory_visual_checks, "mandatory_visual_checks");
+  if (visualChecks.length < 1) throw new Error("Enhancement Studio review manifest must include visual review checks.");
 
   const expectedTools = [
     "evavo_review_existing_image_quality",
@@ -141,8 +153,10 @@ export function admitEnhancementStudioReviewManifest(
   for (const tool of expectedTools) {
     if (!requiredTools.includes(tool)) throw new Error(`Enhancement Studio review manifest omitted required Art Studio tool ${tool}.`);
   }
-  if (role === "work-header" && !requiredTools.includes("evavo_review_work_header_image")) {
-    throw new Error("Work-header enhancement candidates must require the Art Studio header reviewer.");
+  if (role === "work-header") {
+    for (const tool of ["evavo_review_work_header_image", "evavo_review_image_for_intended_use"]) {
+      if (!requiredTools.includes(tool)) throw new Error(`Work-header enhancement candidates must require ${tool}.`);
+    }
   }
   if (["work-header", "support-image", "tile"].includes(role) && value.page_context_review_required !== true) {
     throw new Error("Website media enhancement candidates must require page-context review.");
