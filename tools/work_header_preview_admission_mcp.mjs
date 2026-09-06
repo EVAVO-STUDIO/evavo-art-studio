@@ -9,7 +9,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-preview-admission";
-const SERVER_VERSION = "1.2.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -39,14 +39,12 @@ async function admit(args) {
   const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
   const desktop = captureByProfile(manifest, "desktop");
   const mobile = captureByProfile(manifest, "mobile");
-
   const [currentDesktop, candidateDesktop, currentMobile, candidateMobile] = await Promise.all([
     readBound(desktop.currentScreenshot.path),
     readBound(desktop.candidateScreenshot.path),
     readBound(mobile.currentScreenshot.path),
     readBound(mobile.candidateScreenshot.path),
   ]);
-
   const admission = admitWorkHeaderCandidatePreviewManifest(manifest, {
     currentDesktop: currentDesktop.bytes,
     candidateDesktop: candidateDesktop.bytes,
