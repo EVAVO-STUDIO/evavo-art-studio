@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.dev/contracts/art-studio-enhancement-review-v1.schema.json",
+  "title": "EVAVO Enhancement Studio to Art Studio Review Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "source_path",
+    "source_sha256",
+    "source_width",
+    "source_height",
+    "candidate_path",
+    "candidate_sha256",
+    "candidate_width",
+    "candidate_height",
+    "enhancement_profile",
+    "art_studio_review_profile",
+    "intended_role",
+    "learned_candidate",
+    "comparison",
+    "mandatory_art_studio_tools",
+    "mandatory_visual_checks",
+    "approval_state",
+    "source_immutable",
+    "candidate_is_review_only",
+    "art_studio_visual_review_required",
+    "durable_image_review_session_required",
+    "page_context_review_required",
+    "comparative_candidate_review_required",
+    "current_header_baseline_required",
+    "semantic_review_brief_required",
+    "candidate_preview_admission_required",
+    "candidate_page_render_review_required",
+    "approval_packet_required",
+    "publication_allowed",
+    "cloud_overwrite_allowed",
+    "automatic_creative_approval",
+    "automatic_release_approval"
+  ],
+  "properties": {
+    "contract": { "const": "evavo.enhancement-art-review.v1" },
+    "source_path": { "type": "string", "minLength": 1 },
+    "source_sha256": { "$ref": "#/$defs/sha256" },
+    "source_width": { "$ref": "#/$defs/dimension" },
+    "source_height": { "$ref": "#/$defs/dimension" },
+    "candidate_path": { "type": "string", "minLength": 1 },
+    "candidate_sha256": { "$ref": "#/$defs/sha256" },
+    "candidate_width": { "$ref": "#/$defs/dimension" },
+    "candidate_height": { "$ref": "#/$defs/dimension" },
+    "enhancement_profile": { "type": "string", "minLength": 1 },
+    "art_studio_review_profile": {
+      "enum": [
+        "logo-transparent",
+        "web-hero",
+        "ui-screenshot",
+        "product-cutout",
+        "photo",
+        "cel-animation-frame",
+        "pixel-art",
+        "texture",
+        "illustration"
+      ]
+    },
+    "intended_role": { "type": "string", "minLength": 1 },
+    "provider": { "type": ["string", "null"] },
+    "model": { "type": ["string", "null"] },
+    "learned_candidate": { "type": "boolean" },
+    "comparison": { "type": "object" },
+    "mandatory_art_studio_tools": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "mandatory_visual_checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "approval_state": { "const": "unapproved" },
+    "source_immutable": { "const": true },
+    "candidate_is_review_only": { "const": true },
+    "art_studio_visual_review_required": { "const": true },
+    "durable_image_review_session_required": { "const": true },
+    "page_context_review_required": { "type": "boolean" },
+    "comparative_candidate_review_required": { "type": "boolean" },
+    "current_header_baseline_required": { "type": "boolean" },
+    "semantic_review_brief_required": { "type": "boolean" },
+    "candidate_preview_admission_required": { "type": "boolean" },
+    "candidate_page_render_review_required": { "type": "boolean" },
+    "approval_packet_required": { "type": "boolean" },
+    "publication_allowed": { "const": false },
+    "cloud_overwrite_allowed": { "const": false },
+    "automatic_creative_approval": { "const": false },
+    "automatic_release_approval": { "const": false }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dimension": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32768
+    }
+  }
+}
