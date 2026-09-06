@@ -22,6 +22,7 @@ export interface WorkHeaderApprovalPacketResult {
     reviewEvidenceHashBindingVerified: boolean;
     pageRenderShortlisted: boolean;
     candidateIdentityMatchesPageRender: boolean;
+    candidateHashMatchesPageRender: boolean;
   }>;
   readonly explicitApprovalStillRequired: true;
   readonly automaticPublicationAllowed: false;
@@ -29,14 +30,10 @@ export interface WorkHeaderApprovalPacketResult {
   readonly automaticWebsiteMutationAllowed: false;
 }
 
-/**
- * Converts already-reviewed evidence into an approval packet only. It does not
- * approve, publish, upload, mutate a website, or overwrite Cloudinary assets.
- */
 export function prepareWorkHeaderApprovalPacket(spec: WorkHeaderApprovalPacketSpec): WorkHeaderApprovalPacketResult {
   if (!spec?.selection || !spec?.pageRender) throw new Error("selection and pageRender evidence are required.");
   const blockers: string[] = [];
-  const candidateRecommended = spec.selection.recommendation === "candidate-recommended" && Boolean(spec.selection.recommendedCandidateId);
+  const candidateRecommended = spec.selection.recommendation === "candidate-recommended" && Boolean(spec.selection.recommendedCandidateId) && Boolean(spec.selection.recommendedCandidateSha256);
   if (!candidateRecommended) blockers.push(`selection-not-candidate-recommended:${spec.selection.recommendation}`);
   if (!spec.selection.semanticBriefProvided) blockers.push("semantic-review-brief-not-proved");
   if (!spec.selection.currentHeaderBaselineProvided) blockers.push("current-header-baseline-not-proved");
@@ -50,11 +47,15 @@ export function prepareWorkHeaderApprovalPacket(spec: WorkHeaderApprovalPacketSp
     spec.pageRender.candidateId === spec.selection.recommendedCandidateId;
   if (!candidateIdentityMatchesPageRender) blockers.push("page-render-candidate-id-does-not-match-selection");
 
+  const candidateHashMatchesPageRender = Boolean(spec.selection.recommendedCandidateSha256) &&
+    spec.pageRender.candidateSha256 === spec.selection.recommendedCandidateSha256;
+  if (!candidateHashMatchesPageRender) blockers.push("page-render-candidate-hash-does-not-match-selection");
+
   return Object.freeze({
     contract: WORK_HEADER_APPROVAL_PACKET_CONTRACT,
     status: blockers.length ? "blocked" : "ready-for-explicit-approval",
-    candidateId: spec.selection.recommendedCandidateId,
-    candidateSha256: candidateIdentityMatchesPageRender ? spec.pageRender.candidateSha256 : null,
+    candidateId: candidateRecommended ? spec.selection.recommendedCandidateId : null,
+    candidateSha256: candidateIdentityMatchesPageRender && candidateHashMatchesPageRender ? spec.pageRender.candidateSha256 : null,
     blockers: Object.freeze(blockers),
     verified: Object.freeze({
       candidateRecommended,
@@ -64,6 +65,7 @@ export function prepareWorkHeaderApprovalPacket(spec: WorkHeaderApprovalPacketSp
       reviewEvidenceHashBindingVerified: spec.selection.reviewEvidenceHashBindingVerified,
       pageRenderShortlisted,
       candidateIdentityMatchesPageRender,
+      candidateHashMatchesPageRender,
     }),
     explicitApprovalStillRequired: true,
     automaticPublicationAllowed: false,
