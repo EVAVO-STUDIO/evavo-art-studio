@@ -153,7 +153,7 @@ export async function reviewEnhancementStudioCandidate(
   ];
 
   const materialTechnicalBenefitFound = sourceSpaceEdit.evidence.improvements.length > 0 ||
-    nativeCandidateReview.quality.score >= sourceSpaceEdit.evidence.source.score + 3;
+    sourceSpaceEdit.evidence.edited.score >= sourceSpaceEdit.evidence.source.score + 3;
   if (!materialTechnicalBenefitFound) {
     warnings.push("no-material-technical-benefit-proved-over-source");
     if (admitted.learnedCandidate) blockers.push("learned-enhancement-has-no-proven-source-space-benefit");
