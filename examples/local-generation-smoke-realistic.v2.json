@@ -1,0 +1,51 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "evavo-smoke-realistic-v1",
+  "contentClass": "general",
+  "batch_size": 1,
+  "generation_mode": "sequential-anchor",
+  "consistency_mode": "strict",
+  "quality_profile": "cinematic_stills",
+  "quality_overrides": {"width": 1024, "height": 1024, "steps": 32, "cfg": 5.5, "sampler": "dpmpp_2m", "scheduler": "karras", "denoise": 1, "outputFormat": "png"},
+  "character": {
+    "id": "realistic-field-engineer-anchor",
+    "description": "An original adult field engineer in practical outdoor clothing, photographed naturally with realistic proportions and skin texture",
+    "face": "specific original adult face with natural asymmetry and believable skin detail",
+    "hair": "short wind-tousled dark hair",
+    "build": "average athletic adult proportions",
+    "costume": "weathered canvas jacket over plain work shirt, dark trousers and practical boots with no branding",
+    "palette": ["weathered brown", "charcoal", "muted green", "natural skin tones"],
+    "signatureDetails": ["natural skin texture", "credible fabric construction", "physically coherent equipment"]
+  },
+  "style": {
+    "name": "original-cinematic-documentary-photography",
+    "description": "Original cinematic documentary-style photography with believable optics, natural skin, physically coherent materials, restrained colour grading and motivated environmental light rather than glossy AI portrait treatment",
+    "medium": "realistic photographic still",
+    "period": "contemporary documentary cinematography",
+    "lighting": "soft late-afternoon overcast key with subtle practical bounce and realistic dynamic range",
+    "palette": ["natural earth tones", "muted foliage", "restrained warm skin"],
+    "materials": ["weathered canvas", "real skin", "brushed metal", "damp soil"],
+    "lineTreatment": ["natural optical edge falloff", "realistic depth of field", "no painted outlines"],
+    "mustHave": ["credible anatomy", "natural face detail", "realistic fabric folds", "coherent lens perspective", "specific environment"],
+    "mustAvoid": ["plastic skin", "beauty-filter face", "HDR halo", "over-sharpening", "generic stock-photo smile", "fantasy lighting", "obvious AI artifacts"]
+  },
+  "continuity_locks": ["keep anatomy physically plausible", "keep lighting motivated", "no logos or text"],
+  "quality_prompt": ["believable documentary photograph", "subtle cinematic composition", "natural human detail", "physically coherent scene"],
+  "negative": ["plastic skin", "extra fingers", "duplicate limbs", "overprocessed HDR", "AI-generated text artifacts", "watermark", "logo"],
+  "seed_strategy": {"base": 90620263, "stride": 1},
+  "output_rules": {"exactCount": true, "requireUniqueHashes": true, "requireNonZeroBytes": true, "requireDimensions": true, "writeImageMetadata": true, "preserveAttempts": false},
+  "retry_rules": {"maxShotAttempts": 2, "retryMissing": true, "retryInvalidFile": true, "retryDimensionMismatch": true, "retryDuplicate": true, "seedBump": 1009},
+  "provider": {"baseUrl": "http://127.0.0.1:8192", "adapterId": "comfyui:sdxl-base-local-cinematic_stills"},
+  "shots": [
+    {
+      "id": "001-realistic-anchor",
+      "description": "A realistic documentary portrait of an original adult field engineer standing beside a rain-darkened utility shed at the edge of native bushland after a passing shower",
+      "pose": "natural standing posture with relaxed hands and believable weight distribution",
+      "camera": "eye-level 50mm-equivalent environmental portrait",
+      "expression": "calm attentive neutral expression",
+      "background": "realistic damp utility shed and soft-focus bushland with no text or branding",
+      "framing": "three-quarter body with environmental context",
+      "continuityLocks": ["one adult subject", "no text", "no logos"]
+    }
+  ]
+}
