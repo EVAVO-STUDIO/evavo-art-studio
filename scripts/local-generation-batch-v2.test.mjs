@@ -72,6 +72,19 @@ test('quality profiles provide actual generation settings and anti-generic promp
   }
 });
 
+test('style must-have directives survive validation and enter the positive prompt', () => {
+  const source = manifest({ count: 1 });
+  source.style.mustHave = ['required-hand-drawn-smoke-shape', 'clear silhouette'];
+  source.style.mustAvoid = ['generic AI look', '3D particle render'];
+  const plan = compileBatchPlan(source);
+  const frame = plan.frames[0];
+  assert.deepEqual(plan.style.mustHave, ['required-hand-drawn-smoke-shape', 'clear silhouette']);
+  assert.match(frame.prompt.positiveLayers.style, /required visual directives: required-hand-drawn-smoke-shape, clear silhouette/u);
+  assert.match(frame.prompt.positive, /required-hand-drawn-smoke-shape/u);
+  assert.match(frame.prompt.negative, /generic AI look/u);
+  assert.match(frame.prompt.negative, /3D particle render/u);
+});
+
 test('120-shot campaign validates and chunks without fixed-count assumptions', () => {
   const source = manifest({ count: 120 });
   const validated = validateLocalGenerationBatch(source);
@@ -110,6 +123,7 @@ test('compiled legacy manifest preserves structured prompt layers and reviewed l
   assert.equal(legacy.provider.adapterId, 'comfyui:sdxl-base-local');
   assert.match(legacy.scenes[0].prompt, /A deliberately specific recurring character/u);
   assert.match(legacy.scenes[0].prompt, /Specific authored production art/u);
+  assert.match(legacy.scenes[0].prompt, /clear silhouette/u);
   assert.match(legacy.scenes[0].prompt, /cinematic production still/u);
   assert.match(legacy.scenes[0].negativePrompt, /generic AI look/u);
 });
