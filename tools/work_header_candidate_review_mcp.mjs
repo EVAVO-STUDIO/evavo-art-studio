@@ -3,11 +3,15 @@
 import { readFile, writeFile } from "node:fs/promises";
 import readline from "node:readline";
 
-import { compareWorkHeaderCandidates, judgeWorkHeaderVisualCritique } from "../packages/media/dist/index.js";
+import {
+  compareWorkHeaderCandidates,
+  judgeWorkHeaderVisualCritique,
+  resolveWorkHeaderSelection,
+} from "../packages/media/dist/index.js";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-candidate-review";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -56,7 +60,7 @@ async function compareCandidates(args) {
     creativeWinner: null,
     publicationAllowed: false,
     cloudOverwriteAllowed: false,
-    nextRequiredAction: "A human or vision-capable agent must inspect the board and submit an explicit visual critique for shortlisted candidates.",
+    nextRequiredAction: "A human or vision-capable agent must inspect the board and submit explicit visual critiques before running the conservative selection resolver.",
   }, null, 2)}\n`, { flag: "wx" });
   return { ok: true, proofPath, receiptPath, evidence: result.evidence };
 }
@@ -76,10 +80,57 @@ async function recordCritique(args) {
   return { ok: true, receiptPath, critique: result };
 }
 
+async function resolveSelection(args) {
+  if (typeof args.candidateReviewReceiptPath !== "string") throw new Error("candidateReviewReceiptPath is required.");
+  if (!Array.isArray(args.critiqueReceiptPaths) || args.critiqueReceiptPaths.length < 1) throw new Error("critiqueReceiptPaths must contain at least one critique receipt.");
+  if (typeof args.receiptPath !== "string") throw new Error("receiptPath is required.");
+  if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required.");
+  if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
+
+  const candidateReviewReceiptPath = await allowed(args.candidateReviewReceiptPath, false);
+  const candidateReviewReceipt = JSON.parse(await readFile(candidateReviewReceiptPath, "utf8"));
+  if (candidateReviewReceipt.contract !== "evavo.work-header-candidate-review.v1" || !candidateReviewReceipt.evidence) {
+    throw new Error("candidateReviewReceiptPath must point to an evavo.work-header-candidate-review.v1 receipt.");
+  }
+  const critiques = [];
+  for (const path of args.critiqueReceiptPaths) {
+    const resolved = await allowed(path, false);
+    const value = JSON.parse(await readFile(resolved, "utf8"));
+    if (value.contract !== "evavo.work-header-visual-critique.v1") throw new Error(`Critique receipt ${resolved} has an unsupported contract.`);
+    critiques.push(value);
+  }
+  let currentHeaderCritique;
+  if (args.currentHeaderCritiqueReceiptPath) {
+    const resolved = await allowed(args.currentHeaderCritiqueReceiptPath, false);
+    const value = JSON.parse(await readFile(resolved, "utf8"));
+    if (value.contract !== "evavo.work-header-visual-critique.v1") throw new Error("currentHeaderCritiqueReceiptPath must point to an evavo.work-header-visual-critique.v1 receipt.");
+    currentHeaderCritique = value;
+  }
+
+  const result = resolveWorkHeaderSelection({
+    candidateReview: candidateReviewReceipt.evidence,
+    critiques,
+    currentHeaderCritique,
+    minimumVisualScore: args.minimumVisualScore,
+    minimumAdvantageOverCurrent: args.minimumAdvantageOverCurrent,
+    minimumTechnicalScore: args.minimumTechnicalScore,
+    requireCurrentHeaderBaseline: args.requireCurrentHeaderBaseline,
+  });
+  const receiptPath = await allowed(args.receiptPath, true);
+  await writeFile(receiptPath, `${JSON.stringify({
+    ...result,
+    approvalState: "unapproved",
+    publicationAllowed: false,
+    cloudOverwriteAllowed: false,
+    websiteMutationAllowed: false,
+  }, null, 2)}\n`, { flag: "wx" });
+  return { ok: true, receiptPath, resolution: result };
+}
+
 const tools = [
   {
     name: "evavo_work_header_candidate_review_capabilities",
-    description: "Describe comparative Work-header candidate review and explicit visual-critique requirements.",
+    description: "Describe comparative Work-header candidate review, explicit visual critique, and conservative retain-current selection policy.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -122,6 +173,26 @@ const tools = [
       additionalProperties: false,
     },
   },
+  {
+    name: "evavo_resolve_work_header_selection",
+    description: "Resolve technical evidence plus explicit visual critiques into a conservative recommendation. Defaults to retaining the current header unless a candidate proves a material visual and technical advantage. Never mutates the website or Cloudinary.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        candidateReviewReceiptPath: { type: "string" },
+        critiqueReceiptPaths: { type: "array", minItems: 1, maxItems: 12, items: { type: "string" } },
+        currentHeaderCritiqueReceiptPath: { type: "string" },
+        minimumVisualScore: { type: "number", minimum: 0, maximum: 100 },
+        minimumAdvantageOverCurrent: { type: "number", minimum: 0, maximum: 30 },
+        minimumTechnicalScore: { type: "number", minimum: 0, maximum: 100 },
+        requireCurrentHeaderBaseline: { type: "boolean" },
+        receiptPath: { type: "string" },
+        confirmLocalWrite: { type: "boolean" },
+      },
+      required: ["candidateReviewReceiptPath", "critiqueReceiptPaths", "receiptPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function capabilities() {
@@ -132,12 +203,17 @@ function capabilities() {
     comparativeResponsiveProofBoard: true,
     technicalShortlistingOnly: true,
     explicitVisualCritiqueRequired: true,
+    conservativeSelectionResolverAvailable: true,
+    retainCurrentByDefault: true,
+    currentHeaderBaselineRecommended: true,
+    materialAdvantageRequiredForReplacementRecommendation: true,
     genericStockRiskHardDisqualifier: true,
     aiLookingRiskHardDisqualifier: true,
     blurryCheapRiskHardDisqualifier: true,
     mobileCropFailureHardDisqualifier: true,
     automaticCreativeWinner: false,
     automaticPublicationAllowed: false,
+    automaticWebsiteMutationAllowed: false,
     cloudOverwriteAllowed: false,
   };
 }
@@ -146,6 +222,7 @@ async function callTool(name, args) {
   if (name === "evavo_work_header_candidate_review_capabilities") return capabilities();
   if (name === "evavo_compare_work_header_candidates") return compareCandidates(args ?? {});
   if (name === "evavo_record_work_header_visual_critique") return recordCritique(args ?? {});
+  if (name === "evavo_resolve_work_header_selection") return resolveSelection(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 
