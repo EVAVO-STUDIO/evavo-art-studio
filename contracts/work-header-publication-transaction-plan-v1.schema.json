@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evavo.work-header-publication-transaction-plan.v1",
+  "title": "EVAVO Work Header Publication Transaction Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "schemaSha256",
+    "transactionState",
+    "targetKind",
+    "targetIdentifier",
+    "publicationPreparationReceiptPath",
+    "publicationPreparationReceiptSha256",
+    "publicationPreparationReceiptByteLength",
+    "route",
+    "candidateId",
+    "candidateSha256",
+    "candidateByteLength",
+    "currentTargetSnapshot",
+    "rollbackEvidence",
+    "explicitExecutionConfirmationRequired",
+    "backupCapturedBeforeExecution",
+    "rollbackEvidenceVerifiedBeforeExecution",
+    "executionAllowed",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed"
+  ],
+  "properties": {
+    "contract": {
+      "const": "evavo.work-header-publication-transaction-plan.v1"
+    },
+    "schemaSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transactionState": {
+      "const": "planned-unexecuted"
+    },
+    "targetKind": {
+      "enum": [
+        "website-header-source-update",
+        "cloudinary-stable-id-replacement"
+      ]
+    },
+    "targetIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "publicationPreparationReceiptPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "publicationPreparationReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "publicationPreparationReceiptByteLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "route": {
+      "type": "string",
+      "pattern": "^/work/[a-z0-9-]+$"
+    },
+    "candidateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "candidateSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidateByteLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "currentTargetSnapshot": {
+      "$ref": "#/$defs/fileBinding"
+    },
+    "rollbackEvidence": {
+      "$ref": "#/$defs/rollbackEvidence"
+    },
+    "explicitExecutionConfirmationRequired": {
+      "const": true
+    },
+    "backupCapturedBeforeExecution": {
+      "const": true
+    },
+    "rollbackEvidenceVerifiedBeforeExecution": {
+      "const": true
+    },
+    "stableUrlOrPublicIdMustBePreserved": {
+      "type": "boolean"
+    },
+    "websiteRevertPointRequired": {
+      "type": "boolean"
+    },
+    "executionAllowed": {
+      "const": false
+    },
+    "publicationAllowed": {
+      "const": false
+    },
+    "cloudOverwriteAllowed": {
+      "const": false
+    },
+    "websiteMutationAllowed": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "byteLength",
+        "immutableEvidence"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "immutableEvidence": {
+          "const": true
+        }
+      }
+    },
+    "rollbackEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backupPath",
+        "backupSha256",
+        "backupByteLength",
+        "restoreTargetIdentifier",
+        "rollbackReady"
+      ],
+      "properties": {
+        "backupPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "backupSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "backupByteLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "restoreTargetIdentifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "rollbackReady": {
+          "const": true
+        }
+      }
+    }
+  }
+}
