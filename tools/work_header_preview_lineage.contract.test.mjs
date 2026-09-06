@@ -34,17 +34,34 @@ test("preview admission has read-only stale-evidence reverification", async () =
   ]) assert.ok(source.includes(token), `missing preview reverification token: ${token}`);
 });
 
-test("page render accepts screenshots only through a reverified preview admission receipt", async () => {
+test("page render requires fully reverified atomic preview admission", async () => {
   const source = await read("./work_header_page_render_review_mcp.mjs");
   for (const token of [
+    'SERVER_VERSION = "1.5.0"',
     "previewAdmissionReceiptPath",
     "verifyPreviewAdmissionReceipt",
     "previewAdmissionReceiptRequiredForPageRenderReview: true",
     "previewAdmissionReceiptReverifiedBeforePageReview: true",
     "previewAdmissionReceiptReverifiedBeforeApprovalPacket: true",
+    "previewAdmissionManifestSha256AndLengthReverified: true",
+    "atomicPreviewEvidenceBundleRequired: true",
+    "atomicPreviewEvidenceBundleReverifiedBeforePageReview: true",
+    "atomicEvidenceBundleVerified",
+    "previewAdmissionFullyReverified: true",
     "rawCallerScreenshotPathsAccepted: false",
   ]) assert.ok(source.includes(token), `missing page-render lineage token: ${token}`);
   assert.ok(!source.includes('required: ["selectionReceiptPath", "candidateImagePath", "pageSlug", "pageTitle", "currentDesktopPath"'), "raw caller screenshot path schema unexpectedly returned");
+});
+
+test("page-render proof and source bindings include byte lengths", async () => {
+  const source = await read("./work_header_page_render_review_mcp.mjs");
+  for (const token of [
+    "proofByteLength",
+    "previewManifestByteLength",
+    "previewAdmissionReceiptByteLength",
+    "screenshotSha256AndLengthBinding: true",
+    "pageRenderProofSha256AndLengthBinding: true",
+  ]) assert.ok(source.includes(token), `missing page-render byte-length token: ${token}`);
 });
 
 test("page-render proof/receipt and approval receipt use rollback-safe create-only writes", async () => {
