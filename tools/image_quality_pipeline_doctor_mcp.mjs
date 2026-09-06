@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.16.0";
+const SERVER_VERSION = "1.17.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CHECKS = Object.freeze([
@@ -18,6 +18,7 @@ const CHECKS = Object.freeze([
   { id: "enhancement-session", file: "tools/enhancement_review_session_mcp.mjs", tokens: ["evavo.enhancement-art-review-session.v1_5", "evavo_verify_enhancement_review_session", "proofSha256AndLengthBound: true"] },
   { id: "work-preview-core-v7", file: "packages/media/src/work-header-preview-admission.ts", tokens: ["evavo.work-header-candidate-preview-capture.v7", "browserResponseBodyIdentityVerified", "browserResponseMetadataBound", "browserResponseBindings", "atomicEvidenceBundleVerified: true"] },
   { id: "work-preview-mcp-v170", file: "tools/work_header_preview_admission_mcp.mjs", tokens: ['SERVER_VERSION = "1.7.0"', "browserResponseMetadataShaAndLengthBound: true", "browserResponseMetadataPersistedPerProfile: true", "evavo_verify_work_header_preview_admission"] },
+  { id: "work-page-review-input-safety", file: "packages/media/src/work-header-page-render-review.ts", tokens: ["MAX_SCREENSHOT_BYTES", "MAX_NOTES = 24", "MAX_NOTE_CHARACTERS = 500", "MAX_NOTES_CHARACTERS = 4_000", "pageSlug must be a canonical Work detail route under /work/.", "must be boolean.", "notes exceed the"] },
   { id: "work-page-review-v200", file: "tools/work_header_page_render_review_mcp.mjs", tokens: ['SERVER_VERSION = "2.0.0"', "selectionReceiptShaAndLengthBound: true", "candidateReviewReceiptShaAndLengthBound: true", "previewAdmissionReceiptShaAndLengthBound: true", "previewManifestShaAndLengthBound: true", "pageSourceBindingsShaAndLengthReverified: true", "fullReceiptLineageVerifiedBeforeApprovalPacket: true", "approvalPacketReverificationAvailable: true", "approvalPacketCoreRecomputedDuringVerification: true", "staleApprovalPacketLineageRejected: true", "evavo_verify_work_header_approval_packet", "approvalPacketRecomputedAndMatched: true", "automaticPublicationAllowed: false"] },
   { id: "durable-review", file: "tools/image_review_session_mcp.mjs", tokens: ["evavo.image-review-session.v1_1", "sourceSha256AndLengthBound: true", "staleEvidenceVerification: true"] },
   { id: "safe-bundle", file: "tools/lib/create_only_bundle.mjs", tokens: ["writeCreateOnlyBundle", "rollback", "preflight"] },
@@ -36,13 +37,13 @@ async function inspect() {
     }
   }
   const blockers = checks.filter((x) => !x.ok).map((x) => x.id);
-  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_16", ready: blockers.length === 0, blockerCount: blockers.length, blockers, checks, executionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, nextAction: blockers.length ? "Repair failing image-quality contract surfaces." : "Static preservation, browser-loaded byte lineage, full page-review receipt lineage and read-only approval-packet reverification are aligned; runtime execution and visual approval remain separate." });
+  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_17", ready: blockers.length === 0, blockerCount: blockers.length, blockers, checks, executionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, nextAction: blockers.length ? "Repair failing image-quality contract surfaces." : "Static preservation, browser-loaded byte lineage, fail-closed page-review inputs, full receipt lineage and approval-packet reverification are aligned; runtime execution and visual approval remain separate." });
 }
 const tools = Object.freeze([
   { name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only EVAVO image quality pipeline doctor.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation and exact evidence lineage through browser preview, page review and approval-packet reverification without mutating source.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, bounded page-review inputs and exact evidence lineage through browser preview, page review and approval-packet reverification without mutating source.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
 ]);
-const capabilities = () => Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_16", serverVersion: SERVER_VERSION, readOnly: true, browserResponseBodyLineageChecked: true, fullPageReviewReceiptLineageChecked: true, approvalPacketReverificationChecked: true, runtimeExecutionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
+const capabilities = () => Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_17", serverVersion: SERVER_VERSION, readOnly: true, browserResponseBodyLineageChecked: true, pageReviewInputSafetyChecked: true, fullPageReviewReceiptLineageChecked: true, approvalPacketReverificationChecked: true, runtimeExecutionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
 async function callTool(name) { if (name === "evavo_image_quality_pipeline_doctor_capabilities") return capabilities(); if (name === "evavo_run_image_quality_pipeline_doctor") return inspect(); throw new Error(`Unknown tool ${name}`); }
 const response = (id, result) => ({ jsonrpc: "2.0", id, result });
 const toolResult = (payload, isError = false) => ({ content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError });
