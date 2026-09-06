@@ -4,17 +4,19 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers preservation review and finishing planning", async () => {
+test("image quality doctor covers preservation review finishing and enhancement schema", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_3"',
-    'SERVER_VERSION = "1.3.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_4"',
+    'SERVER_VERSION = "1.4.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
     'id: "finishing-plan-core"',
     'id: "artifact-signals"',
     'id: "unified-orchestrator"',
+    'id: "enhancement-review-schema"',
+    'id: "enhancement-review-admission"',
     'id: "durable-review-session"',
     'id: "review-mcp-profile-policy"',
     'id: "defect-mcp-source-bound"',
@@ -38,6 +40,19 @@ test("MCP configuration exposes quality doctor durable review and finishing plan
     '"evavo-existing-image-finishing-plan-v1"',
     '"tools/existing_image_finishing_plan_mcp.mjs"',
   ]) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
+});
+
+test("doctor verifies enhancement review schema preserves authority boundaries", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    "contracts/art-studio-enhancement-review-v1.schema.json",
+    "evavo.enhancement-art-review.v1",
+    "durable_image_review_session_required",
+    '"publication_allowed": { "const": false }',
+    '"cloud_overwrite_allowed": { "const": false }',
+    "candidateAspectRatioRelativeDrift",
+    "maximumAspectRatioRelativeDrift",
+  ]) assert.ok(source.includes(token), `missing enhancement-schema doctor token: ${token}`);
 });
 
 test("doctor verifies profile-aware review and source-bound finishing evidence", async () => {
