@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "kind": "evavo-art-studio-photography-production-extension",
+  "status": "planned-extension-not-yet-runtime-admitted",
+  "authority": "EVAVO-STUDIO/evavo-art-studio",
+  "newRepositoryRequired": false,
+  "purpose": "Extend Art Studio with professional still-photography ingest, camera RAW development, culling, colour-managed review and archival handoff while preserving Image Enhancement as the restoration/mastering specialist and Storage as durable byte authority.",
+  "gapEvidence": {
+    "currentRawArtMeaning": "immutable creative source-art intake and review",
+    "cameraRawPipelineEvidenced": false,
+    "tetheredCaptureEvidenced": false,
+    "contactSheetWorkflowEvidenced": false,
+    "commonCameraRawFormatsEvidenced": false
+  },
+  "plannedCapabilities": [
+    "camera-card-and-folder-ingest",
+    "content-hash-and-original-preservation",
+    "exif-xmp-and-sidecar-inspection",
+    "camera-raw-format-detection",
+    "raw-demosaic-and-development",
+    "white-balance-and-exposure-adjustment",
+    "lens-correction-and-chromatic-aberration-correction",
+    "working-colour-space-management",
+    "embedded-profile-preservation",
+    "soft-proof-profile-selection",
+    "non-destructive-edit-recipe",
+    "contact-sheet-generation",
+    "rating-flag-colour-label-and-culling",
+    "duplicate-and-near-duplicate-review",
+    "focus-and-motion-blur-review-aids",
+    "highlight-shadow-clipping-review",
+    "batch-development",
+    "web-print-and-archive-derivative-profiles",
+    "provenance-preserving-export",
+    "durable-storage-handoff"
+  ],
+  "cameraRawFormats": [
+    "DNG",
+    "CR2",
+    "CR3",
+    "NEF",
+    "ARW",
+    "RAF",
+    "ORF",
+    "RW2",
+    "PEF"
+  ],
+  "preferredLocalToolAdapters": [
+    "LibRaw-compatible",
+    "rawpy-compatible",
+    "ExifTool-compatible",
+    "LittleCMS-or-OCIO-compatible-colour-management"
+  ],
+  "optionalCaptureAdapters": [
+    "gPhoto2-compatible-tethering-where-supported",
+    "vendor-SDK-adapter-behind-explicit-device-profile"
+  ],
+  "mustReuse": [
+    {
+      "capability": "source-provenance-and-project-art-workspace",
+      "authority": "EVAVO-STUDIO/evavo-art-studio"
+    },
+    {
+      "capability": "restoration-denoise-deblock-deband-halo-repair-and-final-raster-mastering",
+      "authority": "EVAVO-STUDIO/evavo-image-enhancement-studio"
+    },
+    {
+      "capability": "mechanical-file-optimization-and-delivery-transforms",
+      "authority": "EVAVO-STUDIO/evavo-file-optimizer"
+    },
+    {
+      "capability": "durable-byte-versioning-and-archive",
+      "authority": "EVAVO-STUDIO/evavo-storage"
+    },
+    {
+      "capability": "physical-local-byte-lifecycle",
+      "authority": "EVAVO-STUDIO/evavo-local-storage"
+    }
+  ],
+  "mustNotOwn": [
+    "camera-firmware-flashing",
+    "general-device-control",
+    "printer-prepress-authority",
+    "client-release-approval",
+    "creative-approval-by-metric",
+    "destructive-original-overwrite"
+  ],
+  "safetyAndQuality": {
+    "originalsImmutable": true,
+    "sidecarOrRecipeBasedEditsPreferred": true,
+    "embeddedCredentialsForbidden": true,
+    "metadataPrivacyReviewBeforeExternalDelivery": true,
+    "technicalSharpnessScoreIsNotCreativeApproval": true,
+    "colourConversionMustRecordSourceAndDestinationProfiles": true,
+    "cameraTetherControlRequiresExplicitDeviceAdmission": true
+  },
+  "minimumAcceptance": [
+    "canonical-capability-manifest-updated",
+    "at-least-five-camera-raw-format-fixtures-green",
+    "exif-xmp-preservation-tests-green",
+    "non-destructive-recipe-replay-green",
+    "contact-sheet-and-culling-fixture-green",
+    "colour-profile-roundtrip-tests-green",
+    "metadata-privacy-export-test-green",
+    "image-enhancement-handoff-test-green",
+    "storage-handoff-test-green"
+  ]
+}
