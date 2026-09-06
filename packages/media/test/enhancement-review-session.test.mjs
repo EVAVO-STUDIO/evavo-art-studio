@@ -55,9 +55,20 @@ function manifest(source, candidate, width, height, role = "illustration", profi
         "evavo_compare_work_header_candidates",
         "evavo_record_work_header_visual_critique",
         "evavo_resolve_work_header_selection",
+        "evavo_review_work_header_candidate_page_render",
+        "evavo_prepare_work_header_approval_packet",
       ] : []),
     ],
-    mandatory_visual_checks: ["review candidate visually", ...(workHeader ? ["compare viable candidates side-by-side", "retain current header unless replacement proves material advantage", "require semantic project brief"] : [])],
+    mandatory_visual_checks: [
+      "review candidate visually",
+      ...(workHeader ? [
+        "compare viable candidates side-by-side",
+        "retain current header unless replacement proves material advantage",
+        "require semantic project brief",
+        "review exact candidate in real desktop and mobile page renders",
+        "prepare review-only approval packet",
+      ] : []),
+    ],
     approval_state: "unapproved",
     source_immutable: true,
     candidate_is_review_only: true,
@@ -66,6 +77,8 @@ function manifest(source, candidate, width, height, role = "illustration", profi
     comparative_candidate_review_required: workHeader,
     current_header_baseline_required: workHeader,
     semantic_review_brief_required: workHeader,
+    candidate_page_render_review_required: workHeader,
+    approval_packet_required: workHeader,
     publication_allowed: false,
     cloud_overwrite_allowed: false,
     automatic_creative_approval: false,
@@ -79,6 +92,7 @@ test("end-to-end enhancement review never grants publishing authority", async ()
   const result = await reviewEnhancementStudioCandidate({ manifest: manifest(source, candidate, 320, 180), source, candidate });
   assert.equal(result.evidence.sourceBytesVerified, true);
   assert.equal(result.evidence.candidateBytesVerified, true);
+  assert.equal(result.evidence.localDetailRisk, null);
   assert.equal(result.evidence.publicationAllowed, false);
   assert.equal(result.evidence.cloudOverwriteAllowed, false);
   assert.equal(result.evidence.automaticCreativeApproval, false);
@@ -135,11 +149,13 @@ test("support image review uses current header for page relationship QA", async 
   assert.equal(result.evidence.cloudOverwriteAllowed, false);
 });
 
-test("learned candidate with no proven source-space benefit is blocked", async () => {
+test("learned candidate receives independent Art Studio patch-level review", async () => {
   const source = await makePatternPng(320, 180);
   const candidate = Buffer.from(source);
   const m = manifest(source, candidate, 320, 180, "illustration", "illustration", true);
   const result = await reviewEnhancementStudioCandidate({ manifest: m, source, candidate });
+  assert.ok(result.evidence.localDetailRisk);
+  assert.equal(result.evidence.localDetailRisk.reviewRequired, true);
   assert.equal(result.evidence.materialTechnicalBenefitFound, false);
   assert.ok(result.evidence.blockers.includes("learned-enhancement-has-no-proven-source-space-benefit"));
   assert.equal(result.evidence.decision, "reject");
