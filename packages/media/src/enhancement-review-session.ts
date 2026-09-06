@@ -33,9 +33,11 @@ export interface EnhancementReviewSessionResult {
     nativeCandidateReview: Awaited<ReturnType<typeof orchestrateImageReview>>;
     sourceSpaceEditReview: Awaited<ReturnType<typeof reviewExistingImageEdit>>["evidence"];
     pageContextReview: Awaited<ReturnType<typeof createWorkPageMediaReviewBundle>>["evidence"] | null;
+    materialTechnicalBenefitFound: boolean;
+    pageContextComplete: boolean;
     blockers: readonly string[];
     warnings: readonly string[];
-    decision: "reject" | "needs-finishing" | "ready-for-human-visual-review";
+    decision: "reject" | "needs-finishing" | "needs-page-context" | "ready-for-human-visual-review";
     publicationAllowed: false;
     cloudOverwriteAllowed: false;
     automaticCreativeApproval: false;
@@ -66,12 +68,6 @@ async function sourceSpaceCandidate(source: Buffer, candidate: Buffer): Promise<
     .toBuffer();
 }
 
-/**
- * Runs the full Art Studio receiving review for an Enhancement Studio candidate.
- * It verifies the source-bound manifest, inspects the candidate at native size,
- * projects enlarged candidates back to source space for regression evidence, and
- * judges actual Work-page context when the candidate is website media.
- */
 export async function reviewEnhancementStudioCandidate(
   spec: EnhancementReviewSessionSpec,
 ): Promise<EnhancementReviewSessionResult> {
@@ -156,6 +152,19 @@ export async function reviewEnhancementStudioCandidate(
     ...(pageContextReview?.warnings ?? []).map((item) => `page:${item}`),
   ];
 
+  const materialTechnicalBenefitFound = sourceSpaceEdit.evidence.improvements.length > 0 ||
+    nativeCandidateReview.quality.score >= sourceSpaceEdit.evidence.source.score + 3;
+  if (!materialTechnicalBenefitFound) {
+    warnings.push("no-material-technical-benefit-proved-over-source");
+    if (admitted.learnedCandidate) blockers.push("learned-enhancement-has-no-proven-source-space-benefit");
+  }
+
+  const pageContextComplete = !admitted.pageContextReviewRequired || (
+    Boolean(pageContextReview) &&
+    Boolean(spec.desktopScreenshot) &&
+    Boolean(spec.mobileScreenshot) &&
+    (admitted.intendedRole === "work-header" || Boolean(spec.header))
+  );
   if (admitted.pageContextReviewRequired) {
     if (!spec.desktopScreenshot) warnings.push("desktop-page-context-missing");
     if (!spec.mobileScreenshot) warnings.push("mobile-page-context-missing");
@@ -168,7 +177,9 @@ export async function reviewEnhancementStudioCandidate(
     ? "reject"
     : needsFinishing
       ? "needs-finishing"
-      : "ready-for-human-visual-review";
+      : !pageContextComplete
+        ? "needs-page-context"
+        : "ready-for-human-visual-review";
 
   return {
     qualityProofPng: sourceSpaceEdit.proofPng,
@@ -184,6 +195,8 @@ export async function reviewEnhancementStudioCandidate(
       nativeCandidateReview,
       sourceSpaceEditReview: sourceSpaceEdit.evidence,
       pageContextReview,
+      materialTechnicalBenefitFound,
+      pageContextComplete,
       blockers: Object.freeze([...new Set(blockers)]),
       warnings: Object.freeze([...new Set(warnings)]),
       decision,
