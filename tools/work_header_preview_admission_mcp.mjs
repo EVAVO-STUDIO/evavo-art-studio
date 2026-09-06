@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import readline from "node:readline";
 
 import { admitWorkHeaderCandidatePreviewManifest } from "../packages/media/dist/index.js";
+import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-preview-admission";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -71,8 +72,9 @@ async function admit(args) {
     websiteMutationAllowed: false,
     nextRequiredAction: "Use this exact admission receipt for candidate page-render review. Any manifest or screenshot byte change requires a fresh admission.",
   };
-  await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
-  return { ok: true, receiptPath, receiptSha256: sha256(Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8")), admission, screenshotBindings };
+  const payload = `${JSON.stringify(receipt, null, 2)}\n`;
+  await writeCreateOnlyBundle([{ path: receiptPath, data: payload, encoding: "utf8" }]);
+  return { ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), admission, screenshotBindings };
 }
 
 const tools = [
@@ -83,14 +85,10 @@ const tools = [
   },
   {
     name: "evavo_admit_work_header_candidate_preview",
-    description: "Re-read candidate-preview v3 evidence, reverify source identity and all screenshots, then write a create-only admission receipt required by page-render review.",
+    description: "Re-read candidate-preview v3 evidence, reverify source identity and all screenshots, then write a rollback-safe create-only admission receipt required by page-render review.",
     inputSchema: {
       type: "object",
-      properties: {
-        manifestPath: { type: "string" },
-        receiptPath: { type: "string" },
-        confirmLocalWrite: { type: "boolean" },
-      },
+      properties: { manifestPath: { type: "string" }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } },
       required: ["manifestPath", "receiptPath", "confirmLocalWrite"],
       additionalProperties: false,
     },
@@ -104,6 +102,7 @@ function capabilities() {
     acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v3",
     durableAdmissionReceiptAvailable: true,
     createOnlyReceiptWrite: true,
+    rollbackSafeReceiptWrite: true,
     manifestSha256Bound: true,
     screenshotPathSha256AndLengthBound: true,
     screenshotSha256Reverification: true,
