@@ -19,6 +19,13 @@ export interface WorkHeaderCandidateReviewSpec {
 export interface WorkHeaderCandidateReviewResult {
   readonly proofPng: Buffer;
   readonly evidence: Readonly<{
+    currentHeader: Readonly<{
+      technicalScore: number;
+      technicalGrade: "pass" | "warn" | "fail";
+      technicalIssues: readonly string[];
+      minimumCropRetainedRatio: number;
+      maximumUpscaleRatio: number;
+    }> | null;
     candidates: readonly Readonly<{
       id: string;
       provenance: string | null;
@@ -38,6 +45,7 @@ export interface WorkHeaderCandidateReviewResult {
     creativeWinner: null;
     finalSelectionAllowed: false;
     visualCritiqueRequired: true;
+    currentHeaderBaselineRequiredForReplacement: true;
     visualCritiqueDimensions: readonly string[];
   }>;
 }
@@ -46,12 +54,13 @@ function safeLabel(value: string): string {
   return value.replace(/[&<>"']/gu, (token) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[token]!));
 }
 
-async function candidatePanel(id: string, proof: Buffer, score: number, grade: string, issues: readonly string[]): Promise<Buffer> {
+async function candidatePanel(id: string, proof: Buffer, score: number, grade: string, issues: readonly string[], current = false): Promise<Buffer> {
   const width = 700;
   const proofMeta = await sharp(proof).metadata();
   const proofHeight = proofMeta.height ?? 1000;
   const captionHeight = 92;
-  const caption = Buffer.from(`<svg width="${width}" height="${captionHeight}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#050505"/><text x="18" y="30" font-family="Arial,sans-serif" font-size="21" fill="#ffffff">${safeLabel(id)}</text><text x="18" y="57" font-family="Arial,sans-serif" font-size="17" fill="#dddddd">technical ${score}/100 • ${safeLabel(grade)} • issues ${issues.length}</text><text x="18" y="80" font-family="Arial,sans-serif" font-size="14" fill="#aaaaaa">Technical score is not creative approval. Inspect every crop.</text></svg>`);
+  const prefix = current ? "CURRENT • " : "";
+  const caption = Buffer.from(`<svg width="${width}" height="${captionHeight}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#050505"/><text x="18" y="30" font-family="Arial,sans-serif" font-size="21" fill="#ffffff">${safeLabel(prefix + id)}</text><text x="18" y="57" font-family="Arial,sans-serif" font-size="17" fill="#dddddd">technical ${score}/100 • ${safeLabel(grade)} • issues ${issues.length}</text><text x="18" y="80" font-family="Arial,sans-serif" font-size="14" fill="#aaaaaa">${current ? "Baseline to beat. Retain unless replacement proves a material advantage." : "Technical score is not creative approval. Inspect every crop."}</text></svg>`);
   const resizedProof = await sharp(proof).resize({ width, fit: "inside", withoutEnlargement: false }).png().toBuffer();
   const resizedMeta = await sharp(resizedProof).metadata();
   const actualHeight = resizedMeta.height ?? proofHeight;
@@ -59,6 +68,16 @@ async function candidatePanel(id: string, proof: Buffer, score: number, grade: s
     .composite([{ input: resizedProof, left: 0, top: 0 }, { input: caption, left: 0, top: actualHeight }])
     .png()
     .toBuffer();
+}
+
+function baselineEvidence(header: Awaited<ReturnType<typeof reviewWorkHeaderImage>>) {
+  return Object.freeze({
+    technicalScore: header.evidence.score,
+    technicalGrade: header.evidence.grade,
+    technicalIssues: header.evidence.issues,
+    minimumCropRetainedRatio: Math.min(...header.evidence.viewportEvidence.map((item) => item.cropRetainedRatio)),
+    maximumUpscaleRatio: Math.max(...header.evidence.viewportEvidence.map((item) => item.effectiveUpscaleRatio)),
+  });
 }
 
 export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateReviewSpec): Promise<WorkHeaderCandidateReviewResult> {
@@ -70,6 +89,7 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
   if (ids.some((id) => !id)) throw new Error("Every Work-header candidate requires a non-empty id.");
   if (new Set(ids).size !== ids.length) throw new Error("Work-header candidate ids must be unique.");
 
+  const currentHeaderReview = spec.currentHeader ? await reviewWorkHeaderImage(spec.currentHeader) : null;
   const reviewed = await Promise.all(spec.candidates.map(async (candidate) => {
     const header = await reviewWorkHeaderImage(candidate.image);
     const current = spec.currentHeader ? await compareImageSimilarity(candidate.image, spec.currentHeader) : null;
@@ -104,13 +124,18 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
     .sort((a, b) => b.evidence.technicalScore - a.evidence.technicalScore)
     .map((item) => item.evidence.id);
 
-  const panels = await Promise.all(reviewed.map((item) => candidatePanel(
+  const panels: Buffer[] = [];
+  if (currentHeaderReview) {
+    panels.push(await candidatePanel("current-header", currentHeaderReview.proofPng, currentHeaderReview.evidence.score, currentHeaderReview.evidence.grade, currentHeaderReview.evidence.issues, true));
+  }
+  panels.push(...await Promise.all(reviewed.map((item) => candidatePanel(
     item.evidence.id,
     item.header.proofPng,
     item.evidence.technicalScore,
     item.evidence.technicalGrade,
     item.evidence.technicalIssues,
-  )));
+  ))));
+
   const panelMeta = await Promise.all(panels.map((panel) => sharp(panel).metadata()));
   const gap = 18;
   const width = 700 * 2 + gap;
@@ -139,11 +164,13 @@ export async function compareWorkHeaderCandidates(spec: WorkHeaderCandidateRevie
   return {
     proofPng,
     evidence: Object.freeze({
+      currentHeader: currentHeaderReview ? baselineEvidence(currentHeaderReview) : null,
       candidates: Object.freeze(reviewed.map((item) => item.evidence)),
       technicalShortlist: Object.freeze(technicalShortlist),
       creativeWinner: null,
       finalSelectionAllowed: false,
       visualCritiqueRequired: true,
+      currentHeaderBaselineRequiredForReplacement: true,
       visualCritiqueDimensions: Object.freeze([
         "semantic relevance to the actual case study/project",
         "focal-point strength and immediate readability",
