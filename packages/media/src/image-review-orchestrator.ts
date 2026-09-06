@@ -1,5 +1,7 @@
 import sharp from "sharp";
 import { reviewExistingImageQuality } from "./existing-image-quality-review.js";
+import { detectExistingImageDefects } from "./existing-image-defect-detection.js";
+import { segmentDefectMaskRegions } from "./defect-region-components.js";
 import { reviewWorkHeaderImage } from "./work-header-quality.js";
 import { compareImageSimilarity } from "./image-similarity.js";
 import {
@@ -18,6 +20,10 @@ export interface ImageReviewOrchestrationResult {
   readonly profile: ImageReviewProfileName;
   readonly profileReason: readonly string[];
   readonly quality: Awaited<ReturnType<typeof reviewExistingImageQuality>>;
+  readonly defectReview: Readonly<{
+    evidence: Awaited<ReturnType<typeof detectExistingImageDefects>>["evidence"];
+    regions: Awaited<ReturnType<typeof segmentDefectMaskRegions>>;
+  }>;
   readonly header?: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"];
   readonly similarity: readonly Readonly<{
     id: string;
@@ -85,26 +91,36 @@ export async function orchestrateImageReview(
   if (encoded.byteLength === 0) throw new Error("Image review orchestration input is empty.");
   const inferred = await inferProfile(encoded, context);
   const profile = getImageReviewProfile(inferred.profile);
-  const quality = await reviewExistingImageQuality(encoded, {
-    minimumSharpness: profile.minimumSharpness,
-    minimumLumaStdDev: profile.minimumLumaStdDev,
-    maximumTransparentRgbContaminationRatio: profile.maximumTransparentRgbContaminationRatio,
-    maximumEdgeHaloRiskRatio: profile.maximumEdgeHaloRiskRatio,
-    maximumPinholeRatio: profile.maximumPinholeRatio,
-    maximumBlockinessRatio: profile.maximumBlockinessRatio,
+  const [quality, defects] = await Promise.all([
+    reviewExistingImageQuality(encoded, {
+      minimumSharpness: profile.minimumSharpness,
+      minimumLumaStdDev: profile.minimumLumaStdDev,
+      maximumTransparentRgbContaminationRatio: profile.maximumTransparentRgbContaminationRatio,
+      maximumEdgeHaloRiskRatio: profile.maximumEdgeHaloRiskRatio,
+      maximumPinholeRatio: profile.maximumPinholeRatio,
+      maximumBlockinessRatio: profile.maximumBlockinessRatio,
+    }),
+    detectExistingImageDefects(encoded, { profile: inferred.profile }),
+  ]);
+  const defectRegions = await segmentDefectMaskRegions(defects.maskPng, {
+    minimumPixelCount: 2,
+    maximumRegions: 12,
+    mergeGap: 1,
   });
+
   const blockers: string[] = [];
   const warnings: string[] = [...quality.issues];
 
   if (quality.grade === "fail") blockers.push("technical image-quality review failed");
-  if (quality.transparentRgbContaminationRatio > profile.maximumTransparentRgbContaminationRatio) {
-    blockers.push("transparent RGB contamination exceeds profile limit");
-  }
-  if (quality.edgeHaloRiskRatio > profile.maximumEdgeHaloRiskRatio) {
-    blockers.push("edge halo risk exceeds profile limit");
-  }
-  if (quality.alphaPinholeRatio > profile.maximumPinholeRatio) {
-    blockers.push("alpha pinholes exceed profile limit");
+  if (quality.transparentRgbContaminationRatio > profile.maximumTransparentRgbContaminationRatio) blockers.push("transparent RGB contamination exceeds profile limit");
+  if (quality.edgeHaloRiskRatio > profile.maximumEdgeHaloRiskRatio) blockers.push("edge halo risk exceeds profile limit");
+  if (quality.alphaPinholeRatio > profile.maximumPinholeRatio) blockers.push("alpha pinholes exceed profile limit");
+
+  if (defects.evidence.suggestedAction === "manual-review") blockers.push("defect proposal exceeds safe automatic finishing scope");
+  if (defects.evidence.defectPixels > 0) {
+    warnings.push(`defect-regions:${defectRegions.retainedComponentCount}`);
+    warnings.push(`defect-mask-coverage:${(defects.evidence.maskCoverageRatio * 100).toFixed(3)}%`);
+    warnings.push(`defect-action:${defects.evidence.suggestedAction}`);
   }
 
   let header: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"] | undefined;
@@ -135,7 +151,7 @@ export async function orchestrateImageReview(
     else if (compared.nearDuplicate) warnings.push(`near-duplicate-of:${candidate.id}:${compared.perceptualSimilarity.toFixed(3)}`);
   }
 
-  const finishSignal = warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur/u.test(warning));
+  const finishSignal = defects.evidence.defectPixels > 0 || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur/u.test(warning));
   const decision: ImageReviewOrchestrationResult["decision"] = blockers.length
     ? "reject"
     : finishSignal
@@ -146,6 +162,7 @@ export async function orchestrateImageReview(
     profile: inferred.profile,
     profileReason: Object.freeze(inferred.reasons),
     quality,
+    defectReview: Object.freeze({ evidence: defects.evidence, regions: defectRegions }),
     ...(header ? { header } : {}),
     similarity: Object.freeze(similarity),
     decision,
@@ -154,6 +171,7 @@ export async function orchestrateImageReview(
     visualReviewRequired: true,
     visualChecklist: Object.freeze([
       ...profile.visualChecks,
+      "Inspect the highest-ranked connected defect regions before authorising localized repair.",
       "Judge the image at intended runtime size, not only at 100% zoom.",
       "Reject imagery that is technically valid but looks cheap, generic, repetitive, semantically weak or badly art-directed.",
       "For page media, compare against adjacent imagery and avoid near-duplicate storytelling.",
