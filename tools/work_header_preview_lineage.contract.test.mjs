@@ -40,23 +40,36 @@ test("preview admission verifier rejects stale browser metadata, artifact or rem
   ]) assert.ok(source.includes(token), `missing preview reverification token: ${token}`);
 });
 
-test("page render carries responsive browser metadata through approval", async () => {
+test("page render binds full receipt and source lineage before approval", async () => {
   const source = await read("./work_header_page_render_review_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.8.0"',
-    "admitWorkHeaderCandidatePreviewManifest",
-    "browserResponseMetadataRequiredFromAdmission: true",
-    "browserResponseMetadataPersistedInPageReceipt: true",
-    "browserResponseMetadataReverifiedBeforeApprovalPacket: true",
-    "browserResponseBodyIdentityVerified: true",
-    "browserResponseMetadataBound: true",
+    'SERVER_VERSION = "1.9.0"',
+    "selectionReceiptShaAndLengthBound: true",
+    "candidateReviewReceiptShaAndLengthBound: true",
+    "previewAdmissionReceiptShaAndLengthBound: true",
+    "previewManifestShaAndLengthBound: true",
+    "pageSourceBindingsShaAndLengthReverified: true",
+    "fullReceiptLineageVerifiedBeforeApprovalPacket: true",
+    "selectionReceiptByteLength",
+    "candidateReviewReceiptByteLength",
+    "previewAdmissionReceiptByteLength",
+    "previewManifestByteLength",
+    "candidateReviewProofSha256",
     "browserResponseBindings",
-    "page-render Chrome response metadata drifted from the reverified preview admission",
-    "immutablePreviewCandidateArtifactRequired: true",
-    "currentRemoteCandidateMustMatchImmutableArtifact: true",
+    "fullReceiptLineageBound: true",
+    "fullReceiptLineageVerified: true",
+    "Page-render receipt is bound to a different preview-admission receipt version.",
+    "Page-render receipt preview-manifest lineage is stale.",
+    "Page-render review is bound to a different selection receipt version.",
+    "Page-render candidate-review lineage is stale.",
+    "Page-render currentDesktop binding drifted from admitted preview evidence.",
+    "Approval packet selection input does not match the fully verified page-render lineage.",
     "selectedLocalCandidateMustMatchPreviewedResponseBytes: true",
-    "exactPreviewedCandidateBytesMatchedSelectedCandidate: true",
     "pageRenderProofSha256AndLengthBinding: true",
     "rollbackSafePageReviewEvidenceBundle: true",
-  ]) assert.ok(source.includes(token), `missing page-render browser-lineage token: ${token}`);
+    "rollbackSafeApprovalReceiptWrite: true",
+    "publicationAllowed: false",
+    "cloudOverwriteAllowed: false",
+    "websiteMutationAllowed: false",
+  ]) assert.ok(source.includes(token), `missing page-render full-lineage token: ${token}`);
 });
