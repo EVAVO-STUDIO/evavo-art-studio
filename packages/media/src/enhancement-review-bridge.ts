@@ -1,6 +1,7 @@
 import type { ImageReviewProfileName } from "./image-review-profiles.js";
 
 export const ENHANCEMENT_ART_REVIEW_CONTRACT = "evavo.enhancement-art-review.v1" as const;
+export const ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256 = "dd9e0e25bcde4f82a0e2e34955a4ef520927e0a1a3472f04d8b2867ebba0ad94" as const;
 export const ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT = 0.0025 as const;
 
 const REVIEW_PROFILES = new Set<ImageReviewProfileName>([
@@ -9,6 +10,7 @@ const REVIEW_PROFILES = new Set<ImageReviewProfileName>([
 
 export interface EnhancementStudioReviewManifest {
   readonly contract: string;
+  readonly schema_sha256: string;
   readonly source_path: string;
   readonly source_sha256: string;
   readonly source_width: number;
@@ -44,6 +46,7 @@ export interface EnhancementStudioReviewManifest {
 export interface AdmittedEnhancementStudioReview {
   readonly profile: ImageReviewProfileName;
   readonly intendedRole: "work-header" | "support-image" | "tile" | "logo" | "ui" | "photo" | "sprite" | "illustration" | "texture";
+  readonly schemaSha256: typeof ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256;
   readonly sourceSha256: string;
   readonly candidateSha256: string;
   readonly candidateAspectRatioRelativeDrift: number;
@@ -95,6 +98,7 @@ function relativeAspectRatioDrift(sourceWidth: number, sourceHeight: number, can
 export function admitEnhancementStudioReviewManifest(value: EnhancementStudioReviewManifest): AdmittedEnhancementStudioReview {
   if (!value || typeof value !== "object") throw new Error("Enhancement Studio review manifest is required.");
   if (value.contract !== ENHANCEMENT_ART_REVIEW_CONTRACT) throw new Error(`Unsupported Enhancement Studio review contract ${JSON.stringify(value.contract)}.`);
+  if (value.schema_sha256 !== ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256) throw new Error("Enhancement Studio review manifest was produced against a stale or different shared review schema SHA-256.");
   if (value.source_immutable !== true || value.candidate_is_review_only !== true) throw new Error("Enhancement Studio manifest must preserve immutable-source and review-candidate boundaries.");
   if (value.art_studio_visual_review_required !== true) throw new Error("Enhancement Studio candidate cannot bypass Art Studio visual review.");
   if (value.durable_image_review_session_required !== true) throw new Error("Enhancement Studio candidates must require a durable source-bound Art Studio image-review session before downstream use.");
@@ -156,6 +160,7 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   return Object.freeze({
     profile,
     intendedRole: role,
+    schemaSha256: ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256,
     sourceSha256: sha(value.source_sha256, "source_sha256"),
     candidateSha256: sha(value.candidate_sha256, "candidate_sha256"),
     candidateAspectRatioRelativeDrift,
