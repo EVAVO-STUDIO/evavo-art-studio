@@ -2,6 +2,7 @@ export const WORK_HEADER_VISUAL_CRITIQUE_CONTRACT = "evavo.work-header-visual-cr
 
 export interface WorkHeaderVisualCritiqueInput {
   readonly candidateId: string;
+  readonly candidateSha256: string;
   readonly semanticRelevance: number;
   readonly focalPointStrength: number;
   readonly cropStability: number;
@@ -22,6 +23,7 @@ export interface WorkHeaderVisualCritiqueInput {
 export interface WorkHeaderVisualCritiqueResult {
   readonly contract: typeof WORK_HEADER_VISUAL_CRITIQUE_CONTRACT;
   readonly candidateId: string;
+  readonly candidateSha256: string;
   readonly visualScore: number;
   readonly disqualifiers: readonly string[];
   readonly weaknesses: readonly string[];
@@ -29,6 +31,7 @@ export interface WorkHeaderVisualCritiqueResult {
   readonly verdict: "reject" | "rework" | "visual-shortlist";
   readonly eligibleForFinalSelection: boolean;
   readonly humanOrVisionReviewPerformed: true;
+  readonly exactImageHashBound: true;
   readonly automaticPublicationAllowed: false;
   readonly automaticCloudOverwriteAllowed: false;
   readonly finalSelectionStillRequiresComparativeReview: true;
@@ -51,13 +54,19 @@ function rating(value: unknown, label: string): number {
   return Number(value);
 }
 
+function sha256(value: unknown): string {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) throw new Error("candidateSha256 must be a lowercase SHA-256 hex digest.");
+  return value;
+}
+
 /**
  * Records actual visual judgement after a reviewer has inspected the generated
- * candidate crop board. Numeric image metrics are deliberately not accepted as
- * a substitute for this review.
+ * candidate crop board. The judgement is bound to the exact candidate bytes so
+ * it cannot be silently reused for a changed/replaced image.
  */
 export function judgeWorkHeaderVisualCritique(input: WorkHeaderVisualCritiqueInput): WorkHeaderVisualCritiqueResult {
   if (!input?.candidateId?.trim()) throw new Error("candidateId is required.");
+  const candidateSha256 = sha256(input.candidateSha256);
   const values = RATING_FIELDS.map((field) => rating(input[field], field));
   if (!Array.isArray(input.notes) || input.notes.some((note) => typeof note !== "string" || !note.trim())) {
     throw new Error("notes must be an array of non-empty strings.");
@@ -78,8 +87,6 @@ export function judgeWorkHeaderVisualCritique(input: WorkHeaderVisualCritiqueInp
     else if (value >= 4) strengths.push(`${field}:${value.toFixed(1)}/5`);
   });
 
-  // Weight relevance, deliberate design choice and mobile/crop behaviour more
-  // heavily than surface-level prettiness. The score only creates a shortlist.
   const weighted = (
     values[0]! * 1.35 +
     values[1]! * 1.10 +
@@ -102,6 +109,7 @@ export function judgeWorkHeaderVisualCritique(input: WorkHeaderVisualCritiqueInp
   return Object.freeze({
     contract: WORK_HEADER_VISUAL_CRITIQUE_CONTRACT,
     candidateId: input.candidateId,
+    candidateSha256,
     visualScore,
     disqualifiers: Object.freeze(disqualifiers),
     weaknesses: Object.freeze(weaknesses),
@@ -109,6 +117,7 @@ export function judgeWorkHeaderVisualCritique(input: WorkHeaderVisualCritiqueInp
     verdict,
     eligibleForFinalSelection: verdict === "visual-shortlist",
     humanOrVisionReviewPerformed: true,
+    exactImageHashBound: true,
     automaticPublicationAllowed: false,
     automaticCloudOverwriteAllowed: false,
     finalSelectionStillRequiresComparativeReview: true,
