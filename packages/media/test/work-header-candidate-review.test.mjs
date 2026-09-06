@@ -18,7 +18,7 @@ async function image(width, height, seed) {
   return sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer();
 }
 
-test("candidate board includes current technical baseline but never a creative winner", async () => {
+test("candidate board includes hash-bound current technical baseline but never a creative winner", async () => {
   const current = await image(1920, 1080, 2);
   const a = await image(1920, 1080, 10);
   const b = await image(1920, 1080, 80);
@@ -27,6 +27,9 @@ test("candidate board includes current technical baseline but never a creative w
     currentHeader: current,
   });
   assert.ok(result.evidence.currentHeader);
+  assert.match(result.evidence.currentHeader.imageSha256, /^[0-9a-f]{64}$/u);
+  assert.match(result.evidence.candidates[0].imageSha256, /^[0-9a-f]{64}$/u);
+  assert.equal(result.evidence.critiqueHashBindingRequired, true);
   assert.equal(typeof result.evidence.currentHeader.technicalScore, "number");
   assert.equal(result.evidence.currentHeaderBaselineRequiredForReplacement, true);
   assert.equal(result.evidence.creativeWinner, null);
@@ -47,9 +50,10 @@ test("exact support duplicate is not technically eligible", async () => {
   assert.equal(duplicate.technicallyEligibleForVisualReview, false);
 });
 
-test("visual critique rejects generic or AI-looking header even with strong ratings", () => {
+test("visual critique rejects AI-looking header and carries exact image hash", () => {
   const result = judgeWorkHeaderVisualCritique({
     candidateId: "candidate-a",
+    candidateSha256: "a".repeat(64),
     semanticRelevance: 4.5,
     focalPointStrength: 4.5,
     cropStability: 4.5,
@@ -66,6 +70,8 @@ test("visual critique rejects generic or AI-looking header even with strong rati
     mobileCropFailure: false,
     notes: ["Visible AI-like malformed detail in focal area."],
   });
+  assert.equal(result.candidateSha256, "a".repeat(64));
+  assert.equal(result.exactImageHashBound, true);
   assert.equal(result.verdict, "reject");
   assert.equal(result.eligibleForFinalSelection, false);
   assert.equal(result.automaticPublicationAllowed, false);
