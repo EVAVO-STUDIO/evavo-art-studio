@@ -9,6 +9,7 @@ export interface ExistingImageDiffOptions {
 
 export interface ExistingImageDiffResult {
   readonly proofPng: Buffer;
+  readonly changeMaskPng: Buffer;
   readonly evidence: Readonly<{
     width: number;
     height: number;
@@ -25,17 +26,13 @@ export interface ExistingImageDiffResult {
 
 function boundedByte(value: number | undefined, label: string, fallback: number): number {
   if (value === undefined) return fallback;
-  if (!Number.isInteger(value) || value < 0 || value > 255) {
-    throw new Error(`${label} must be an integer from 0 through 255.`);
-  }
+  if (!Number.isInteger(value) || value < 0 || value > 255) throw new Error(`${label} must be an integer from 0 through 255.`);
   return value;
 }
 
 function boundedRatio(value: number | undefined, fallback: number): number {
   if (value === undefined) return fallback;
-  if (!Number.isFinite(value) || value < 0 || value > 1) {
-    throw new Error("maximumChangedPixelRatio must be between 0 and 1.");
-  }
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error("maximumChangedPixelRatio must be between 0 and 1.");
   return value;
 }
 
@@ -46,11 +43,7 @@ async function rawRgba(encoded: Buffer) {
   return { width: meta.width, height: meta.height, raw };
 }
 
-/**
- * Builds objective evidence showing exactly where an edited existing image
- * differs from its source. This is intentionally pixel based rather than
- * perceptual: it is a preservation gate for polishing/repair workflows.
- */
+/** Pixel-exact preservation evidence plus a binary mask suitable for region segmentation. */
 export async function createExistingImageDifferenceProof(
   sourceEncoded: Buffer,
   editedEncoded: Buffer,
@@ -59,9 +52,7 @@ export async function createExistingImageDifferenceProof(
   const source = await rawRgba(sourceEncoded);
   const edited = await rawRgba(editedEncoded);
   if (source.width !== edited.width || source.height !== edited.height) {
-    if (options.failOnDimensionMismatch !== false) {
-      throw new Error(`Existing image diff dimensions differ: source ${source.width}x${source.height}, edited ${edited.width}x${edited.height}.`);
-    }
+    if (options.failOnDimensionMismatch !== false) throw new Error(`Existing image diff dimensions differ: source ${source.width}x${source.height}, edited ${edited.width}x${edited.height}.`);
     throw new Error("Dimension-normalizing diff is not enabled for preservation proof.");
   }
 
@@ -70,7 +61,8 @@ export async function createExistingImageDifferenceProof(
   const maximumChangedPixelRatio = boundedRatio(options.maximumChangedPixelRatio, 1);
   const width = source.width;
   const height = source.height;
-  const mask = Buffer.alloc(width * height * 4);
+  const proof = Buffer.alloc(width * height * 4);
+  const binary = Buffer.alloc(width * height);
 
   let changedPixels = 0;
   let opaqueRgbChangedPixels = 0;
@@ -84,7 +76,8 @@ export async function createExistingImageDifferenceProof(
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const i = (y * width + x) * 4;
+      const p = y * width + x;
+      const i = p * 4;
       const dr = Math.abs(source.raw[i]! - edited.raw[i]!);
       const dg = Math.abs(source.raw[i + 1]! - edited.raw[i + 1]!);
       const db = Math.abs(source.raw[i + 2]! - edited.raw[i + 2]!);
@@ -100,33 +93,34 @@ export async function createExistingImageDifferenceProof(
       if (source.raw[i + 3] === 255 && rgbChanged) opaqueRgbChangedPixels += 1;
       if (changed) {
         changedPixels += 1;
+        binary[p] = 255;
         minX = Math.min(minX, x);
         minY = Math.min(minY, y);
         maxX = Math.max(maxX, x);
         maxY = Math.max(maxY, y);
-        // Red means RGB changed, blue means alpha changed, magenta means both.
-        mask[i] = rgbChanged ? 255 : 0;
-        mask[i + 1] = 0;
-        mask[i + 2] = alphaChanged ? 255 : 0;
-        mask[i + 3] = 255;
+        proof[i] = rgbChanged ? 255 : 0;
+        proof[i + 1] = 0;
+        proof[i + 2] = alphaChanged ? 255 : 0;
+        proof[i + 3] = 255;
       } else {
-        // Dim checker-like neutral field makes isolated changes easy to spot.
         const neutral = ((x >> 4) + (y >> 4)) % 2 === 0 ? 32 : 48;
-        mask[i] = neutral;
-        mask[i + 1] = neutral;
-        mask[i + 2] = neutral;
-        mask[i + 3] = 255;
+        proof[i] = neutral;
+        proof[i + 1] = neutral;
+        proof[i + 2] = neutral;
+        proof[i + 3] = 255;
       }
     }
   }
 
   const changedPixelRatio = changedPixels / (width * height);
-  const proofPng = await sharp(mask, { raw: { width, height, channels: 4 } })
-    .png({ compressionLevel: 9 })
-    .toBuffer();
+  const [proofPng, changeMaskPng] = await Promise.all([
+    sharp(proof, { raw: { width, height, channels: 4 } }).png({ compressionLevel: 9 }).toBuffer(),
+    sharp(binary, { raw: { width, height, channels: 1 } }).png({ compressionLevel: 9 }).toBuffer(),
+  ]);
 
   return {
     proofPng,
+    changeMaskPng,
     evidence: Object.freeze({
       width,
       height,
@@ -136,9 +130,7 @@ export async function createExistingImageDifferenceProof(
       alphaChangedPixels,
       maxChannelDelta,
       maxAlphaDelta,
-      changeBounds: changedPixels === 0
-        ? null
-        : Object.freeze({ left: minX, top: minY, right: maxX, bottom: maxY }),
+      changeBounds: changedPixels === 0 ? null : Object.freeze({ left: minX, top: minY, right: maxX, bottom: maxY }),
       withinMaximumChangedPixelRatio: changedPixelRatio <= maximumChangedPixelRatio,
     }),
   };
