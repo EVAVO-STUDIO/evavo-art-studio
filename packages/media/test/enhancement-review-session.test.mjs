@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import sharp from "sharp";
 
-import { reviewEnhancementStudioCandidate } from "../dist/index.js";
+import { ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256, reviewEnhancementStudioCandidate } from "../dist/index.js";
 
 async function makePng(width, height, pixel) {
   const raw = Buffer.alloc(width * height * 4);
@@ -33,6 +33,7 @@ function manifest(source, candidate, width, height, role = "illustration", profi
   const workHeader = role === "work-header";
   return {
     contract: "evavo.enhancement-art-review.v1",
+    schema_sha256: ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256,
     source_path: "/source.png",
     source_sha256: sha(source),
     source_width: width,
