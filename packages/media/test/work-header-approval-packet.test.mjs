@@ -37,11 +37,15 @@ function page(overrides = {}) {
     candidateDesktopSha256: "d".repeat(64),
     currentMobileSha256: "e".repeat(64),
     candidateMobileSha256: "f".repeat(64),
+    desktopViewport: { currentWidth: 1440, currentHeight: 900, candidateWidth: 1440, candidateHeight: 900, dimensionsMatch: true, screenshotsDiffer: true },
+    mobileViewport: { currentWidth: 390, currentHeight: 844, candidateWidth: 390, candidateHeight: 844, dimensionsMatch: true, screenshotsDiffer: true },
     visualScore: 91,
     disqualifiers: [],
     verdict: "page-shortlist",
     pageRenderReviewPerformed: true,
     exactScreenshotHashesBound: true,
+    comparableViewportGeometryVerified: true,
+    candidateRenderDifferenceVerified: true,
     automaticPublicationAllowed: false,
     automaticWebsiteMutationAllowed: false,
     finalApprovalRequired: true,
@@ -55,6 +59,8 @@ test("approval packet can become ready but never becomes approval", () => {
   assert.equal(result.candidateId, "candidate-a");
   assert.equal(result.candidateSha256, "b".repeat(64));
   assert.equal(result.verified.candidateHashMatchesPageRender, true);
+  assert.equal(result.verified.comparableViewportGeometryVerified, true);
+  assert.equal(result.verified.candidateRenderDifferenceVerified, true);
   assert.equal(result.explicitApprovalStillRequired, true);
   assert.equal(result.automaticPublicationAllowed, false);
   assert.equal(result.automaticWebsiteMutationAllowed, false);
@@ -85,4 +91,22 @@ test("approval packet blocks page render from different candidate bytes", () => 
   });
   assert.equal(result.status, "blocked");
   assert.ok(result.blockers.includes("page-render-candidate-hash-does-not-match-selection"));
+});
+
+test("approval packet blocks viewport-mismatched comparison", () => {
+  const result = prepareWorkHeaderApprovalPacket({
+    selection: selection(),
+    pageRender: page({ comparableViewportGeometryVerified: false }),
+  });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.includes("page-render-current-candidate-viewports-not-comparable"));
+});
+
+test("approval packet blocks when screenshots do not prove candidate render changed", () => {
+  const result = prepareWorkHeaderApprovalPacket({
+    selection: selection(),
+    pageRender: page({ candidateRenderDifferenceVerified: false }),
+  });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.includes("page-render-does-not-prove-candidate-was-visible-in-both-viewports"));
 });
