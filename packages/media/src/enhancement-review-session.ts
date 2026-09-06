@@ -34,6 +34,7 @@ export interface EnhancementReviewSessionResult {
     sourceSpaceEditReview: Awaited<ReturnType<typeof reviewExistingImageEdit>>["evidence"];
     pageContextReview: Awaited<ReturnType<typeof createWorkPageMediaReviewBundle>>["evidence"] | null;
     materialTechnicalBenefitFound: boolean;
+    currentHeaderBaselineComplete: boolean;
     pageContextComplete: boolean;
     blockers: readonly string[];
     warnings: readonly string[];
@@ -159,11 +160,16 @@ export async function reviewEnhancementStudioCandidate(
     if (admitted.learnedCandidate) blockers.push("learned-enhancement-has-no-proven-source-space-benefit");
   }
 
+  const currentHeaderBaselineComplete = !admitted.currentHeaderBaselineRequired || Boolean(spec.header);
+  if (admitted.currentHeaderBaselineRequired && !spec.header) {
+    warnings.push("current-header-baseline-missing");
+  }
+
   const pageContextComplete = !admitted.pageContextReviewRequired || (
     Boolean(pageContextReview) &&
     Boolean(spec.desktopScreenshot) &&
     Boolean(spec.mobileScreenshot) &&
-    (admitted.intendedRole === "work-header" || Boolean(spec.header))
+    (admitted.intendedRole === "work-header" ? currentHeaderBaselineComplete : Boolean(spec.header))
   );
   if (admitted.pageContextReviewRequired) {
     if (!spec.desktopScreenshot) warnings.push("desktop-page-context-missing");
@@ -177,7 +183,7 @@ export async function reviewEnhancementStudioCandidate(
     ? "reject"
     : needsFinishing
       ? "needs-finishing"
-      : !pageContextComplete
+      : !pageContextComplete || !currentHeaderBaselineComplete
         ? "needs-page-context"
         : "ready-for-human-visual-review";
 
@@ -196,6 +202,7 @@ export async function reviewEnhancementStudioCandidate(
       sourceSpaceEditReview: sourceSpaceEdit.evidence,
       pageContextReview,
       materialTechnicalBenefitFound,
+      currentHeaderBaselineComplete,
       pageContextComplete,
       blockers: Object.freeze([...new Set(blockers)]),
       warnings: Object.freeze([...new Set(warnings)]),
