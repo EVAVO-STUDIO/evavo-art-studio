@@ -2,6 +2,7 @@ import sharp from "sharp";
 import { reviewExistingImageQuality } from "./existing-image-quality-review.js";
 import { detectExistingImageDefects } from "./existing-image-defect-detection.js";
 import { segmentDefectMaskRegions } from "./defect-region-components.js";
+import { planExistingImageFinishing } from "./existing-image-finishing-plan.js";
 import { detectImageArtifactSignals } from "./image-artifact-signals.js";
 import { reviewWorkHeaderImage } from "./work-header-quality.js";
 import { compareImageSimilarity } from "./image-similarity.js";
@@ -25,6 +26,7 @@ export interface ImageReviewOrchestrationResult {
     evidence: Awaited<ReturnType<typeof detectExistingImageDefects>>["evidence"];
     regions: Awaited<ReturnType<typeof segmentDefectMaskRegions>>;
   }>;
+  readonly finishingPlan: ReturnType<typeof planExistingImageFinishing>;
   readonly artifactSignals: Awaited<ReturnType<typeof detectImageArtifactSignals>>;
   readonly header?: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"];
   readonly similarity: readonly Readonly<{
@@ -112,6 +114,7 @@ export async function orchestrateImageReview(
     maximumRegions: 12,
     mergeGap: 1,
   });
+  const finishingPlan = planExistingImageFinishing(defects.evidence, defectRegions, { profile: inferred.profile });
 
   const blockers: string[] = [];
   const warnings: string[] = [...quality.issues, ...artifactSignals.warnings];
@@ -121,11 +124,11 @@ export async function orchestrateImageReview(
   if (quality.edgeHaloRiskRatio > profile.maximumEdgeHaloRiskRatio) blockers.push("edge halo risk exceeds profile limit");
   if (quality.alphaPinholeRatio > profile.maximumPinholeRatio) blockers.push("alpha pinholes exceed profile limit");
 
-  if (defects.evidence.suggestedAction === "manual-review") blockers.push("defect proposal exceeds safe automatic finishing scope");
+  if (finishingPlan.route === "manual-review") blockers.push("defect proposal exceeds safe automatic finishing scope");
   if (defects.evidence.defectPixels > 0) {
     warnings.push(`defect-regions:${defectRegions.retainedComponentCount}`);
     warnings.push(`defect-mask-coverage:${(defects.evidence.maskCoverageRatio * 100).toFixed(3)}%`);
-    warnings.push(`defect-action:${defects.evidence.suggestedAction}`);
+    warnings.push(`finishing-route:${finishingPlan.route}`);
   }
 
   if (artifactSignals.nearestNeighbourUpscaleRisk && inferred.profile !== "pixel-art") blockers.push("probable-nearest-neighbour-upscale-of-non-pixel-art");
@@ -160,7 +163,10 @@ export async function orchestrateImageReview(
     else if (compared.nearDuplicate) warnings.push(`near-duplicate-of:${candidate.id}:${compared.perceptualSimilarity.toFixed(3)}`);
   }
 
-  const finishSignal = defects.evidence.defectPixels > 0 || artifactSignals.warnings.length > 0 || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur|ring|posterization/u.test(warning));
+  const finishSignal = finishingPlan.route === "preservation-polish"
+    || finishingPlan.route === "localized-repair"
+    || artifactSignals.warnings.length > 0
+    || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur|ring|posterization/u.test(warning));
   const decision: ImageReviewOrchestrationResult["decision"] = blockers.length
     ? "reject"
     : finishSignal
@@ -172,6 +178,7 @@ export async function orchestrateImageReview(
     profileReason: Object.freeze(inferred.reasons),
     quality,
     defectReview: Object.freeze({ evidence: defects.evidence, regions: defectRegions }),
+    finishingPlan,
     artifactSignals,
     ...(header ? { header } : {}),
     similarity: Object.freeze(similarity),
@@ -181,12 +188,12 @@ export async function orchestrateImageReview(
     visualReviewRequired: true,
     visualChecklist: Object.freeze([
       ...profile.visualChecks,
-      "Inspect the highest-ranked connected defect regions before authorising localized repair.",
+      "Inspect the highest-ranked connected defect regions and confirm the preservation-first finishing route before authorising any repair.",
       "Check ringing/oversharpen, tonal posterization and suspicious resampling signals against the actual image before accepting them as defects.",
       "Judge the image at intended runtime size, not only at 100% zoom.",
       "Reject imagery that is technically valid but looks cheap, generic, repetitive, semantically weak or badly art-directed.",
       "For page media, compare against adjacent imagery and avoid near-duplicate storytelling.",
-      "Do not publish automatically from numeric scores; the reviewer must inspect the actual proof/crop.",
+      "Do not publish automatically from numeric scores or finishing-plan output; the reviewer must inspect the actual proof/crop.",
     ]),
   });
 }
