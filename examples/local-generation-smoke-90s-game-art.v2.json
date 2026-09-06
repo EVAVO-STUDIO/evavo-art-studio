@@ -1,0 +1,51 @@
+{
+  "schema": "evavo.local-generation-batch.v2",
+  "campaignId": "evavo-smoke-90s-game-art-v1",
+  "contentClass": "general",
+  "batch_size": 1,
+  "generation_mode": "sequential-anchor",
+  "consistency_mode": "strict",
+  "quality_profile": "cinematic_stills",
+  "quality_overrides": {"width": 1024, "height": 1024, "steps": 32, "cfg": 5.5, "sampler": "dpmpp_2m", "scheduler": "karras", "denoise": 1, "outputFormat": "png"},
+  "character": {
+    "id": "retro-game-scout-anchor",
+    "description": "An original 1990s PC and console game hero: practical frontier scout with readable silhouette, compact gear and no resemblance to an existing franchise character",
+    "face": "distinct original angular face with simple game-art readability",
+    "hair": "short dark windswept hair",
+    "build": "athletic compact silhouette designed for low-resolution readability",
+    "costume": "weathered field jacket, utility belt, boots and simple shoulder gear with no logos",
+    "palette": ["muted olive", "rust", "sand", "deep charcoal"],
+    "signatureDetails": ["large readable shape grouping", "restrained 1990s palette", "original equipment design"]
+  },
+  "style": {
+    "name": "original-mid-1990s-game-production-art",
+    "description": "Original mid-1990s computer and console game production art combining hand-painted concept-art sensibility, limited-colour sprite readability, slightly chunky forms and era-appropriate illustrated packaging atmosphere; draw from broad 1990s shooter, strategy, JRPG, beat-em-up, vertical-shooter, dungeon-sim and RTS production traditions without copying any existing franchise, character, unit or interface",
+    "medium": "hand-painted digital game concept illustration with sprite-conscious shape design",
+    "period": "1993-1998 game art aesthetics",
+    "lighting": "simple dramatic key light with readable shadow grouping",
+    "palette": ["limited earthy midtones", "deep painted shadows", "small warm highlights"],
+    "materials": ["painted metal", "weathered cloth", "stone and dust"],
+    "lineTreatment": ["firm silhouette edges", "selective painted detail", "avoid modern hyper-detail"],
+    "mustHave": ["strong low-resolution silhouette", "specific original design", "era-appropriate painted game-art feel", "clear focal hierarchy"],
+    "mustAvoid": ["modern AAA photorealism", "mobile-game gloss", "generic AI fantasy", "copied franchise iconography", "existing characters", "modern tactical branding"]
+  },
+  "continuity_locks": ["keep the hero design original", "preserve 1990s production-art restraint", "no franchise logos or recognizable copied assets"],
+  "quality_prompt": ["authored 1990s game production artwork", "readable game silhouette", "specific material choices", "non-generic composition"],
+  "negative": ["modern UI", "photoreal screenshot", "existing game logo", "existing franchise character", "AI-generated text artifacts", "watermark"],
+  "seed_strategy": {"base": 90620262, "stride": 1},
+  "output_rules": {"exactCount": true, "requireUniqueHashes": true, "requireNonZeroBytes": true, "requireDimensions": true, "writeImageMetadata": true, "preserveAttempts": false},
+  "retry_rules": {"maxShotAttempts": 2, "retryMissing": true, "retryInvalidFile": true, "retryDimensionMismatch": true, "retryDuplicate": true, "seedBump": 1009},
+  "provider": {"baseUrl": "http://127.0.0.1:8192", "adapterId": "comfyui:sdxl-base-local-cinematic_stills"},
+  "shots": [
+    {
+      "id": "001-retro-game-anchor",
+      "description": "Original 1990s game production-art hero standing at the edge of a rugged industrial ruin, designed to test retro silhouette, materials, palette and authored game-art character",
+      "pose": "alert relaxed stance with one foot forward and gear clearly readable",
+      "camera": "eye-level three-quarter full figure",
+      "expression": "focused and self-possessed",
+      "background": "restrained industrial ruin with broad painted shapes and no text",
+      "framing": "full figure with comfortable negative space",
+      "continuityLocks": ["one hero only", "original design only", "no text or logos"]
+    }
+  ]
+}
