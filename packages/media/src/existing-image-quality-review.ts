@@ -17,6 +17,9 @@ export interface ExistingImageQualityEvidence {
   readonly height: number;
   readonly hasAlpha: boolean;
   readonly megapixels: number;
+  readonly metricDomain: "alpha-weighted-visible-pixels";
+  readonly visiblePixelRatio: number;
+  readonly alphaWeightRatio: number;
   readonly lumaMean: number;
   readonly lumaStdDev: number;
   readonly shadowClipRatio: number;
@@ -88,26 +91,31 @@ async function rawRgba(encoded: Buffer) {
 
 function analysePixels(width: number, height: number, rgba: Buffer) {
   const total = width * height;
-  let lumaSum = 0;
-  let lumaSq = 0;
-  let shadow = 0;
-  let highlight = 0;
+  let visiblePixels = 0;
+  let alphaWeightSum = 0;
+  let lumaWeightedSum = 0;
+  let lumaWeightedSq = 0;
+  let shadowWeight = 0;
+  let highlightWeight = 0;
   let semiTransparent = 0;
   let transparentRgbContaminated = 0;
   let edgePixels = 0;
   let haloRisk = 0;
   let pinholes = 0;
-  let gradientSum = 0;
-  let gradientSq = 0;
-  let gradientCount = 0;
-  let boundaryDiff = 0;
-  let boundaryCount = 0;
-  let interiorDiff = 0;
-  let interiorCount = 0;
+  let gradientWeightedSum = 0;
+  let gradientWeightedSq = 0;
+  let gradientWeight = 0;
+  let boundaryWeightedDiff = 0;
+  let boundaryWeight = 0;
+  let interiorWeightedDiff = 0;
+  let interiorWeight = 0;
 
-  const lumaAt = (x: number, y: number) => {
+  const rgbaAt = (x: number, y: number) => {
     const i = sampleOffset(width, x, y);
-    return luminance(rgba[i]!, rgba[i + 1]!, rgba[i + 2]!);
+    return {
+      luma: luminance(rgba[i]!, rgba[i + 1]!, rgba[i + 2]!),
+      alpha: rgba[i + 3]!,
+    };
   };
 
   for (let y = 0; y < height; y += 1) {
@@ -117,38 +125,51 @@ function analysePixels(width: number, height: number, rgba: Buffer) {
       const g = rgba[i + 1]!;
       const b = rgba[i + 2]!;
       const a = rgba[i + 3]!;
+      const alphaWeight = a / 255;
       const l = luminance(r, g, b);
-      lumaSum += l;
-      lumaSq += l * l;
-      if (l <= 5) shadow += 1;
-      if (l >= 250) highlight += 1;
+      if (a > 0) visiblePixels += 1;
+      alphaWeightSum += alphaWeight;
+      if (alphaWeight > 0) {
+        lumaWeightedSum += l * alphaWeight;
+        lumaWeightedSq += l * l * alphaWeight;
+        if (l <= 5) shadowWeight += alphaWeight;
+        if (l >= 250) highlightWeight += alphaWeight;
+      }
       if (a > 0 && a < 255) semiTransparent += 1;
       if (a === 0 && (r !== 0 || g !== 0 || b !== 0)) transparentRgbContaminated += 1;
 
       if (x > 0) {
-        const d = Math.abs(l - lumaAt(x - 1, y));
-        gradientSum += d;
-        gradientSq += d * d;
-        gradientCount += 1;
-        if (x % 8 === 0) {
-          boundaryDiff += d;
-          boundaryCount += 1;
-        } else {
-          interiorDiff += d;
-          interiorCount += 1;
+        const neighbour = rgbaAt(x - 1, y);
+        const pairWeight = Math.min(alphaWeight, neighbour.alpha / 255);
+        if (pairWeight > 0) {
+          const d = Math.abs(l - neighbour.luma);
+          gradientWeightedSum += d * pairWeight;
+          gradientWeightedSq += d * d * pairWeight;
+          gradientWeight += pairWeight;
+          if (x % 8 === 0) {
+            boundaryWeightedDiff += d * pairWeight;
+            boundaryWeight += pairWeight;
+          } else {
+            interiorWeightedDiff += d * pairWeight;
+            interiorWeight += pairWeight;
+          }
         }
       }
       if (y > 0) {
-        const d = Math.abs(l - lumaAt(x, y - 1));
-        gradientSum += d;
-        gradientSq += d * d;
-        gradientCount += 1;
-        if (y % 8 === 0) {
-          boundaryDiff += d;
-          boundaryCount += 1;
-        } else {
-          interiorDiff += d;
-          interiorCount += 1;
+        const neighbour = rgbaAt(x, y - 1);
+        const pairWeight = Math.min(alphaWeight, neighbour.alpha / 255);
+        if (pairWeight > 0) {
+          const d = Math.abs(l - neighbour.luma);
+          gradientWeightedSum += d * pairWeight;
+          gradientWeightedSq += d * d * pairWeight;
+          gradientWeight += pairWeight;
+          if (y % 8 === 0) {
+            boundaryWeightedDiff += d * pairWeight;
+            boundaryWeight += pairWeight;
+          } else {
+            interiorWeightedDiff += d * pairWeight;
+            interiorWeight += pairWeight;
+          }
         }
       }
 
@@ -196,19 +217,23 @@ function analysePixels(width: number, height: number, rgba: Buffer) {
     }
   }
 
-  const mean = lumaSum / total;
-  const stdDev = Math.sqrt(Math.max(0, lumaSq / total - mean * mean));
-  const detailEnergy = gradientCount ? gradientSum / gradientCount : 0;
-  const sharpness = gradientCount ? Math.sqrt(gradientSq / gradientCount) : 0;
-  const boundaryMean = boundaryCount ? boundaryDiff / boundaryCount : 0;
-  const interiorMean = interiorCount ? interiorDiff / interiorCount : 0;
+  const safeAlphaWeight = alphaWeightSum > 0 ? alphaWeightSum : 1;
+  const mean = alphaWeightSum > 0 ? lumaWeightedSum / safeAlphaWeight : 0;
+  const stdDev = alphaWeightSum > 0 ? Math.sqrt(Math.max(0, lumaWeightedSq / safeAlphaWeight - mean * mean)) : 0;
+  const detailEnergy = gradientWeight ? gradientWeightedSum / gradientWeight : 0;
+  const sharpness = gradientWeight ? Math.sqrt(gradientWeightedSq / gradientWeight) : 0;
+  const boundaryMean = boundaryWeight ? boundaryWeightedDiff / boundaryWeight : 0;
+  const interiorMean = interiorWeight ? interiorWeightedDiff / interiorWeight : 0;
   const blockinessRatio = interiorMean > 0 ? boundaryMean / interiorMean : 1;
 
   return {
+    metricDomain: "alpha-weighted-visible-pixels" as const,
+    visiblePixelRatio: visiblePixels / total,
+    alphaWeightRatio: alphaWeightSum / total,
     lumaMean: mean,
     lumaStdDev: stdDev,
-    shadowClipRatio: shadow / total,
-    highlightClipRatio: highlight / total,
+    shadowClipRatio: shadowWeight / safeAlphaWeight,
+    highlightClipRatio: highlightWeight / safeAlphaWeight,
     sharpness,
     detailEnergy,
     semiTransparentPixelRatio: semiTransparent / total,
@@ -235,11 +260,15 @@ export async function reviewExistingImageQuality(
 
   const issues: string[] = [];
   let score = 100;
-  if (metrics.sharpness < minimumSharpness) {
+  if (metrics.alphaWeightRatio === 0) {
+    issues.push("fully-transparent-no-visible-artwork");
+    score -= 55;
+  }
+  if (metrics.alphaWeightRatio > 0 && metrics.sharpness < minimumSharpness) {
     issues.push(`soft-or-blurry:${metrics.sharpness.toFixed(2)}<${minimumSharpness.toFixed(2)}`);
     score -= 24;
   }
-  if (metrics.lumaStdDev < minimumLumaStdDev) {
+  if (metrics.alphaWeightRatio > 0 && metrics.lumaStdDev < minimumLumaStdDev) {
     issues.push(`flat-low-contrast:${metrics.lumaStdDev.toFixed(2)}`);
     score -= 10;
   }
@@ -269,7 +298,7 @@ export async function reviewExistingImageQuality(
   }
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  const grade: ExistingImageQualityGrade = score < 72 || issues.some((issue) => issue.startsWith("edge-halo-risk") || issue.startsWith("soft-or-blurry"))
+  const grade: ExistingImageQualityGrade = score < 72 || issues.some((issue) => issue.startsWith("edge-halo-risk") || issue.startsWith("soft-or-blurry") || issue === "fully-transparent-no-visible-artwork")
     ? "fail"
     : score < 88 || issues.length
       ? "warn"
@@ -321,7 +350,7 @@ export async function reviewExistingImageEdit(
   const maximumSharpnessRegressionRatio = finite(spec.maximumSharpnessRegressionRatio, 0.12, 0, 1, "maximumSharpnessRegressionRatio");
   if (source.sharpness > 0 && edited.sharpness < source.sharpness * (1 - maximumSharpnessRegressionRatio)) {
     regressions.push(`sharpness-regressed:${source.sharpness.toFixed(2)}->${edited.sharpness.toFixed(2)}`);
-  } else if (edited.sharpness > source.sharpness * 1.06) {
+  } else if (source.sharpness > 0 && edited.sharpness > source.sharpness * 1.06) {
     improvements.push(`sharpness-improved:${source.sharpness.toFixed(2)}->${edited.sharpness.toFixed(2)}`);
   }
 
