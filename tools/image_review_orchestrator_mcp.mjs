@@ -14,16 +14,15 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-image-review-orchestrator";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS";
 
-const assertAllowed = (filePath) =>
-  assertAllowedLocalPath(filePath, {
-    envName: ALLOWED_ROOTS_ENV,
-    output: false,
-    label: "image review orchestrator",
-  });
+const assertAllowed = (filePath) => assertAllowedLocalPath(filePath, {
+  envName: ALLOWED_ROOTS_ENV,
+  output: false,
+  label: "image review orchestrator",
+});
 
 async function review(args) {
   if (typeof args.inputPath !== "string") throw new Error("inputPath is required.");
@@ -45,7 +44,7 @@ async function review(args) {
     inputPath,
     ...result,
     publicationAllowed: false,
-    instruction: "Use this result to route work. Technical PASS only advances to visual review; ranked defect regions must be inspected before finishing and this tool never publishes an asset automatically.",
+    instruction: "Use this result to route work. Technical PASS only advances to visual review. Ranked defect regions and artifact signals are advisory evidence that must be visually checked before finishing or promotion.",
   });
 }
 
@@ -57,15 +56,12 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_image_for_intended_use",
-    description: "Run unified review for an existing image. Uses alpha-weighted visible-pixel quality metrics, profile-aware defect detection with ranked connected defect regions, optional Work-header crop QA, and adjacent-image similarity checks before routing to reject, finishing or mandatory visual review.",
+    description: "Run unified review for an existing image. Uses alpha-weighted visible-pixel quality metrics, profile-aware defect detection with ranked regions, ringing/posterization/resampling signals, optional Work-header crop QA, and adjacent-image similarity checks before routing to reject, finishing or mandatory visual review.",
     inputSchema: {
       type: "object",
       properties: {
         inputPath: { type: "string", minLength: 1 },
-        intendedRole: {
-          type: "string",
-          enum: ["work-header", "support-image", "tile", "logo", "ui", "photo", "sprite", "illustration", "texture"],
-        },
+        intendedRole: { type: "string", enum: ["work-header", "support-image", "tile", "logo", "ui", "photo", "sprite", "illustration", "texture"] },
         declaredProfile: { type: "string", enum: [...IMAGE_REVIEW_PROFILE_NAMES] },
         filename: { type: "string" },
         compareAgainst: {
@@ -74,10 +70,7 @@ const tools = Object.freeze([
           items: {
             type: "object",
             required: ["id", "path"],
-            properties: {
-              id: { type: "string", minLength: 1 },
-              path: { type: "string", minLength: 1 },
-            },
+            properties: { id: { type: "string", minLength: 1 }, path: { type: "string", minLength: 1 } },
             additionalProperties: false,
           },
         },
@@ -90,7 +83,7 @@ const tools = Object.freeze([
 
 function capabilities() {
   return Object.freeze({
-    contract: "evavo_image_review_orchestrator_v1_1",
+    contract: "evavo_image_review_orchestrator_v1_2",
     serverVersion: SERVER_VERSION,
     allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
     profiles: IMAGE_REVIEW_PROFILE_NAMES,
@@ -98,6 +91,9 @@ function capabilities() {
     alphaWeightedVisiblePixelMetrics: true,
     profileAwareDefectDetection: true,
     rankedConnectedDefectRegions: true,
+    ringingAndOversharpenSignals: true,
+    posterizationSignals: true,
+    suspiciousNearestNeighbourUpscaleSignals: true,
     sourceMutation: false,
     checks: [
       "asset-aware-profile-selection",
@@ -106,6 +102,9 @@ function capabilities() {
       "profile-aware-alpha-contamination-and-halo-risk",
       "alpha-pinhole-and-discontinuity-risk",
       "ranked-connected-defect-regions",
+      "ringing-and-oversharpen-risk",
+      "tonal-posterization-risk",
+      "non-pixel-art-nearest-neighbour-upscale-risk",
       "compression-blockiness-risk",
       "work-header-resolution-and-crop-safety",
       "near-duplicate-and-repetition-detection",
@@ -122,9 +121,7 @@ async function callTool(name, args) {
 }
 
 function response(id, result) { return { jsonrpc: "2.0", id, result }; }
-function toolResult(payload, isError = false) {
-  return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError };
-}
+function toolResult(payload, isError = false) { return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError }; }
 
 async function handle(message) {
   const { id, method, params } = message;
