@@ -39,6 +39,11 @@ function page(overrides = {}) {
     candidateMobileSha256: "f".repeat(64),
     desktopViewport: { currentWidth: 1440, currentHeight: 900, candidateWidth: 1440, candidateHeight: 900, dimensionsMatch: true, screenshotsDiffer: true },
     mobileViewport: { currentWidth: 390, currentHeight: 844, candidateWidth: 390, candidateHeight: 844, dimensionsMatch: true, screenshotsDiffer: true },
+    currentPageQuality: 4.0,
+    candidatePageQuality: 4.5,
+    pageQualityAdvantage: 0.5,
+    minimumPageQualityAdvantage: 0.25,
+    materialPageQualityAdvantageVerified: true,
     visualScore: 91,
     disqualifiers: [],
     verdict: "page-shortlist",
@@ -55,12 +60,14 @@ function page(overrides = {}) {
 
 test("approval packet can become ready but never becomes approval", () => {
   const result = prepareWorkHeaderApprovalPacket({ selection: selection(), pageRender: page() });
+  assert.equal(result.contract, "evavo.work-header-approval-packet.v2");
   assert.equal(result.status, "ready-for-explicit-approval");
   assert.equal(result.candidateId, "candidate-a");
   assert.equal(result.candidateSha256, "b".repeat(64));
   assert.equal(result.verified.candidateHashMatchesPageRender, true);
   assert.equal(result.verified.comparableViewportGeometryVerified, true);
   assert.equal(result.verified.candidateRenderDifferenceVerified, true);
+  assert.equal(result.verified.materialPageQualityAdvantageVerified, true);
   assert.equal(result.explicitApprovalStillRequired, true);
   assert.equal(result.automaticPublicationAllowed, false);
   assert.equal(result.automaticWebsiteMutationAllowed, false);
@@ -76,37 +83,34 @@ test("approval packet blocks when resolver retained current header", () => {
 });
 
 test("approval packet blocks failed page render", () => {
-  const result = prepareWorkHeaderApprovalPacket({
-    selection: selection(),
-    pageRender: page({ verdict: "reject", disqualifiers: ["mobile-crop-failure"] }),
-  });
+  const result = prepareWorkHeaderApprovalPacket({ selection: selection(), pageRender: page({ verdict: "reject", disqualifiers: ["mobile-crop-failure"] }) });
   assert.equal(result.status, "blocked");
   assert.ok(result.blockers.some((item) => item.startsWith("page-render-not-shortlisted")));
 });
 
 test("approval packet blocks page render from different candidate bytes", () => {
-  const result = prepareWorkHeaderApprovalPacket({
-    selection: selection(),
-    pageRender: page({ candidateSha256: "9".repeat(64) }),
-  });
+  const result = prepareWorkHeaderApprovalPacket({ selection: selection(), pageRender: page({ candidateSha256: "9".repeat(64) }) });
   assert.equal(result.status, "blocked");
   assert.ok(result.blockers.includes("page-render-candidate-hash-does-not-match-selection"));
 });
 
 test("approval packet blocks viewport-mismatched comparison", () => {
-  const result = prepareWorkHeaderApprovalPacket({
-    selection: selection(),
-    pageRender: page({ comparableViewportGeometryVerified: false }),
-  });
+  const result = prepareWorkHeaderApprovalPacket({ selection: selection(), pageRender: page({ comparableViewportGeometryVerified: false }) });
   assert.equal(result.status, "blocked");
   assert.ok(result.blockers.includes("page-render-current-candidate-viewports-not-comparable"));
 });
 
 test("approval packet blocks when screenshots do not prove candidate render changed", () => {
-  const result = prepareWorkHeaderApprovalPacket({
-    selection: selection(),
-    pageRender: page({ candidateRenderDifferenceVerified: false }),
-  });
+  const result = prepareWorkHeaderApprovalPacket({ selection: selection(), pageRender: page({ candidateRenderDifferenceVerified: false }) });
   assert.equal(result.status, "blocked");
   assert.ok(result.blockers.includes("page-render-does-not-prove-candidate-was-visible-in-both-viewports"));
+});
+
+test("approval packet blocks a candidate that did not materially beat current page quality", () => {
+  const result = prepareWorkHeaderApprovalPacket({
+    selection: selection(),
+    pageRender: page({ materialPageQualityAdvantageVerified: false, pageQualityAdvantage: 0.1 }),
+  });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.includes("page-render-does-not-prove-material-quality-advantage-over-current"));
 });
