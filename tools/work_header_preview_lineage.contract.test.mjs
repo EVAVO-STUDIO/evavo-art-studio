@@ -31,3 +31,15 @@ test("page render accepts screenshots only through a reverified preview admissio
   ]) assert.ok(source.includes(token), `missing page-render lineage token: ${token}`);
   assert.ok(!source.includes('required: ["selectionReceiptPath", "candidateImagePath", "pageSlug", "pageTitle", "currentDesktopPath"'), "raw caller screenshot path schema unexpectedly returned");
 });
+
+test("page-render proof/receipt and approval receipt use rollback-safe create-only writes", async () => {
+  const source = await read("./work_header_page_render_review_mcp.mjs");
+  for (const token of [
+    "writeCreateOnlyBundle",
+    "rollbackSafePageReviewEvidenceBundle: true",
+    "rollbackSafeApprovalReceiptWrite: true",
+    "{ path: proofPath, data: result.proofPng }",
+  ]) assert.ok(source.includes(token), `missing atomic evidence-write token: ${token}`);
+  assert.ok(!source.includes("await writeFile(proofPath"), "sequential proof write unexpectedly returned");
+  assert.ok(!source.includes("await writeFile(receiptPath"), "sequential receipt write unexpectedly returned");
+});
