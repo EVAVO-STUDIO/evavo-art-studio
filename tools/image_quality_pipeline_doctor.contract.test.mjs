@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers preservation review finishing enhancement admission and atomic Work preview", async () => {
+test("image quality doctor covers preservation enhancement and fully reverified Work preview/page review", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_8"',
-    'SERVER_VERSION = "1.8.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_9"',
+    'SERVER_VERSION = "1.9.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -20,13 +20,13 @@ test("image quality doctor covers preservation review finishing enhancement admi
     'id: "enhancement-session-fail-closed"',
     'id: "work-preview-admission-core"',
     'id: "work-preview-admission-mcp"',
+    'id: "work-page-review-reverified-preview"',
     'id: "durable-review-session"',
     'id: "review-mcp-profile-policy"',
     'id: "defect-mcp-source-bound"',
     'id: "finishing-plan-mcp"',
     'id: "safe-output-bundle"',
     'id: "edit-mask-no-private-sharp"',
-    'id: "page-review-atomic"',
     'id: "mcp-registration"',
     "runtimeExecutionPerformed: false",
     "sourceMutationPerformed: false",
@@ -67,7 +67,7 @@ test("doctor verifies enhancement schema geometry proof binding and stale eviden
   ]) assert.ok(source.includes(token), `missing enhancement-schema/session doctor token: ${token}`);
 });
 
-test("doctor verifies Work preview v4 atomic bundle admission", async () => {
+test("doctor verifies Work preview v4 atomic bundle admission and read-only reverification", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
     "evavo.work-header-candidate-preview-capture.v4",
@@ -78,7 +78,23 @@ test("doctor verifies Work preview v4 atomic bundle admission", async () => {
     "atomicPreviewEvidenceBundleRequired: true",
     'acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v4"',
     "manifestSha256AndLengthBound: true",
-  ]) assert.ok(source.includes(token), `missing atomic preview-admission doctor token: ${token}`);
+    "previewAdmissionReverificationAvailable: true",
+    "staleManifestOrScreenshotEvidenceRejected: true",
+    "admissionRecomputedDuringReverification: true",
+    "evavo_verify_work_header_preview_admission",
+  ]) assert.ok(source.includes(token), `missing reverified preview-admission doctor token: ${token}`);
+});
+
+test("doctor verifies page review rechecks atomic preview SHA and lengths", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    'SERVER_VERSION = "1.5.0"',
+    "previewAdmissionManifestSha256AndLengthReverified: true",
+    "atomicPreviewEvidenceBundleReverifiedBeforePageReview: true",
+    "screenshotSha256AndLengthBinding: true",
+    "pageRenderProofSha256AndLengthBinding: true",
+    "previewAdmissionFullyReverified: true",
+  ]) assert.ok(source.includes(token), `missing page-review reverification doctor token: ${token}`);
 });
 
 test("doctor verifies profile-aware review and source-bound finishing evidence", async () => {
