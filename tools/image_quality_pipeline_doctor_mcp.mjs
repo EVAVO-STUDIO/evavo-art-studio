@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.14.0";
+const SERVER_VERSION = "1.15.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CHECKS = Object.freeze([
@@ -18,7 +18,7 @@ const CHECKS = Object.freeze([
   { id: "enhancement-session", file: "tools/enhancement_review_session_mcp.mjs", tokens: ["evavo.enhancement-art-review-session.v1_5", "evavo_verify_enhancement_review_session", "proofSha256AndLengthBound: true"] },
   { id: "work-preview-core-v7", file: "packages/media/src/work-header-preview-admission.ts", tokens: ["evavo.work-header-candidate-preview-capture.v7", "candidateContentArtifact", "browserCandidateResponseIdentity", "browserResponseBodyIdentityVerified", "browserResponseMetadataBound", "browserResponseBindings", "candidateContentArtifactPath", "atomicEvidenceBundleVerified: true"] },
   { id: "work-preview-mcp-v170", file: "tools/work_header_preview_admission_mcp.mjs", tokens: ['SERVER_VERSION = "1.7.0"', 'acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v7"', "browserResponseMetadataShaAndLengthBound: true", "browserResponseMetadataPersistedPerProfile: true", "browserResponseMetadataBound: true", "evavo_verify_work_header_preview_admission"] },
-  { id: "work-page-review-v180", file: "tools/work_header_page_render_review_mcp.mjs", tokens: ['SERVER_VERSION = "1.8.0"', "browserResponseMetadataRequiredFromAdmission: true", "browserResponseMetadataPersistedInPageReceipt: true", "browserResponseMetadataReverifiedBeforeApprovalPacket: true", "browserResponseMetadataBound: true", "browserResponseBindings", "selectedLocalCandidateMustMatchPreviewedResponseBytes: true", "pageRenderProofSha256AndLengthBinding: true", "admitWorkHeaderCandidatePreviewManifest"] },
+  { id: "work-page-review-v190", file: "tools/work_header_page_render_review_mcp.mjs", tokens: ['SERVER_VERSION = "1.9.0"', "selectionReceiptShaAndLengthBound: true", "candidateReviewReceiptShaAndLengthBound: true", "previewAdmissionReceiptShaAndLengthBound: true", "previewManifestShaAndLengthBound: true", "pageSourceBindingsShaAndLengthReverified: true", "fullReceiptLineageVerifiedBeforeApprovalPacket: true", "browserResponseMetadataPersistedInPageReceipt: true", "browserResponseMetadataReverifiedBeforeApprovalPacket: true", "fullReceiptLineageVerified: true", "selectedLocalCandidateMustMatchPreviewedResponseBytes: true", "pageRenderProofSha256AndLengthBinding: true", "admitWorkHeaderCandidatePreviewManifest"] },
   { id: "durable-review", file: "tools/image_review_session_mcp.mjs", tokens: ["evavo.image-review-session.v1_1", "sourceSha256AndLengthBound: true", "staleEvidenceVerification: true"] },
   { id: "safe-bundle", file: "tools/lib/create_only_bundle.mjs", tokens: ["writeCreateOnlyBundle", "rollback", "preflight"] },
   { id: "mcp-registration", file: ".mcp.json", tokens: ["evavo-image-review-session-v1", "evavo-image-quality-pipeline-doctor-v1", "evavo-work-header-preview-admission-v1", "evavo-work-header-page-render-review-v1"] },
@@ -36,13 +36,13 @@ async function inspect() {
     }
   }
   const blockers = checks.filter((x) => !x.ok).map((x) => x.id);
-  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_14", ready: blockers.length === 0, blockerCount: blockers.length, blockers, checks, executionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, nextAction: blockers.length ? "Repair failing image-quality contract surfaces." : "Static preservation, exact Chrome-loaded preview bytes and durable responsive browser metadata are carried through admission, page review and approval; runtime execution and visual approval remain separate." });
+  return Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_15", ready: blockers.length === 0, blockerCount: blockers.length, blockers, checks, executionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, nextAction: blockers.length ? "Repair failing image-quality contract surfaces." : "Static preservation, exact Chrome-loaded preview bytes, durable responsive browser metadata and complete receipt/source lineage are carried through admission, page review and approval; runtime execution and visual approval remain separate." });
 }
 const tools = Object.freeze([
   { name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only EVAVO image quality pipeline doctor.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, enhancement and exact Chrome-response lineage through preview admission, page review and approval without mutating source.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, enhancement and exact receipt/source lineage from browser preview through approval without mutating source.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
 ]);
-const capabilities = () => Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_14", serverVersion: SERVER_VERSION, readOnly: true, browserResponseBodyLineageChecked: true, responsiveBrowserResponseMetadataChecked: true, browserResponseMetadataCarriedThroughApprovalChecked: true, runtimeExecutionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
+const capabilities = () => Object.freeze({ contract: "evavo.image-quality-pipeline-doctor.v1_15", serverVersion: SERVER_VERSION, readOnly: true, browserResponseBodyLineageChecked: true, responsiveBrowserResponseMetadataChecked: true, browserResponseMetadataCarriedThroughApprovalChecked: true, fullPageReviewReceiptLineageChecked: true, runtimeExecutionPerformed: false, sourceMutationPerformed: false, publicationAllowed: false, checkCount: CHECKS.length });
 async function callTool(name) { if (name === "evavo_image_quality_pipeline_doctor_capabilities") return capabilities(); if (name === "evavo_run_image_quality_pipeline_doctor") return inspect(); throw new Error(`Unknown tool ${name}`); }
 const response = (id, result) => ({ jsonrpc: "2.0", id, result });
 const toolResult = (payload, isError = false) => ({ content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError });
