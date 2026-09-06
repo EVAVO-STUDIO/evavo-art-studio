@@ -26,14 +26,16 @@ function manifest(overrides = {}) {
       "evavo_review_image_for_intended_use",
       "evavo_compare_work_header_candidates",
       "evavo_record_work_header_visual_critique",
+      "evavo_resolve_work_header_selection",
     ],
-    mandatory_visual_checks: ["inspect source vs candidate", "inspect actual page crops", "compare viable header options side-by-side"],
+    mandatory_visual_checks: ["inspect source vs candidate", "inspect actual page crops", "compare viable header options side-by-side", "retain current header unless replacement proves material advantage"],
     approval_state: "unapproved",
     source_immutable: true,
     candidate_is_review_only: true,
     art_studio_visual_review_required: true,
     page_context_review_required: true,
     comparative_candidate_review_required: true,
+    current_header_baseline_required: true,
     publication_allowed: false,
     cloud_overwrite_allowed: false,
     automatic_creative_approval: false,
@@ -49,6 +51,7 @@ test("admits a source-bound Work header enhancement only as review material", ()
   assert.equal(admitted.learnedCandidate, true);
   assert.equal(admitted.pageContextReviewRequired, true);
   assert.equal(admitted.comparativeCandidateReviewRequired, true);
+  assert.equal(admitted.currentHeaderBaselineRequired, true);
   assert.equal(admitted.publicationAllowed, false);
   assert.equal(admitted.cloudOverwriteAllowed, false);
   assert.equal(admitted.finalApprovalRequired, true);
@@ -66,6 +69,10 @@ test("rejects Work header manifests that omit comparative candidate review", () 
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ comparative_candidate_review_required: false })), /comparative candidate review/u);
 });
 
+test("rejects Work header manifests that omit current-header baseline review", () => {
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ current_header_baseline_required: false })), /current-header baseline review/u);
+});
+
 test("rejects Work header manifests with a weaker review profile", () => {
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ art_studio_review_profile: "illustration" })), /requires Art Studio profile web-hero/u);
 });
@@ -77,4 +84,9 @@ test("rejects enhancement candidates smaller than the immutable source", () => {
 test("rejects Work header manifests missing the visual critique tool", () => {
   const tools = manifest().mandatory_art_studio_tools.filter((tool) => tool !== "evavo_record_work_header_visual_critique");
   assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ mandatory_art_studio_tools: tools })), /must require evavo_record_work_header_visual_critique/u);
+});
+
+test("rejects Work header manifests missing the conservative selection resolver", () => {
+  const tools = manifest().mandatory_art_studio_tools.filter((tool) => tool !== "evavo_resolve_work_header_selection");
+  assert.throws(() => admitEnhancementStudioReviewManifest(manifest({ mandatory_art_studio_tools: tools })), /must require evavo_resolve_work_header_selection/u);
 });
