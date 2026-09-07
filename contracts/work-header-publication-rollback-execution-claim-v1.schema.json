@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evavo.work-header-publication-rollback-execution-claim.v1",
+  "title": "EVAVO Work-header publication rollback execution claim",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "properties": {
+    "contract": {
+      "const": "evavo.work-header-publication-rollback-execution-claim.v1"
+    },
+    "schemaSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "claimState": {
+      "const": "rollback-claimed-unexecuted"
+    },
+    "authorizationReceiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorizationReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "authorizationReceiptByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "rollbackReadinessReceiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rollbackReadinessReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackReadinessReceiptByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "route": {
+      "type": "string",
+      "pattern": "^/work/[a-z0-9-]+$"
+    },
+    "candidateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "candidateSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidateByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "targetKind": {
+      "enum": [
+        "website-header-source-update",
+        "cloudinary-stable-id-replacement"
+      ]
+    },
+    "targetIdentifier": {
+      "type": "string",
+      "minLength": 1
+    },
+    "publishedTargetPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "publishedTargetSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "publishedTargetByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "rollbackBackupPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rollbackBackupSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackBackupByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "previousTargetSnapshotSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "previousTargetSnapshotByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "currentPublishedTargetRecheckedAtClaim": {
+      "const": true
+    },
+    "rollbackBackupReverifiedAtClaim": {
+      "const": true
+    },
+    "rollbackAuthorizationReverifiedAtClaim": {
+      "const": true
+    },
+    "deterministicClaimPathRequired": {
+      "const": true
+    },
+    "singleUseRollbackClaimEstablished": {
+      "const": true
+    },
+    "claimInvalidOnAnyEvidenceDrift": {
+      "const": true
+    },
+    "rollbackExecutionAllowed": {
+      "const": false
+    },
+    "publicationAllowed": {
+      "const": false
+    },
+    "cloudOverwriteAllowed": {
+      "const": false
+    },
+    "websiteMutationAllowed": {
+      "const": false
+    }
+  },
+  "required": [
+    "contract",
+    "schemaSha256",
+    "claimState",
+    "authorizationReceiptPath",
+    "authorizationReceiptSha256",
+    "authorizationReceiptByteLength",
+    "rollbackReadinessReceiptPath",
+    "rollbackReadinessReceiptSha256",
+    "rollbackReadinessReceiptByteLength",
+    "route",
+    "candidateId",
+    "candidateSha256",
+    "candidateByteLength",
+    "targetKind",
+    "targetIdentifier",
+    "publishedTargetPath",
+    "publishedTargetSha256",
+    "publishedTargetByteLength",
+    "rollbackBackupPath",
+    "rollbackBackupSha256",
+    "rollbackBackupByteLength",
+    "previousTargetSnapshotSha256",
+    "previousTargetSnapshotByteLength",
+    "currentPublishedTargetRecheckedAtClaim",
+    "rollbackBackupReverifiedAtClaim",
+    "rollbackAuthorizationReverifiedAtClaim",
+    "deterministicClaimPathRequired",
+    "singleUseRollbackClaimEstablished",
+    "claimInvalidOnAnyEvidenceDrift",
+    "rollbackExecutionAllowed",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed"
+  ]
+}
