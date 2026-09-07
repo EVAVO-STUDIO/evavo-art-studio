@@ -4,13 +4,17 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import readline from "node:readline";
 
+import { reviewWorkMediaDiversity } from "../packages/media/dist/index.js";
 import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-approval-decision";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-approval-decision.v1";
+const DIVERSITY_RECEIPT_CONTRACT = "evavo.work-media-diversity-receipt.v1_2";
+const DIVERSITY_REVIEW_CONTRACT = "evavo.work-media-diversity.v1_2";
+const STORY_MODEL = "work-story-archetype-v1";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
 const MAX_REVIEWER_LABEL = 160;
@@ -81,7 +85,6 @@ async function verifyApprovalPacket(filePath) {
     const current = await bound(binding.path);
     if (current.sha256 !== binding.sha256 || current.byteLength !== binding.byteLength) throw new Error("Approval packet page-render source bytes changed.");
   }
-
   if (canonical(packet.browserResponseBindings) !== canonical(pageValue.browserResponseBindings) || canonical(packet.browserResponseBindings) !== canonical(previewValue.browserResponseBindings)) throw new Error("Approval packet responsive Chrome response metadata drifted across durable receipts.");
 
   return Object.freeze({
@@ -92,6 +95,54 @@ async function verifyApprovalPacket(filePath) {
     candidateByteLength: artifact.byteLength,
     fullReceiptLineageVerified: true,
     browserResponseMetadataVerified: true,
+  });
+}
+
+async function verifyStoryDiversityReceipt(filePath, approvalReview) {
+  const diversityFile = await bound(filePath);
+  const receipt = JSON.parse(diversityFile.bytes.toString("utf8"));
+  if (receipt.contract !== DIVERSITY_RECEIPT_CONTRACT || receipt.reviewContract !== DIVERSITY_REVIEW_CONTRACT || receipt.storySimilarityModel !== STORY_MODEL) throw new Error("Approved Work-header decisions require a current semantic Work-media diversity receipt v1_2.");
+  assertNoMutationAuthority(receipt, "Work-media diversity receipt");
+  if (receipt.automaticReplacementAllowed !== false || receipt.visualReviewRequired !== true) throw new Error("Work-media diversity receipt carries unsafe automatic replacement state.");
+  const sourceBindings = Array.isArray(receipt.sourceBindings) ? receipt.sourceBindings : [];
+  if (sourceBindings.length < 3) throw new Error("Approved Work-header decisions require story-diversity evidence covering the candidate plus at least two comparison images.");
+  const routeCount = new Set(sourceBindings.map((item) => item?.route).filter((route) => typeof route === "string" && route.startsWith("/work/"))).size;
+  if (routeCount < 3) throw new Error("Approved Work-header decisions require semantic diversity evidence spanning at least three Work routes.");
+
+  const images = [];
+  for (const binding of sourceBindings) {
+    if (!binding?.id || !binding?.path || !binding?.sha256 || !Number.isInteger(binding?.byteLength)) throw new Error("Work-media diversity source binding is malformed.");
+    const file = await bound(binding.path);
+    if (file.sha256 !== binding.sha256 || file.byteLength !== binding.byteLength) throw new Error(`Work-media diversity source bytes changed: ${binding.id}.`);
+    images.push({ id: binding.id, route: binding.route ?? undefined, role: binding.role ?? "other", story: binding.story ?? undefined, image: file.bytes });
+  }
+  const evidence = receipt.evidence ?? {};
+  const recomputed = await reviewWorkMediaDiversity({
+    images,
+    nearDuplicateThreshold: evidence.nearDuplicateThreshold,
+    reviewSimilarityThreshold: evidence.reviewSimilarityThreshold,
+    storyCollisionThreshold: evidence.storyCollisionThreshold,
+    storyReviewThreshold: evidence.storyReviewThreshold,
+    requireStoryReview: true,
+    maximumImages: Math.max(3, images.length),
+  });
+  if (recomputed.contract !== DIVERSITY_REVIEW_CONTRACT || canonical(recomputed.evidence) !== canonical(evidence)) throw new Error("Work-media diversity evidence changed on recomputation.");
+  if (recomputed.evidence.storyReviewComplete !== true || recomputed.evidence.semanticStoryReviewPassed !== true || recomputed.evidence.storyDistinctnessPass !== true || recomputed.evidence.distinctnessPass !== true) throw new Error("Approved Work-header candidate failed semantic story-diversity review.");
+  if (recomputed.evidence.genericOrFillerItems.length !== 0 || recomputed.evidence.crossRouteStoryCollisionCount !== 0 || recomputed.evidence.crossRouteDuplicateCount !== 0 || recomputed.evidence.crossRouteNearDuplicateCount !== 0) throw new Error("Approved Work-header diversity evidence contains generic filler, repeated storytelling or cross-route duplicate imagery.");
+
+  const candidateBinding = sourceBindings.find((binding) => binding.route === approvalReview.route && binding.role === "header" && binding.sha256 === approvalReview.candidateSha256 && binding.byteLength === approvalReview.candidateByteLength);
+  if (!candidateBinding) throw new Error("Work-media diversity receipt does not bind the exact approved candidate as the header for its Work route.");
+  if (!candidateBinding.story || candidateBinding.story.genericStockOrAiFiller === true || candidateBinding.story.specificity === "generic") throw new Error("Approved Work-header candidate story review is missing, generic, stock-like or AI-filler-like.");
+  for (const pairId of recomputed.evidence.storyCollisionPairs) if (pairId.split("::").includes(candidateBinding.id)) throw new Error("Approved Work-header candidate repeats an existing cross-route visual story.");
+
+  return Object.freeze({
+    diversityFile,
+    receipt,
+    candidateBinding,
+    evidence: recomputed.evidence,
+    storyReviewComplete: true,
+    semanticStoryReviewPassed: true,
+    exactCandidateIncluded: true,
   });
 }
 
@@ -106,6 +157,12 @@ async function recordDecision(args) {
   const review = await verifyApprovalPacket(args.approvalPacketReceiptPath);
   if (!/^\/work\/[a-z0-9-]+$/u.test(String(review.route ?? ""))) throw new Error("Verified approval packet is missing a canonical Work route.");
 
+  let diversity = null;
+  if (args.decision === "approved") {
+    if (typeof args.diversityReceiptPath !== "string" || !args.diversityReceiptPath) throw new Error("Approved decisions require diversityReceiptPath from a complete semantic Work-media diversity review.");
+    diversity = await verifyStoryDiversityReceipt(args.diversityReceiptPath, review);
+  }
+
   const receiptPath = await allowed(args.receiptPath, true);
   const evidenceIdentity = Object.freeze({
     approvalPacketPath: review.packetFile.path,
@@ -115,6 +172,11 @@ async function recordDecision(args) {
     selectionReceiptSha256: review.selection.sha256,
     candidateReviewReceiptSha256: review.candidateReview.sha256,
     previewAdmissionReceiptSha256: review.preview.sha256,
+    diversityReceiptPath: diversity?.diversityFile.path ?? null,
+    diversityReceiptSha256: diversity?.diversityFile.sha256 ?? null,
+    diversityReceiptByteLength: diversity?.diversityFile.byteLength ?? null,
+    diversityReviewContract: diversity?.receipt.reviewContract ?? null,
+    storySimilarityModel: diversity?.receipt.storySimilarityModel ?? null,
     candidateSha256: review.candidateSha256,
     candidateByteLength: review.candidateByteLength,
     route: review.route,
@@ -131,6 +193,10 @@ async function recordDecision(args) {
     evidenceIdentity,
     evidenceIdentitySha256: sha256(Buffer.from(canonical(evidenceIdentity), "utf8")),
     approvalPacketReverifiedBeforeDecision: true,
+    storyDiversityReceiptReverifiedBeforeDecision: args.decision === "approved",
+    semanticStoryReviewPassed: args.decision === "approved" ? true : null,
+    candidateNotGenericStockOrAiFiller: args.decision === "approved" ? true : null,
+    crossRouteStoryCollisionRejected: args.decision === "approved" ? true : null,
     fullReceiptLineageVerified: true,
     browserResponseMetadataVerified: true,
     candidateBytesVerified: true,
@@ -139,12 +205,12 @@ async function recordDecision(args) {
     cloudOverwriteAllowed: false,
     websiteMutationAllowed: false,
     nextRequiredAction: args.decision === "approved"
-      ? "Prepare a separate governed publication transaction with backup and rollback evidence. This decision receipt does not itself publish or mutate anything."
+      ? "Prepare a separate governed publication transaction with backup and rollback evidence. The approved decision is bound to semantic cross-route story diversity and does not itself publish or mutate anything."
       : "Retain the current Work header. A rejected candidate requires a new review chain before reconsideration.",
   };
   const payload = `${JSON.stringify(receipt, null, 2)}\n`;
   await writeCreateOnlyBundle([{ path: receiptPath, data: payload, encoding: "utf8" }]);
-  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), decision: receipt.decision, route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, publicationPreparationAllowed: receipt.publicationPreparationAllowed, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), decision: receipt.decision, route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, storyDiversityVerified: args.decision === "approved", publicationPreparationAllowed: receipt.publicationPreparationAllowed, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
 async function verifyDecision(receiptPath) {
@@ -158,6 +224,11 @@ async function verifyDecision(receiptPath) {
   const identity = decision.evidenceIdentity;
   if (!identity?.approvalPacketPath || decision.evidenceIdentitySha256 !== sha256(Buffer.from(canonical(identity), "utf8"))) throw new Error("Approval decision evidence identity digest is invalid.");
   const review = await verifyApprovalPacket(identity.approvalPacketPath);
+  let diversity = null;
+  if (decision.decision === "approved") {
+    if (!identity.diversityReceiptPath) throw new Error("Approved decision is missing semantic Work-media diversity lineage.");
+    diversity = await verifyStoryDiversityReceipt(identity.diversityReceiptPath, review);
+  }
   const expected = {
     approvalPacketPath: review.packetFile.path,
     approvalPacketSha256: review.packetFile.sha256,
@@ -166,24 +237,30 @@ async function verifyDecision(receiptPath) {
     selectionReceiptSha256: review.selection.sha256,
     candidateReviewReceiptSha256: review.candidateReview.sha256,
     previewAdmissionReceiptSha256: review.preview.sha256,
+    diversityReceiptPath: diversity?.diversityFile.path ?? null,
+    diversityReceiptSha256: diversity?.diversityFile.sha256 ?? null,
+    diversityReceiptByteLength: diversity?.diversityFile.byteLength ?? null,
+    diversityReviewContract: diversity?.receipt.reviewContract ?? null,
+    storySimilarityModel: diversity?.receipt.storySimilarityModel ?? null,
     candidateSha256: review.candidateSha256,
     candidateByteLength: review.candidateByteLength,
     route: review.route,
     candidateId: review.candidateId,
   };
-  if (canonical(identity) !== canonical(expected)) throw new Error("Approval decision is bound to stale or changed approval-packet lineage.");
+  if (canonical(identity) !== canonical(expected)) throw new Error("Approval decision is bound to stale or changed approval/diversity evidence lineage.");
   if (decision.approvalPacketReverifiedBeforeDecision !== true || decision.fullReceiptLineageVerified !== true || decision.browserResponseMetadataVerified !== true || decision.candidateBytesVerified !== true) throw new Error("Approval decision receipt lacks required verified evidence state.");
-  return Object.freeze({ ok: true, receiptPath: decisionFile.path, receiptSha256: decisionFile.sha256, receiptByteLength: decisionFile.byteLength, decision: decision.decision, reviewerLabel: decision.reviewerLabel, route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, approvalPacketReverifiedAndMatched: true, fullReceiptLineageVerified: true, publicationPreparationAllowed: decision.publicationPreparationAllowed, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  if (decision.decision === "approved" && (decision.storyDiversityReceiptReverifiedBeforeDecision !== true || decision.semanticStoryReviewPassed !== true || decision.candidateNotGenericStockOrAiFiller !== true || decision.crossRouteStoryCollisionRejected !== true)) throw new Error("Approved decision lacks required semantic story-diversity evidence state.");
+  return Object.freeze({ ok: true, receiptPath: decisionFile.path, receiptSha256: decisionFile.sha256, receiptByteLength: decisionFile.byteLength, decision: decision.decision, reviewerLabel: decision.reviewerLabel, route: review.route, candidateId: review.candidateId, candidateSha256: review.candidateSha256, approvalPacketReverifiedAndMatched: true, storyDiversityReverifiedAndMatched: decision.decision === "approved", fullReceiptLineageVerified: true, publicationPreparationAllowed: decision.publicationPreparationAllowed, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
 const tools = [
-  { name: "evavo_work_header_approval_decision_capabilities", description: "Describe explicit reviewer Work-header decisions that consume a fully reverified approval packet but never publish or mutate the website/Cloudinary.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_record_work_header_approval_decision", description: "Record an explicit approved/rejected reviewer decision only after re-verifying the exact approval packet, page proof, selected candidate, preview admission and browser-response lineage. Writes one create-only decision receipt; grants no publication authority.", inputSchema: { type: "object", properties: { approvalPacketReceiptPath: { type: "string", minLength: 1 }, receiptPath: { type: "string", minLength: 1 }, decision: { type: "string", enum: ["approved", "rejected"] }, reviewerLabel: { type: "string", minLength: 1, maxLength: MAX_REVIEWER_LABEL }, reviewerAcknowledgement: { type: "string", minLength: 1, maxLength: MAX_NOTE }, automaticDecision: { type: "boolean" }, confirmLocalWrite: { type: "boolean" } }, required: ["approvalPacketReceiptPath", "receiptPath", "decision", "reviewerLabel", "reviewerAcknowledgement", "confirmLocalWrite"], additionalProperties: false } },
-  { name: "evavo_verify_work_header_approval_decision", description: "Read-only reverification of an explicit Work-header approval decision against its exact approval packet and complete downstream evidence lineage.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
+  { name: "evavo_work_header_approval_decision_capabilities", description: "Describe explicit reviewer Work-header decisions. Approval additionally requires a recomputed semantic cross-route story-diversity receipt so different pixels cannot hide repeated generic storytelling.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_record_work_header_approval_decision", description: "Record an explicit approved/rejected reviewer decision after re-verifying the full page/browser lineage. Approved decisions additionally require exact candidate-bound semantic Work-media diversity evidence spanning at least three routes, with no generic stock/AI filler or cross-route story collision.", inputSchema: { type: "object", properties: { approvalPacketReceiptPath: { type: "string", minLength: 1 }, diversityReceiptPath: { type: "string", minLength: 1 }, receiptPath: { type: "string", minLength: 1 }, decision: { type: "string", enum: ["approved", "rejected"] }, reviewerLabel: { type: "string", minLength: 1, maxLength: MAX_REVIEWER_LABEL }, reviewerAcknowledgement: { type: "string", minLength: 1, maxLength: MAX_NOTE }, automaticDecision: { type: "boolean" }, confirmLocalWrite: { type: "boolean" } }, required: ["approvalPacketReceiptPath", "receiptPath", "decision", "reviewerLabel", "reviewerAcknowledgement", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_work_header_approval_decision", description: "Read-only reverification of an explicit Work-header approval decision against its exact approval packet, semantic story-diversity receipt when approved, and complete downstream evidence lineage.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
 ];
 
 function capabilities() {
-  return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, explicitReviewerDecisionRequired: true, automaticDecisionAllowed: false, approvalPacketReverificationRequired: true, pageRenderProofReverificationRequired: true, candidateByteIdentityRequired: true, responsiveBrowserResponseMetadataRequired: true, fullReceiptLineageRequired: true, evidenceIdentityDigestRequired: true, createOnlyDecisionReceipt: true, rollbackSafeDecisionReceiptWrite: true, approvedDecisionAllowsPublicationPreparationOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
+  return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, explicitReviewerDecisionRequired: true, automaticDecisionAllowed: false, approvalPacketReverificationRequired: true, pageRenderProofReverificationRequired: true, candidateByteIdentityRequired: true, responsiveBrowserResponseMetadataRequired: true, semanticStoryDiversityRequiredForApproval: true, diversityReviewContract: DIVERSITY_REVIEW_CONTRACT, diversityReceiptContract: DIVERSITY_RECEIPT_CONTRACT, storySimilarityModel: STORY_MODEL, approvedCandidateMustAppearAsExactHeaderBinding: true, minimumDistinctWorkRoutesForApprovalDiversity: 3, genericStockOrAiFillerApprovalForbidden: true, crossRouteStoryCollisionApprovalForbidden: true, crossRoutePerceptualDuplicateApprovalForbidden: true, fullReceiptLineageRequired: true, evidenceIdentityDigestRequired: true, createOnlyDecisionReceipt: true, rollbackSafeDecisionReceiptWrite: true, approvedDecisionAllowsPublicationPreparationOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
 }
 
 async function callTool(name, args) {
