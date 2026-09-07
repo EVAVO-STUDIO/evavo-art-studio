@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { compareImageSimilarity } from "./image-similarity.js";
 
-export const WORK_MEDIA_DIVERSITY_CONTRACT = "evavo.work-media-diversity.v1" as const;
+export const WORK_MEDIA_DIVERSITY_CONTRACT = "evavo.work-media-diversity.v1_1" as const;
 
 export interface WorkMediaDiversityInput {
   readonly id: string;
@@ -23,6 +23,7 @@ export interface WorkMediaDiversityResult {
     imageCount: number;
     nearDuplicateThreshold: number;
     reviewSimilarityThreshold: number;
+    similarityModel: "dhash-ahash-rgb-grid-v1";
     images: readonly Readonly<{
       id: string;
       route: string | null;
@@ -37,6 +38,10 @@ export interface WorkMediaDiversityResult {
       leftRole: string;
       rightRole: string;
       exactBinaryMatch: boolean;
+      differenceHashSimilarity: number;
+      averageHashSimilarity: number;
+      colorGridSimilarity: number;
+      colorGridMeanAbsoluteDifference: number;
       perceptualSimilarity: number;
       classification: "duplicate" | "near-duplicate" | "review-similarity" | "distinct";
       crossRoute: boolean;
@@ -101,8 +106,9 @@ function clustersFromPairs(ids: readonly string[], linkedPairs: readonly [string
 }
 
 /**
- * Read-only cross-page media QA. It catches exact/near duplicate imagery that can
- * make the Work catalogue feel repetitive even when each individual image is technically valid.
+ * Read-only cross-page media QA. It catches exact/near duplicate imagery and
+ * keeps independent shape, tone and color evidence so recolored artwork does not
+ * get collapsed into one story merely because its grayscale structure matches.
  */
 export async function reviewWorkMediaDiversity(spec: WorkMediaDiversitySpec): Promise<WorkMediaDiversityResult> {
   const maximumImages = spec.maximumImages ?? 48;
@@ -152,6 +158,10 @@ export async function reviewWorkMediaDiversity(spec: WorkMediaDiversitySpec): Pr
         leftRole: left.role ?? "other",
         rightRole: right.role ?? "other",
         exactBinaryMatch: similarity.exactBinaryMatch,
+        differenceHashSimilarity: similarity.differenceHashSimilarity,
+        averageHashSimilarity: similarity.averageHashSimilarity,
+        colorGridSimilarity: similarity.colorGridSimilarity,
+        colorGridMeanAbsoluteDifference: similarity.colorGridMeanAbsoluteDifference,
         perceptualSimilarity: similarity.perceptualSimilarity,
         classification,
         crossRoute,
@@ -167,6 +177,7 @@ export async function reviewWorkMediaDiversity(spec: WorkMediaDiversitySpec): Pr
       imageCount: images.length,
       nearDuplicateThreshold,
       reviewSimilarityThreshold,
+      similarityModel: "dhash-ahash-rgb-grid-v1",
       images: Object.freeze(images.map((item) => Object.freeze({ id: item.id, route: item.route ?? null, role: item.role ?? "other", sha256: sha256(item.image) }))),
       pairs: Object.freeze(pairs),
       duplicatePairs: Object.freeze(duplicatePairs),
