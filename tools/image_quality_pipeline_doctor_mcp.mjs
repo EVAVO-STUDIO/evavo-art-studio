@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.27.0";
+const SERVER_VERSION = "1.28.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -24,8 +24,9 @@ const CHECKS = Object.freeze([
   { id: "work-explicit-approval-decision", file: "tools/work_header_approval_decision_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-approval-decision.v1"', "explicitReviewerDecisionRequired: true", "automaticDecisionAllowed: false", "approvalPacketReverificationRequired: true", "approvedDecisionAllowsPublicationPreparationOnly: true", "publicationAllowed: false", "cloudOverwriteAllowed: false", "websiteMutationAllowed: false"] },
   { id: "work-publication-preparation", file: "tools/work_header_publication_preparation_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-preparation.v1"', "explicitApprovedDecisionRequired: true", "approvalDecisionReverificationRequired: true", "backupRequiredBeforeExecution: true", "rollbackEvidenceRequiredBeforeExecution: true", "executionAllowed: false", "publicationAllowed: false"] },
   { id: "work-publication-transaction-plan", file: "tools/work_header_publication_transaction_plan_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-transaction-plan.v1"', "explicitExecutionConfirmationRequired: true", "currentTargetSnapshotRequired: true", "separateRollbackBackupRequired: true", "exactRollbackByteMatchRequired: true", "executionAllowed: false", "publicationAllowed: false"] },
-  { id: "work-publication-execution-authorization", file: "tools/work_header_publication_execution_authorization_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-execution-authorization.v1"', "confirmExecutionAuthorization=true is required", "singleTransactionAuthorizationOnly: true", "authorizationExpiresOnAnyEvidenceDrift: true", "executionAllowed: false", "publicationAllowed: false"] },
-  { id: "work-publication-execution-claim", file: "tools/work_header_publication_execution_claim_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-execution-claim.v1"', "deterministicClaimPathRequired: true", "createOnlySingleUseClaim: true", "secondClaimForSameAuthorizationRejected: true", "claimInvalidOnAnyEvidenceDrift: true", "executionAllowed: false", "publicationAllowed: false"] },
+  { id: "work-publication-target-aware-recheck", file: "tools/lib/publication_target_recheck.mjs", tokens: ['CLOUDINARY_HOST = "res.cloudinary.com"', 'CLOUDINARY_CLOUD = "dntogqtey"', "unversioned stable delivery URL", 'cache: "no-store"', "cloudinary-stable-id-replacement", "currentTargetRecheckUrl", "currentTargetRecheckPath", "live-remote-cloudinary", "governed-local-website-source"] },
+  { id: "work-publication-execution-authorization", file: "tools/work_header_publication_execution_authorization_mcp.mjs", tokens: ['SERVER_VERSION = "1.1.0"', 'CONTRACT = "evavo.work-header-publication-execution-authorization.v1"', "confirmExecutionAuthorization=true is required", "targetAwareCurrentTargetRecheck: true", "cloudinaryUsesLiveRemoteRecheck: true", "cloudinaryUnversionedStableDeliveryUrlRequired: true", "cloudinaryCallerLocalRecheckRejected: true", "singleTransactionAuthorizationOnly: true", "authorizationExpiresOnAnyEvidenceDrift: true", "executionAllowed: false", "publicationAllowed: false"] },
+  { id: "work-publication-execution-claim", file: "tools/work_header_publication_execution_claim_mcp.mjs", tokens: ['SERVER_VERSION = "1.1.0"', 'CONTRACT = "evavo.work-header-publication-execution-claim.v1"', "targetAwareCurrentTargetRecheck: true", "cloudinaryUsesLiveRemoteRecheck: true", "cloudinaryUnversionedStableDeliveryUrlRequired: true", "deterministicClaimPathRequired: true", "createOnlySingleUseClaim: true", "secondClaimForSameAuthorizationRejected: true", "claimInvalidOnAnyEvidenceDrift: true", "executionAllowed: false", "publicationAllowed: false"] },
   { id: "work-publication-execution-result", file: "tools/work_header_publication_execution_result_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-execution-result.v1"', "observedExternalExecutionOnly: true", "postExecutionTargetMustExactlyMatchCandidate: true", "rollbackBackupMustRemainPreserved: true", "resultIsEvidenceOnly: true", "executionPerformedByThisTool: false", "executionAllowed: false", "publicationAllowed: false"] },
   { id: "work-publication-rollback-readiness", file: "tools/work_header_publication_rollback_readiness_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-rollback-readiness.v1"', "currentPublishedTargetMustStillMatchCandidate: true", "rollbackBackupMustExactlyMatchPreviousTarget: true", "rollbackPreparationOnly: true", "rollbackExecutionAllowed: false", "publicationAllowed: false"] },
   { id: "work-publication-postflight", file: "tools/work_header_publication_postflight_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-postflight.v1"', 'SCHEMA_SHA256 = "5a1a2a9a329d3ce4eecd81981e3aa35cd2d6d2d3487f78b6b56672bacca99ae8"', "executionResultReverificationRequired: true", "rollbackReadinessReverificationRequired: true", "currentLiveTargetMustExactlyMatchReviewedCandidate: true", "rollbackBackupMustRemainReady: true", "postflightEvidenceOnly: true", "publicationAllowed: false", "cloudOverwriteAllowed: false", "websiteMutationAllowed: false"] },
@@ -50,7 +51,7 @@ async function inspect() {
   }
   const blockers = checks.filter((check) => !check.ok).map((check) => check.id);
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_27",
+    contract: "evavo.image-quality-pipeline-doctor.v1_28",
     ready: blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
@@ -60,17 +61,17 @@ async function inspect() {
     publicationAllowed: false,
     nextAction: blockers.length
       ? "Repair failing image-quality contract surfaces before trusting publication or rollback evidence."
-      : "Static image-quality evidence now runs from preservation through exact browser review, explicit approval, non-executing publication preparation, one-transaction execution evidence, publication postflight and the complete postflight-gated rollback authorization/claim/result chain. Every tool remains evidence-only and grants no direct website, Cloudinary, publication or rollback mutation authority.",
+      : "Static image-quality evidence now runs from preservation through exact browser review, explicit approval, rollback-safe publication planning, target-aware live current-target checks at authorization and single-use claim, execution evidence, publication postflight and the complete postflight-gated rollback chain. Cloudinary authorization/claim cannot substitute a stale caller-local copy for the live stable-ID target.",
   });
 }
 
 const tools = Object.freeze([
   { name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only EVAVO image quality pipeline doctor.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, exact reviewed-image lineage, post-publication verification and postflight-gated rollback evidence without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, exact reviewed-image lineage, target-aware publication TOCTOU protection, post-publication verification and rollback evidence without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
 ]);
 function capabilities() {
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_27",
+    contract: "evavo.image-quality-pipeline-doctor.v1_28",
     serverVersion: SERVER_VERSION,
     readOnly: true,
     browserResponseBodyLineageChecked: true,
@@ -80,6 +81,8 @@ function capabilities() {
     explicitReviewerDecisionBoundaryChecked: true,
     publicationPreparationBoundaryChecked: true,
     publicationTransactionPlanBoundaryChecked: true,
+    publicationTargetAwareRecheckChecked: true,
+    cloudinaryLiveStableTargetRecheckChecked: true,
     publicationExecutionAuthorizationBoundaryChecked: true,
     publicationExecutionSingleUseClaimBoundaryChecked: true,
     publicationExecutionResultAttestationBoundaryChecked: true,
