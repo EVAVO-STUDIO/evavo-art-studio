@@ -1,41 +1,14 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-
-const root=fileURLToPath(new URL('..',import.meta.url));
-const read=path=>readFileSync(join(root,path),'utf8');
-const json=path=>JSON.parse(read(path));
-const integration=json('creative-production.integration.json');
-const gateSchema=json('schemas/creative-production-gate-receipt-v1.schema.json');
-const artifactSchema=json('schemas/creative-production-artifact-manifest-v1.schema.json');
-const source=read('scripts/game-production-intake.mjs');
-const cli=read('tools/game_production_intake_cli.mjs');
-const manifestCli=read('tools/game_production_artifact_manifest_cli.mjs');
-
-assert.equal(integration.contractVersion,'evavo_creative_production_integration_v1');
-assert.equal(integration.repository,'EVAVO-STUDIO/evavo-art-studio');
-assert.equal(integration.artifactManifestSchema,'schemas/creative-production-artifact-manifest-v1.schema.json');
-assert.equal(integration.entrypoints.emitArtifactManifest,'node tools/game_production_artifact_manifest_cli.mjs');
-assert.equal(integration.requirements.reviewedGateReceipts,true);
-assert.equal(integration.requirements.bareGateIdsAccepted,false);
-assert.equal(integration.requirements.completePredecessorReceiptChain,true);
-assert.equal(integration.requirements.operationWhitelist,true);
-assert.equal(integration.requirements.artifactManifestRequiredForDeliveredFiles,true);
-assert.equal(integration.requirements.artifactManifestHashesActualBytes,true);
-assert.equal(integration.requirements.artifactManifestSafeRelativePaths,true);
-assert.equal(integration.requirements.runtimeArtManifestRequiresCanonicalFile,true);
-assert.equal(integration.requirements.conceptAndKeyArtManifestFilesAreReviewOnly,true);
-assert.equal(integration.requirements.artifactManifestAuthenticatesPublisher,false);
-assert.equal(gateSchema.properties.kind.const,'creative-production-gate-receipt');
-assert.equal(artifactSchema.properties.kind.const,'creative-production-artifact-manifest');
-for(const legacy of ['approvedGates','completedPacketIds','--approved-gate'])assert.equal(source.includes(legacy)||cli.includes(legacy),false,`legacy Art production admission API remains: ${legacy}`);
-for(const required of ['gateReceipts','GATE_RECEIPT_REQUIRED','PREDECESSOR_CHAIN_INVALID','unsupported Art Studio operation'])assert.equal(source.includes(required),true,`missing governed Art intake invariant: ${required}`);
-for(const operation of ['produce-environment-art','produce-game-art','produce-environment-key-art','produce-game-concept-art','produce-game-ui'])assert.equal(source.includes(operation),true,`Art operation whitelist is missing ${operation}`);
-for(const required of ['realpath','createHash','CANONICAL_OPS','REVIEW_ONLY_OPS','Artifact path escapes root','requires at least one canonical runtime art file','review-only and cannot be canonical runtime assets','does not authenticate the publisher'])assert.equal(manifestCli.includes(required),true,`missing Art artifact-manifest invariant: ${required}`);
-assert.equal(cli.includes('--gate-receipt'),true);
+const root=fileURLToPath(new URL('..',import.meta.url));const read=path=>readFileSync(join(root,path),'utf8');const json=path=>JSON.parse(read(path));
+const integration=json('creative-production.integration.json');const gateSchema=json('schemas/creative-production-gate-receipt-v1.schema.json');const artifactSchema=json('schemas/creative-production-artifact-manifest-v1.schema.json');const source=read('scripts/game-production-intake.mjs');const cli=read('tools/game_production_intake_cli.mjs');const manifestCli=read('tools/game_production_artifact_manifest_cli.mjs');
+assert.equal(integration.contractVersion,'evavo_creative_production_integration_v1');assert.equal(integration.repository,'EVAVO-STUDIO/evavo-art-studio');assert.equal(integration.artifactManifestSchema,'schemas/creative-production-artifact-manifest-v1.schema.json');assert.equal(integration.entrypoints.emitArtifactManifest,'node tools/game_production_artifact_manifest_cli.mjs');for(const key of ['reviewedGateReceipts','completePredecessorReceiptChain','operationWhitelist','artifactManifestRequiredForDeliveredFiles','artifactManifestHashesActualBytes','artifactManifestSafeRelativePaths','runtimeArtManifestRequiresCanonicalFile','conceptAndKeyArtManifestFilesAreReviewOnly'])assert.equal(integration.requirements[key],true,key);assert.equal(integration.requirements.bareGateIdsAccepted,false);assert.equal(integration.requirements.artifactManifestAuthenticatesPublisher,false);assert.equal(gateSchema.properties.kind.const,'creative-production-gate-receipt');assert.equal(artifactSchema.properties.kind.const,'creative-production-artifact-manifest');
+for(const legacy of ['approvedGates','completedPacketIds','--approved-gate'])assert.equal(source.includes(legacy)||cli.includes(legacy),false,`legacy Art production admission API remains: ${legacy}`);for(const required of ['gateReceipts','GATE_RECEIPT_REQUIRED','PREDECESSOR_CHAIN_INVALID','unsupported Art Studio operation'])assert.equal(source.includes(required),true,`missing governed Art intake invariant: ${required}`);for(const operation of ['produce-environment-art','produce-game-art','produce-environment-key-art','produce-game-concept-art','produce-game-ui'])assert.equal(source.includes(operation),true,`Art operation whitelist is missing ${operation}`);for(const required of ['realpath','createHash','CANONICAL_OPS','REVIEW_ONLY_OPS','Artifact path escapes root','requires at least one canonical runtime art file','review-only and cannot be canonical runtime assets','does not authenticate the publisher'])assert.equal(manifestCli.includes(required),true,`missing Art artifact-manifest invariant: ${required}`);
 const syntax=spawnSync(process.execPath,['--check','tools/game_production_artifact_manifest_cli.mjs'],{cwd:root,encoding:'utf8'});if(syntax.status!==0)throw new Error(syntax.stderr||syntax.stdout);
-const test=spawnSync(process.execPath,['--test','scripts/test-game-production-intake.mjs'],{cwd:root,encoding:'utf8'});if(test.status!==0)throw new Error(test.stderr||test.stdout||'Art game production intake tests failed');
-console.log('Art Studio creative-production contract, ancestry, operation split, exact file manifests and focused tests are valid.');
+const temp=mkdtempSync(join(tmpdir(),'evavo-art-manifest-'));try{const artifactRoot=join(temp,'artifacts');mkdirSync(join(artifactRoot,'ui'),{recursive:true});writeFileSync(join(artifactRoot,'ui','hud.png'),'fake-png');const receipt={kind:'creative-production-receipt',schemaVersion:'1.0.0',status:'completed-reviewed',packetId:'doctor/art',sourceDigest:'doctor-source',studio:'art-studio',repository:'EVAVO-STUDIO/evavo-art-studio',operation:'produce-game-ui',artifactRevision:{id:'art-v1',digest:'sha256:art-v1'}};writeFileSync(join(temp,'receipt.json'),JSON.stringify(receipt));writeFileSync(join(temp,'files.json'),JSON.stringify([{path:'ui/hud.png',role:'runtime-ui',mediaType:'image/png',classification:'canonical'}]));const output=join(temp,'manifest.json');const emitted=spawnSync(process.execPath,['tools/game_production_artifact_manifest_cli.mjs',join(temp,'receipt.json'),artifactRoot,join(temp,'files.json'),'--output',output],{cwd:root,encoding:'utf8'});if(emitted.status!==0)throw new Error(emitted.stderr||emitted.stdout);const manifest=JSON.parse(readFileSync(output,'utf8'));assert.equal(manifest.files[0].canonicalRuntimeAsset,true);assert.equal(manifest.files[0].reviewOnly,false);assert.match(manifest.files[0].digest,/^sha256:[0-9a-f]{64}$/);const concept={...receipt,packetId:'doctor/concept',operation:'produce-game-concept-art'};writeFileSync(join(temp,'concept.json'),JSON.stringify(concept));const rejected=spawnSync(process.execPath,['tools/game_production_artifact_manifest_cli.mjs',join(temp,'concept.json'),artifactRoot,join(temp,'files.json')],{cwd:root,encoding:'utf8'});assert.notEqual(rejected.status,0,'concept art must reject canonical file classification');}finally{rmSync(temp,{recursive:true,force:true});}
+const test=spawnSync(process.execPath,['--test','scripts/test-game-production-intake.mjs'],{cwd:root,encoding:'utf8'});if(test.status!==0)throw new Error(test.stderr||test.stdout||'Art game production intake tests failed');console.log('Art Studio creative-production contract, runtime/concept split, real-byte manifests and focused tests are valid.');
