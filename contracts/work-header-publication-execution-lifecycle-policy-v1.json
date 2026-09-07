@@ -1,7 +1,7 @@
 {
   "contract": "evavo.work-header-publication-execution-lifecycle-policy.v1",
-  "schemaVersion": "1.0",
-  "purpose": "Bind the reviewed Work-header publication transaction, single-use execution authorization/claim, evidence-only execution result, and explicit rollback lifecycle without granting direct mutation authority to review tooling.",
+  "schemaVersion": "1.1",
+  "purpose": "Bind the reviewed Work-header publication transaction, single-use execution authorization/claim, evidence-only execution result, publication postflight, and explicit rollback lifecycle without granting direct mutation authority to review tooling.",
   "transactionPlan": {
     "contract": "evavo.work-header-publication-transaction-plan.v1",
     "schemaPath": "contracts/work-header-publication-transaction-plan-v1.schema.json",
@@ -47,6 +47,19 @@
       "rollbackBackupMustRemainPreserved": true,
       "deterministicCreateOnlyResultRequired": true,
       "resultIsEvidenceOnly": true
+    },
+    "postflight": {
+      "contract": "evavo.work-header-publication-postflight.v1",
+      "schemaPath": "contracts/work-header-publication-postflight-v1.schema.json",
+      "schemaSha256": "5a1a2a9a329d3ce4eecd81981e3aa35cd2d6d2d3487f78b6b56672bacca99ae8",
+      "createTool": "evavo_prepare_work_header_publication_postflight",
+      "verifyTool": "evavo_verify_work_header_publication_postflight",
+      "requiredState": "published-verified-rollback-ready",
+      "executionResultReverificationRequired": true,
+      "rollbackReadinessReverificationRequired": true,
+      "liveTargetMustExactlyMatchCandidate": true,
+      "rollbackBackupMustRemainReady": true,
+      "postflightEvidenceOnly": true
     }
   },
   "rollback": {
@@ -64,13 +77,14 @@
     "authorization": {
       "contract": "evavo.work-header-publication-rollback-authorization.v1",
       "schemaPath": "contracts/work-header-publication-rollback-authorization-v1.schema.json",
-      "schemaSha256": "926c76be30d9d84f880613e703f542f7bf1c7c16d003db395565b46ad084ccb4",
+      "schemaSha256": "3f23166dc2901ba09f222682b2d6e2be4ab84e4d0ad4d469ae9c041e3bac211b",
       "createTool": "evavo_authorize_work_header_publication_rollback",
       "verifyTool": "evavo_verify_work_header_publication_rollback_authorization",
       "requiredState": "rollback-authorized-unexecuted",
       "explicitConfirmationRequired": true,
       "singleTransactionOnly": true,
-      "expiresOnEvidenceDrift": true
+      "expiresOnEvidenceDrift": true,
+      "postflightReverificationRequired": true
     },
     "claim": {
       "contract": "evavo.work-header-publication-rollback-execution-claim.v1",
@@ -103,6 +117,7 @@
     "fullReceiptLineageRequired": true,
     "currentTargetRecheckRequiredBeforeClaim": true,
     "rollbackEvidenceRequiredBeforeForwardExecution": true,
+    "postflightRequiredBeforeRollbackAuthorization": true,
     "automaticExecutionForbidden": true,
     "automaticRollbackForbidden": true,
     "reviewToolDirectMutationForbidden": true,
