@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evavo.work-header-publication-transaction-state.v1",
+  "title": "EVAVO Work header publication transaction state evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "schemaSha256",
+    "transactionState",
+    "terminal",
+    "sourcePostflightContract",
+    "sourcePostflightReceiptPath",
+    "sourcePostflightReceiptSha256",
+    "sourcePostflightReceiptByteLength",
+    "route",
+    "candidateId",
+    "candidateSha256",
+    "candidateByteLength",
+    "targetKind",
+    "targetIdentifier",
+    "liveTargetPath",
+    "liveTargetSha256",
+    "liveTargetByteLength",
+    "rollbackBackupPath",
+    "rollbackBackupSha256",
+    "rollbackBackupByteLength",
+    "sourcePostflightReverified",
+    "liveTargetReverified",
+    "rollbackBackupReverified",
+    "candidateLiveWhenPublished",
+    "previousTargetLiveWhenRolledBack",
+    "rollbackReadyWhenPublished",
+    "transactionStateEvidenceOnly",
+    "executionAllowed",
+    "rollbackExecutionAllowed",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed"
+  ],
+  "properties": {
+    "contract": { "const": "evavo.work-header-publication-transaction-state.v1" },
+    "schemaSha256": { "$ref": "#/$defs/sha256" },
+    "transactionState": { "enum": ["published-verified-rollback-ready", "rolled-back-verified-closed"] },
+    "terminal": { "type": "boolean" },
+    "sourcePostflightContract": { "enum": ["evavo.work-header-publication-postflight.v1", "evavo.work-header-publication-rollback-postflight.v1"] },
+    "sourcePostflightReceiptPath": { "type": "string", "minLength": 1 },
+    "sourcePostflightReceiptSha256": { "$ref": "#/$defs/sha256" },
+    "sourcePostflightReceiptByteLength": { "type": "integer", "minimum": 1 },
+    "route": { "type": "string", "pattern": "^/work/[a-z0-9-]+$" },
+    "candidateId": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "candidateSha256": { "$ref": "#/$defs/sha256" },
+    "candidateByteLength": { "type": "integer", "minimum": 1 },
+    "targetKind": { "enum": ["website-header-source-update", "cloudinary-stable-id-replacement"] },
+    "targetIdentifier": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "liveTargetPath": { "type": "string", "minLength": 1 },
+    "liveTargetSha256": { "$ref": "#/$defs/sha256" },
+    "liveTargetByteLength": { "type": "integer", "minimum": 1 },
+    "rollbackBackupPath": { "type": "string", "minLength": 1 },
+    "rollbackBackupSha256": { "$ref": "#/$defs/sha256" },
+    "rollbackBackupByteLength": { "type": "integer", "minimum": 1 },
+    "sourcePostflightReverified": { "const": true },
+    "liveTargetReverified": { "const": true },
+    "rollbackBackupReverified": { "const": true },
+    "candidateLiveWhenPublished": { "type": "boolean" },
+    "previousTargetLiveWhenRolledBack": { "type": "boolean" },
+    "rollbackReadyWhenPublished": { "type": "boolean" },
+    "transactionStateEvidenceOnly": { "const": true },
+    "executionAllowed": { "const": false },
+    "rollbackExecutionAllowed": { "const": false },
+    "publicationAllowed": { "const": false },
+    "cloudOverwriteAllowed": { "const": false },
+    "websiteMutationAllowed": { "const": false }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "transactionState": { "const": "published-verified-rollback-ready" } } },
+      "then": {
+        "properties": {
+          "terminal": { "const": false },
+          "sourcePostflightContract": { "const": "evavo.work-header-publication-postflight.v1" },
+          "candidateLiveWhenPublished": { "const": true },
+          "previousTargetLiveWhenRolledBack": { "const": false },
+          "rollbackReadyWhenPublished": { "const": true }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "transactionState": { "const": "rolled-back-verified-closed" } } },
+      "then": {
+        "properties": {
+          "terminal": { "const": true },
+          "sourcePostflightContract": { "const": "evavo.work-header-publication-rollback-postflight.v1" },
+          "candidateLiveWhenPublished": { "const": false },
+          "previousTargetLiveWhenRolledBack": { "const": true },
+          "rollbackReadyWhenPublished": { "const": false }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
