@@ -19,8 +19,6 @@
     "fullReceiptLineageVerified",
     "browserResponseMetadataVerified",
     "candidateBytesVerified",
-    "semanticStoryDiversityVerified",
-    "diversityReceiptSha256AndLengthBound",
     "backupRequiredBeforeExecution",
     "rollbackEvidenceRequiredBeforeExecution",
     "stableUrlOrPublicIdPreservationRequired",
@@ -73,10 +71,6 @@
         "selectionReceiptSha256",
         "candidateReviewReceiptSha256",
         "previewAdmissionReceiptSha256",
-        "diversityReceiptPath",
-        "diversityReceiptSha256",
-        "diversityReceiptByteLength",
-        "storySimilarityModel",
         "candidateSha256",
         "candidateByteLength",
         "route",
@@ -110,20 +104,6 @@
         },
         "previewAdmissionReceiptSha256": {
           "$ref": "#/$defs/sha256"
-        },
-        "diversityReceiptPath": {
-          "type": "string",
-          "minLength": 1
-        },
-        "diversityReceiptSha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "diversityReceiptByteLength": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "storySimilarityModel": {
-          "const": "work-story-archetype-v1"
         },
         "candidateSha256": {
           "$ref": "#/$defs/sha256"
@@ -169,12 +149,6 @@
       "const": true
     },
     "candidateBytesVerified": {
-      "const": true
-    },
-    "semanticStoryDiversityVerified": {
-      "const": true
-    },
-    "diversityReceiptSha256AndLengthBound": {
       "const": true
     },
     "backupRequiredBeforeExecution": {
