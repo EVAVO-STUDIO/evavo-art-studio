@@ -13,17 +13,21 @@ const styleGateReceipt = { kind:'creative-production-gate-receipt', schemaVersio
 
 test('art packet requires exact reviewed predecessor receipt', () => assert.equal(admitGameProductionPlan(planFor([env,art])).status, 'blocked-on-dependencies'));
 
-test('structured environment receipt unlocks art intake without execution authority', () => {
-  const result = admitGameProductionPlan(planFor([env,art]), { completedReceipts:[envReceipt] });
-  assert.equal(result.readyCount,1);
-  assert.equal(result.packets[0].intake.resolvedDependencies[0].artifactRevision.id,'env-v2');
-  assert.equal(result.packets[0].intake.executionAuthorized,false);
+test('environment receipt cannot unlock art until its own style gate chain is valid', () => {
+  const blocked = admitGameProductionPlan(planFor([env,art]), { completedReceipts:[envReceipt] });
+  assert.equal(blocked.readyCount,0);
+  assert.equal(blocked.packets[0].intake.blockers[0].code,'PREDECESSOR_CHAIN_INVALID');
+  const ready = admitGameProductionPlan(planFor([env,art]), { gateReceipts:[styleGateReceipt], completedReceipts:[envReceipt] });
+  assert.equal(ready.readyCount,1);
+  assert.equal(ready.packets[0].intake.resolvedDependencies[0].artifactRevision.id,'env-v2');
+  assert.equal(ready.packets[0].intake.executionAuthorized,false);
 });
 
 test('direct art production requires a reviewed style gate receipt', () => {
-  const blocked = admitGameProductionPlan(planFor([directArt]), { approvedGates:['gate/style-approved'] });
+  const blocked = admitGameProductionPlan(planFor([directArt]));
   assert.equal(blocked.readyCount,0);
   assert.equal(blocked.packets[0].intake.blockers[0].code,'GATE_RECEIPT_REQUIRED');
+  assert.throws(() => admitGameProductionPlan(planFor([directArt]), { gateReceipts:['gate/style-approved'] }), /must be an object/);
   const ready = admitGameProductionPlan(planFor([directArt]), { gateReceipts:[styleGateReceipt] });
   assert.equal(ready.readyCount,1);
   assert.equal(ready.gateReceiptCount,1);
