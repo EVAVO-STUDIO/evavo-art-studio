@@ -18,6 +18,7 @@
     "reviewedGateReceipts": true,
     "bareGateIdsAccepted": false,
     "reviewedPredecessorReceipts": true,
+    "completePredecessorReceiptChain": true,
     "exactArtifactRevisionDigest": true,
     "operationWhitelist": true,
     "humanCreativeApprovalRemainsSeparate": true
