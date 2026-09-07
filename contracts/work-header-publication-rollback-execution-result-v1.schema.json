@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evavo.work-header-publication-rollback-execution-result.v1",
+  "title": "EVAVO Work-header publication rollback execution result",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "properties": {
+    "contract": {
+      "const": "evavo.work-header-publication-rollback-execution-result.v1"
+    },
+    "schemaSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "resultState": {
+      "const": "rollback-executed-verified"
+    },
+    "claimReceiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claimReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "claimReceiptByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "authorizationReceiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorizationReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "authorizationReceiptByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "rollbackReadinessReceiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rollbackReadinessReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackReadinessReceiptByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "route": {
+      "type": "string",
+      "pattern": "^/work/[a-z0-9-]+$"
+    },
+    "candidateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "candidateSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidateByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "targetKind": {
+      "enum": [
+        "website-header-source-update",
+        "cloudinary-stable-id-replacement"
+      ]
+    },
+    "targetIdentifier": {
+      "type": "string",
+      "minLength": 1
+    },
+    "previousTargetSnapshotSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "previousTargetSnapshotByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "rollbackBackupPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rollbackBackupSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackBackupByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "postRollbackTargetPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "postRollbackTargetSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "postRollbackTargetByteLength": {
+      "$ref": "#/$defs/positiveInteger"
+    },
+    "claimReverifiedBeforeAttestation": {
+      "const": true
+    },
+    "authorizationReverifiedBeforeAttestation": {
+      "const": true
+    },
+    "rollbackReadinessReverifiedBeforeAttestation": {
+      "const": true
+    },
+    "rollbackBackupReverified": {
+      "const": true
+    },
+    "postRollbackTargetMatchesPreviousTarget": {
+      "const": true
+    },
+    "postRollbackTargetDiffersFromCandidate": {
+      "const": true
+    },
+    "observedExternalRollbackOnly": {
+      "const": true
+    },
+    "deterministicCreateOnlyResultPath": {
+      "const": true
+    },
+    "secondResultForSameClaimRejected": {
+      "const": true
+    },
+    "resultIsEvidenceOnly": {
+      "const": true
+    },
+    "rollbackExecutionAllowed": {
+      "const": false
+    },
+    "publicationAllowed": {
+      "const": false
+    },
+    "cloudOverwriteAllowed": {
+      "const": false
+    },
+    "websiteMutationAllowed": {
+      "const": false
+    }
+  },
+  "required": [
+    "contract",
+    "schemaSha256",
+    "resultState",
+    "claimReceiptPath",
+    "claimReceiptSha256",
+    "claimReceiptByteLength",
+    "authorizationReceiptPath",
+    "authorizationReceiptSha256",
+    "authorizationReceiptByteLength",
+    "rollbackReadinessReceiptPath",
+    "rollbackReadinessReceiptSha256",
+    "rollbackReadinessReceiptByteLength",
+    "route",
+    "candidateId",
+    "candidateSha256",
+    "candidateByteLength",
+    "targetKind",
+    "targetIdentifier",
+    "previousTargetSnapshotSha256",
+    "previousTargetSnapshotByteLength",
+    "rollbackBackupPath",
+    "rollbackBackupSha256",
+    "rollbackBackupByteLength",
+    "postRollbackTargetPath",
+    "postRollbackTargetSha256",
+    "postRollbackTargetByteLength",
+    "claimReverifiedBeforeAttestation",
+    "authorizationReverifiedBeforeAttestation",
+    "rollbackReadinessReverifiedBeforeAttestation",
+    "rollbackBackupReverified",
+    "postRollbackTargetMatchesPreviousTarget",
+    "postRollbackTargetDiffersFromCandidate",
+    "observedExternalRollbackOnly",
+    "deterministicCreateOnlyResultPath",
+    "secondResultForSameClaimRejected",
+    "resultIsEvidenceOnly",
+    "rollbackExecutionAllowed",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed"
+  ]
+}
