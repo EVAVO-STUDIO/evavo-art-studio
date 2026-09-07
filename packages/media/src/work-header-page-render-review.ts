@@ -43,6 +43,21 @@ export interface WorkHeaderPageRenderReviewResult {
     candidateDesktopSha256: string;
     currentMobileSha256: string;
     candidateMobileSha256: string;
+    reviewInputs: Readonly<{
+      titleLegibility: number;
+      focalPointQuality: number;
+      hierarchyQuality: number;
+      responsiveConsistency: number;
+      overallPageQuality: number;
+      currentPageQuality: number;
+      minimumPageQualityAdvantage: number;
+      titleObscured: boolean;
+      textContrastFailure: boolean;
+      importantSubjectCropped: boolean;
+      layoutOverflowOrBreakage: boolean;
+      candidateLooksWorseThanCurrent: boolean;
+      notes: readonly string[];
+    }>;
     desktopViewport: Readonly<{
       currentWidth: number;
       currentHeight: number;
@@ -69,6 +84,7 @@ export interface WorkHeaderPageRenderReviewResult {
     verdict: "reject" | "rework" | "page-shortlist";
     pageRenderReviewPerformed: true;
     exactScreenshotHashesBound: true;
+    normalizedReviewInputsPersisted: true;
     comparableViewportGeometryVerified: boolean;
     candidateRenderDifferenceVerified: boolean;
     automaticPublicationAllowed: false;
@@ -150,7 +166,15 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
     if (!Buffer.isBuffer(image) || image.length === 0) throw new Error(`${label} screenshot is required.`);
     if (image.length > MAX_SCREENSHOT_BYTES) throw new Error(`${label} screenshot exceeds the ${MAX_SCREENSHOT_BYTES}-byte review limit.`);
   }
-  reviewNotes(spec.notes);
+
+  const notes = reviewNotes(spec.notes);
+  const titleLegibility = rating(spec.titleLegibility, "titleLegibility");
+  const focalPointQuality = rating(spec.focalPointQuality, "focalPointQuality");
+  const hierarchyQuality = rating(spec.hierarchyQuality, "hierarchyQuality");
+  const responsiveConsistency = rating(spec.responsiveConsistency, "responsiveConsistency");
+  const overallPageQuality = rating(spec.overallPageQuality, "overallPageQuality");
+  const currentPageQuality = rating(spec.currentPageQuality, "currentPageQuality");
+  const minimumPageQualityAdvantage = bounded(spec.minimumPageQualityAdvantage, 0.25, 0, 2, "minimumPageQualityAdvantage");
   const titleObscured = flag(spec.titleObscured, "titleObscured");
   const textContrastFailure = flag(spec.textContrastFailure, "textContrastFailure");
   const importantSubjectCropped = flag(spec.importantSubjectCropped, "importantSubjectCropped");
@@ -172,16 +196,8 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
   const desktopScreenshotsDiffer = currentDesktopSha !== candidateDesktopSha;
   const mobileScreenshotsDiffer = currentMobileSha !== candidateMobileSha;
 
-  const values = [
-    rating(spec.titleLegibility, "titleLegibility"),
-    rating(spec.focalPointQuality, "focalPointQuality"),
-    rating(spec.hierarchyQuality, "hierarchyQuality"),
-    rating(spec.responsiveConsistency, "responsiveConsistency"),
-    rating(spec.overallPageQuality, "overallPageQuality"),
-  ];
-  const currentPageQuality = rating(spec.currentPageQuality, "currentPageQuality");
-  const candidatePageQuality = values[4]!;
-  const minimumPageQualityAdvantage = bounded(spec.minimumPageQualityAdvantage, 0.25, 0, 2, "minimumPageQualityAdvantage");
+  const values = [titleLegibility, focalPointQuality, hierarchyQuality, responsiveConsistency, overallPageQuality];
+  const candidatePageQuality = overallPageQuality;
   const pageQualityAdvantage = candidatePageQuality - currentPageQuality;
   const materialPageQualityAdvantageVerified = pageQualityAdvantage >= minimumPageQualityAdvantage;
 
@@ -224,6 +240,22 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
   ];
   const proofPng = await sharp({ create: { width: 1418, height: rowOne + gap + rowTwo, channels: 4, background: "#171717" } }).composite(composites).png({ compressionLevel: 9 }).toBuffer();
 
+  const reviewInputs = Object.freeze({
+    titleLegibility,
+    focalPointQuality,
+    hierarchyQuality,
+    responsiveConsistency,
+    overallPageQuality,
+    currentPageQuality,
+    minimumPageQualityAdvantage,
+    titleObscured,
+    textContrastFailure,
+    importantSubjectCropped,
+    layoutOverflowOrBreakage,
+    candidateLooksWorseThanCurrent,
+    notes,
+  });
+
   return {
     contract: WORK_HEADER_PAGE_RENDER_REVIEW_CONTRACT,
     proofPng,
@@ -236,6 +268,7 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
       candidateDesktopSha256: candidateDesktopSha,
       currentMobileSha256: currentMobileSha,
       candidateMobileSha256: candidateMobileSha,
+      reviewInputs,
       desktopViewport: Object.freeze({ currentWidth: currentDesktopMeta.width, currentHeight: currentDesktopMeta.height, candidateWidth: candidateDesktopMeta.width, candidateHeight: candidateDesktopMeta.height, dimensionsMatch: desktopDimensionsMatch, screenshotsDiffer: desktopScreenshotsDiffer }),
       mobileViewport: Object.freeze({ currentWidth: currentMobileMeta.width, currentHeight: currentMobileMeta.height, candidateWidth: candidateMobileMeta.width, candidateHeight: candidateMobileMeta.height, dimensionsMatch: mobileDimensionsMatch, screenshotsDiffer: mobileScreenshotsDiffer }),
       currentPageQuality,
@@ -248,6 +281,7 @@ export async function reviewWorkHeaderPageRender(spec: WorkHeaderPageRenderRevie
       verdict,
       pageRenderReviewPerformed: true,
       exactScreenshotHashesBound: true,
+      normalizedReviewInputsPersisted: true,
       comparableViewportGeometryVerified: desktopDimensionsMatch && mobileDimensionsMatch,
       candidateRenderDifferenceVerified: desktopScreenshotsDiffer && mobileScreenshotsDiffer,
       automaticPublicationAllowed: false,
