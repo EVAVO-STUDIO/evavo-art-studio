@@ -9,7 +9,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-media-diversity";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -39,8 +39,9 @@ async function review(args) {
     maximumImages: args.maximumImages,
   });
   const receipt = {
-    contract: "evavo.work-media-diversity-receipt.v1",
+    contract: "evavo.work-media-diversity-receipt.v1_1",
     reviewContract: result.contract,
+    similarityModel: result.evidence.similarityModel,
     sourceBindings: loaded.map(({ item, file }) => ({ id: item.id, route: item.route ?? null, role: item.role ?? "other", path: file.path, sha256: file.sha256, byteLength: file.byteLength })),
     evidence: result.evidence,
     visualReviewRequired: true,
@@ -63,7 +64,7 @@ async function verify(args) {
   if (typeof args.receiptPath !== "string") throw new Error("receiptPath is required.");
   const receiptFile = await readBound(args.receiptPath);
   const receipt = JSON.parse(receiptFile.bytes.toString("utf8"));
-  if (receipt.contract !== "evavo.work-media-diversity-receipt.v1" || receipt.reviewContract !== "evavo.work-media-diversity.v1") throw new Error("Unsupported Work media diversity receipt.");
+  if (receipt.contract !== "evavo.work-media-diversity-receipt.v1_1" || receipt.reviewContract !== "evavo.work-media-diversity.v1_1" || receipt.similarityModel !== "dhash-ahash-rgb-grid-v1") throw new Error("Unsupported or stale Work media diversity receipt.");
   if (receipt.publicationAllowed !== false || receipt.cloudOverwriteAllowed !== false || receipt.websiteMutationAllowed !== false || receipt.automaticReplacementAllowed !== false) throw new Error("Work media diversity receipt carries forbidden mutation authority.");
   const items = [];
   for (const binding of receipt.sourceBindings ?? []) {
@@ -72,18 +73,19 @@ async function verify(args) {
     items.push({ id: binding.id, route: binding.route ?? undefined, role: binding.role ?? "other", image: file.bytes });
   }
   const recomputed = await reviewWorkMediaDiversity({ images: items, nearDuplicateThreshold: receipt.evidence.nearDuplicateThreshold, reviewSimilarityThreshold: receipt.evidence.reviewSimilarityThreshold, maximumImages: Math.max(2, items.length) });
+  if (recomputed.contract !== receipt.reviewContract || recomputed.evidence.similarityModel !== receipt.similarityModel) throw new Error("Work media diversity similarity model drifted.");
   if (JSON.stringify(recomputed.evidence) !== JSON.stringify(receipt.evidence)) throw new Error("Work media diversity evidence changed on recomputation.");
-  return { ok: true, receiptPath: receiptFile.path, receiptSha256: receiptFile.sha256, receiptByteLength: receiptFile.byteLength, evidenceRecomputedAndMatched: true, evidence: recomputed.evidence, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false };
+  return { ok: true, receiptPath: receiptFile.path, receiptSha256: receiptFile.sha256, receiptByteLength: receiptFile.byteLength, evidenceRecomputedAndMatched: true, colorAwareSimilarityReverified: true, evidence: recomputed.evidence, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false };
 }
 
 const tools = [
-  { name: "evavo_work_media_diversity_capabilities", description: "Describe read-only cross-route Work media duplicate and visual-repetition QA.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_review_work_media_diversity", description: "Compare exact bytes and perceptual similarity across Work headers, tiles and support images. Optionally write a create-only review receipt; never selects or publishes imagery.", inputSchema: { type: "object", properties: { items: { type: "array", minItems: 2, maxItems: 96, items: { type: "object", properties: { id: { type: "string" }, path: { type: "string" }, route: { type: "string" }, role: { type: "string", enum: ["header", "tile", "support", "other"] } }, required: ["id", "path"], additionalProperties: false } }, nearDuplicateThreshold: { type: "number", minimum: 0, maximum: 1 }, reviewSimilarityThreshold: { type: "number", minimum: 0, maximum: 1 }, maximumImages: { type: "integer", minimum: 2, maximum: 96 }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["items"], additionalProperties: false } },
-  { name: "evavo_verify_work_media_diversity", description: "Re-read every source binding and recompute a durable Work media diversity receipt. Read-only.", inputSchema: { type: "object", properties: { receiptPath: { type: "string" } }, required: ["receiptPath"], additionalProperties: false } },
+  { name: "evavo_work_media_diversity_capabilities", description: "Describe read-only color-aware cross-route Work media duplicate and visual-repetition QA.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_review_work_media_diversity", description: "Compare exact bytes plus independent shape, tone and spatial RGB similarity across Work headers, tiles and support images. Optionally write a create-only review receipt; never selects or publishes imagery.", inputSchema: { type: "object", properties: { items: { type: "array", minItems: 2, maxItems: 96, items: { type: "object", properties: { id: { type: "string" }, path: { type: "string" }, route: { type: "string" }, role: { type: "string", enum: ["header", "tile", "support", "other"] } }, required: ["id", "path"], additionalProperties: false } }, nearDuplicateThreshold: { type: "number", minimum: 0, maximum: 1 }, reviewSimilarityThreshold: { type: "number", minimum: 0, maximum: 1 }, maximumImages: { type: "integer", minimum: 2, maximum: 96 }, receiptPath: { type: "string" }, confirmLocalWrite: { type: "boolean" } }, required: ["items"], additionalProperties: false } },
+  { name: "evavo_verify_work_media_diversity", description: "Re-read every source binding and recompute the color-aware durable Work media diversity receipt. Read-only.", inputSchema: { type: "object", properties: { receiptPath: { type: "string" } }, required: ["receiptPath"], additionalProperties: false } },
 ];
 
 function capabilities() {
-  return { contract: "evavo.work-media-diversity.v1", serverVersion: SERVER_VERSION, exactBinaryDuplicateDetection: true, perceptualNearDuplicateDetection: true, crossRouteRepetitionDetection: true, duplicateClusterEvidence: true, durableReceiptAvailable: true, staleSourceReverification: true, visualReviewRequired: true, automaticReplacementAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() };
+  return { contract: "evavo.work-media-diversity.v1_1", serverVersion: SERVER_VERSION, similarityModel: "dhash-ahash-rgb-grid-v1", exactBinaryDuplicateDetection: true, perceptualNearDuplicateDetection: true, colorAwarePerceptualSimilarity: true, spatialColorGridEvidence: true, grayscaleRecolorCollisionResistance: true, componentSimilarityEvidence: true, crossRouteRepetitionDetection: true, duplicateClusterEvidence: true, durableReceiptAvailable: true, staleSourceReverification: true, colorAwareSimilarityReverification: true, visualReviewRequired: true, automaticReplacementAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() };
 }
 async function callTool(name, args) {
   if (name === "evavo_work_media_diversity_capabilities") return capabilities();
