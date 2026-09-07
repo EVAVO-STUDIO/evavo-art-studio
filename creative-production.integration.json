@@ -6,6 +6,7 @@
   "planSchemaVersion": "1.0.0",
   "packetSchema": "schemas/creative-production-packet-v1.schema.json",
   "receiptSchema": "schemas/creative-production-receipt-v1.schema.json",
+  "gateReceiptSchema": "schemas/creative-production-gate-receipt-v1.schema.json",
   "entrypoints": {
     "admit": "node tools/game_production_intake_cli.mjs",
     "library": "scripts/game-production-intake.mjs#admitGameProductionPlan",
@@ -14,8 +15,11 @@
   "upstreamRepositories": ["EVAVO-STUDIO/game-design-studio", "EVAVO-STUDIO/environment-studio"],
   "downstreamRepositories": ["EVAVO-STUDIO/evavo-3d-studio", "EVAVO-STUDIO/evavo-image-enhancement-studio"],
   "requirements": {
+    "reviewedGateReceipts": true,
+    "bareGateIdsAccepted": false,
     "reviewedPredecessorReceipts": true,
     "exactArtifactRevisionDigest": true,
+    "operationWhitelist": true,
     "humanCreativeApprovalRemainsSeparate": true
   },
   "authority": {
