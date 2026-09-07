@@ -71,6 +71,10 @@
       "command": "node", "args": ["tools/work_header_publication_execution_result_mcp.mjs"],
       "env": {"EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"}
     },
+    "evavo-work-header-publication-rollback-readiness-v1": {
+      "command": "node", "args": ["tools/work_header_publication_rollback_readiness_mcp.mjs"],
+      "env": {"EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"}
+    },
     "evavo-existing-image-polish-v1": {
       "command": "node", "args": ["tools/existing_image_polish_mcp.mjs"],
       "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
