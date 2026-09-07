@@ -9,11 +9,14 @@ function normalizeCloudinaryUrl(value) {
   if (typeof value !== "string" || !value.trim()) throw new Error("currentTargetRecheckUrl is required for Cloudinary publication targets.");
   const url = new URL(value);
   if (url.protocol !== "https:" || url.username || url.password || url.hostname !== CLOUDINARY_HOST) throw new Error("Cloudinary current-target recheck URL must use the governed res.cloudinary.com HTTPS origin without credentials.");
+  if (url.search) throw new Error("Cloudinary current-target recheck URL must not contain query parameters.");
   const decodedPath = decodeURIComponent(url.pathname);
   const prefix = `/${CLOUDINARY_CLOUD}/image/upload/`;
   if (!decodedPath.startsWith(prefix)) throw new Error(`Cloudinary current-target recheck URL must use the governed ${CLOUDINARY_CLOUD} image cloud.`);
+  const deliveryPath = decodedPath.slice(prefix.length);
+  if (deliveryPath.split("/").some((segment) => /^v\d+$/u.test(segment))) throw new Error("Cloudinary current-target recheck URL must be the unversioned stable delivery URL, not a version-pinned historical asset URL.");
   url.hash = "";
-  return Object.freeze({ url, decodedPath, prefix });
+  return Object.freeze({ url, decodedPath, prefix, deliveryPath });
 }
 
 function assertCloudinaryTargetIdentifier(decodedPath, targetIdentifier) {
@@ -81,6 +84,7 @@ export {
   CLOUDINARY_CLOUD,
   CLOUDINARY_HOST,
   MAX_REMOTE_TARGET_BYTES,
+  assertCloudinaryTargetIdentifier,
   assertRecheckMatchesSnapshot,
   fetchCloudinaryTarget,
   normalizeCloudinaryUrl,
