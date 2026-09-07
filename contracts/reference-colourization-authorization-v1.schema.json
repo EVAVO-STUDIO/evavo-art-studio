@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.local/schemas/reference-colourization-authorization-v1.schema.json",
+  "title": "EVAVO Reference Colourization Authorization v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reference_provenance",
+    "human_subject",
+    "human_reference_match_confirmed",
+    "real_reference_confirmed",
+    "reference_guided_colorization_allowed",
+    "automatic_colorization_allowed",
+    "invented_colour_allowed",
+    "generative_repair_allowed",
+    "synthetic_detail_allowed",
+    "visual_confirmation_required",
+    "explicit_approval_required",
+    "contract"
+  ],
+  "properties": {
+    "reference_provenance": {
+      "enum": [
+        "user-provided-original",
+        "user-owned-original",
+        "camera-original",
+        "first-party-archive",
+        "verified-archive",
+        "known-colour-photo"
+      ]
+    },
+    "human_subject": {"const": true},
+    "human_reference_match_confirmed": {"const": true},
+    "real_reference_confirmed": {"const": true},
+    "reference_guided_colorization_allowed": {"const": true},
+    "automatic_colorization_allowed": {"const": false},
+    "invented_colour_allowed": {"const": false},
+    "generative_repair_allowed": {"const": false},
+    "synthetic_detail_allowed": {"const": false},
+    "visual_confirmation_required": {"const": true},
+    "explicit_approval_required": {"const": true},
+    "contract": {"const": "evavo.reference-colourization-authorization.v1"}
+  }
+}
