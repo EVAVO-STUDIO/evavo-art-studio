@@ -8,7 +8,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-transaction-plan";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.1.1";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-transaction-plan.v1";
 const SCHEMA_SHA256 = "f9e11403cabe947e50f0681300527fc164d551e2a8c4615f16bd723e2550d73f";
@@ -56,7 +56,6 @@ async function verifyPreparation(filePath) {
   if (decision.contract !== "evavo.work-header-approval-decision.v1" || decision.decision !== "approved" || decision.decisionSource !== "explicit-caller" || decision.automaticDecision !== false || decision.publicationPreparationAllowed !== true) throw new Error("Publication transaction requires the same explicit approved reviewer decision.");
   assertNoMutationAuthority(decision, "Approval-decision receipt");
   for (const flag of ["storyDiversityReceiptReverifiedBeforeDecision", "semanticStoryReviewPassed", "candidateNotGenericStockOrAiFiller", "crossRouteStoryCollisionRejected"]) if (decision[flag] !== true) throw new Error(`Approval decision lost semantic diversity state ${flag}.`);
-
   const decisionIdentity = decision.evidenceIdentity;
   if (!decisionIdentity?.approvalPacketPath || decision.evidenceIdentitySha256 !== sha256(Buffer.from(canonical(decisionIdentity), "utf8"))) throw new Error("Approval-decision evidence identity is invalid.");
   for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "diversityReceiptPath", "diversityReceiptSha256", "diversityReceiptByteLength", "storySimilarityModel"]) if (decisionIdentity[field] !== identity[field]) throw new Error(`Publication preparation and approval decision drifted for ${field}.`);
@@ -74,7 +73,6 @@ async function verifyPreparation(filePath) {
   if (packet.contract !== "evavo.work-header-approval-packet.v2" || packet.fullReceiptLineageVerified !== true || packet.browserResponseMetadataBound !== true || packet.publicationAllowed !== false) throw new Error("Approval packet no longer proves full review lineage.");
   const candidate = await bound(packet.immutablePreviewCandidateArtifactPath);
   if (candidate.sha256 !== identity.candidateSha256 || candidate.byteLength !== identity.candidateByteLength || candidate.sha256 !== packet.immutablePreviewCandidateArtifactSha256 || candidate.byteLength !== packet.immutablePreviewCandidateArtifactByteLength) throw new Error("Exact candidate bytes changed after publication preparation.");
-
   return Object.freeze({ preparationFile, preparation: value, identity, decisionFile, decision, diversityFile, diversity, packetFile, packet, candidate });
 }
 
@@ -88,7 +86,6 @@ async function planTransaction(args) {
   if (snapshot.path === backup.path) throw new Error("Rollback backup must be a separate immutable file from the current-target snapshot.");
   if (snapshot.sha256 !== backup.sha256 || snapshot.byteLength !== backup.byteLength) throw new Error("Rollback backup does not exactly reproduce the captured current target bytes.");
   if (snapshot.sha256 === review.candidate.sha256 && snapshot.byteLength === review.candidate.byteLength) throw new Error("Current target already matches the reviewed candidate; publication transaction is unnecessary.");
-
   const targetKind = review.preparation.targetKind;
   const targetIdentifier = review.preparation.targetIdentifier;
   const receipt = {
@@ -106,9 +103,6 @@ async function planTransaction(args) {
     candidateByteLength: review.candidate.byteLength,
     currentTargetSnapshot: { path: snapshot.path, sha256: snapshot.sha256, byteLength: snapshot.byteLength, immutableEvidence: true },
     rollbackEvidence: { backupPath: backup.path, backupSha256: backup.sha256, backupByteLength: backup.byteLength, restoreTargetIdentifier: targetIdentifier, rollbackReady: true },
-    semanticStoryDiversityVerifiedBeforePlanning: true,
-    diversityReceiptSha256: review.diversityFile.sha256,
-    diversityReceiptByteLength: review.diversityFile.byteLength,
     explicitExecutionConfirmationRequired: true,
     backupCapturedBeforeExecution: true,
     rollbackEvidenceVerifiedBeforeExecution: true,
@@ -131,10 +125,9 @@ async function verifyTransactionPlan(receiptPath) {
   const value = JSON.parse(receiptFile.bytes.toString("utf8"));
   if (value.contract !== CONTRACT || value.schemaSha256 !== SCHEMA_SHA256 || value.transactionState !== "planned-unexecuted" || !TARGET_KINDS.has(value.targetKind)) throw new Error("Publication transaction plan contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(value, "Publication transaction plan");
-  if (value.executionAllowed !== false || value.explicitExecutionConfirmationRequired !== true || value.backupCapturedBeforeExecution !== true || value.rollbackEvidenceVerifiedBeforeExecution !== true || value.semanticStoryDiversityVerifiedBeforePlanning !== true) throw new Error("Publication transaction plan lacks the non-executing rollback-safe semantic-diversity boundary.");
+  if (value.executionAllowed !== false || value.explicitExecutionConfirmationRequired !== true || value.backupCapturedBeforeExecution !== true || value.rollbackEvidenceVerifiedBeforeExecution !== true) throw new Error("Publication transaction plan lacks the non-executing rollback-safe boundary.");
   const preparation = await verifyPreparation(value.publicationPreparationReceiptPath);
   if (preparation.preparationFile.sha256 !== value.publicationPreparationReceiptSha256 || preparation.preparationFile.byteLength !== value.publicationPreparationReceiptByteLength) throw new Error("Publication transaction plan is bound to changed preparation bytes.");
-  if (preparation.diversityFile.sha256 !== value.diversityReceiptSha256 || preparation.diversityFile.byteLength !== value.diversityReceiptByteLength) throw new Error("Publication transaction plan semantic-diversity lineage drifted.");
   if (preparation.identity.route !== value.route || preparation.identity.candidateId !== value.candidateId || preparation.candidate.sha256 !== value.candidateSha256 || preparation.candidate.byteLength !== value.candidateByteLength || preparation.preparation.targetKind !== value.targetKind || preparation.preparation.targetIdentifier !== value.targetIdentifier) throw new Error("Publication transaction plan candidate/target identity drifted from preparation.");
   const snapshot = await bound(value.currentTargetSnapshot?.path);
   if (snapshot.sha256 !== value.currentTargetSnapshot?.sha256 || snapshot.byteLength !== value.currentTargetSnapshot?.byteLength || value.currentTargetSnapshot?.immutableEvidence !== true) throw new Error("Current-target snapshot evidence changed after transaction planning.");
@@ -147,11 +140,11 @@ async function verifyTransactionPlan(receiptPath) {
 }
 
 const tools = [
-  { name: "evavo_work_header_publication_transaction_plan_capabilities", description: "Describe the non-executing transaction plan that now carries semantic Work-story diversity through exact preparation, target-snapshot and rollback evidence.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_plan_work_header_publication_transaction", description: "Plan publication only after re-verifying semantic story diversity, explicit approved preparation, exact candidate bytes, current target snapshot and a separate byte-identical rollback backup. Never mutates website or Cloudinary targets.", inputSchema: { type: "object", properties: { publicationPreparationReceiptPath: { type: "string", minLength: 1 }, currentTargetSnapshotPath: { type: "string", minLength: 1 }, rollbackBackupPath: { type: "string", minLength: 1 }, receiptPath: { type: "string", minLength: 1 }, confirmLocalWrite: { type: "boolean" } }, required: ["publicationPreparationReceiptPath", "currentTargetSnapshotPath", "rollbackBackupPath", "receiptPath", "confirmLocalWrite"], additionalProperties: false } },
-  { name: "evavo_verify_work_header_publication_transaction_plan", description: "Reverify publication planning against semantic story-diversity evidence, explicit approval, exact candidate, current-target snapshot and rollback backup. Grants no mutation authority.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
+  { name: "evavo_work_header_publication_transaction_plan_capabilities", description: "Describe schema-compatible non-executing transaction planning that re-verifies semantic Work-story diversity through the exact publication-preparation lineage.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_plan_work_header_publication_transaction", description: "Plan publication only after re-verifying semantic story diversity, explicit approved preparation, exact candidate bytes, current target snapshot and separate byte-identical rollback backup. Never mutates targets.", inputSchema: { type: "object", properties: { publicationPreparationReceiptPath: { type: "string", minLength: 1 }, currentTargetSnapshotPath: { type: "string", minLength: 1 }, rollbackBackupPath: { type: "string", minLength: 1 }, receiptPath: { type: "string", minLength: 1 }, confirmLocalWrite: { type: "boolean" } }, required: ["publicationPreparationReceiptPath", "currentTargetSnapshotPath", "rollbackBackupPath", "receiptPath", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_work_header_publication_transaction_plan", description: "Reverify transaction planning against semantic diversity, explicit approval, exact candidate, target snapshot and rollback backup. Grants no mutation authority.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
 ];
-function capabilities() { return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, preparationSchemaSha256: PREPARATION_SCHEMA_SHA256, readOnlyTargetAccess: true, semanticStoryDiversityRequired: true, semanticStoryDiversityReverificationRequired: true, explicitApprovedPreparationRequired: true, preparationReverificationRequired: true, exactCandidateBytesRequired: true, currentTargetSnapshotRequired: true, separateRollbackBackupRequired: true, exactRollbackByteMatchRequired: true, explicitExecutionConfirmationRequired: true, createOnlyReceiptWrite: true, rollbackSafeReceiptWrite: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() }); }
+function capabilities() { return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, preparationSchemaSha256: PREPARATION_SCHEMA_SHA256, transactionReceiptSchemaUnchanged: true, semanticStoryDiversityRequiredThroughPreparation: true, semanticStoryDiversityReverificationRequired: true, explicitApprovedPreparationRequired: true, preparationReverificationRequired: true, exactCandidateBytesRequired: true, currentTargetSnapshotRequired: true, separateRollbackBackupRequired: true, exactRollbackByteMatchRequired: true, explicitExecutionConfirmationRequired: true, createOnlyReceiptWrite: true, rollbackSafeReceiptWrite: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() }); }
 async function callTool(name, args) {
   if (name === "evavo_work_header_publication_transaction_plan_capabilities") return capabilities();
   if (name === "evavo_plan_work_header_publication_transaction") return planTransaction(args ?? {});
