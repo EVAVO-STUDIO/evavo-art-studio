@@ -1,9 +1,11 @@
 # Game production intake
 
-Art Studio now has a strict read-only intake for Game Design Studio `creative-production-plan` packets.
+Art Studio accepts only exact `art-studio` packets from Game Design Studio production plans. Intake is read-only and never authorizes a provider, a workspace mutation, creative approval, a game-repository write or publication.
 
-It admits only packets targeted to `art-studio` and `EVAVO-STUDIO/evavo-art-studio`, validates source lineage and dependency receipts, and refuses any packet that tries to grant itself execution, creative approval, consumer-repository mutation or publishing authority.
+Non-gate prerequisites now require a structured `creative-production-receipt`, not a packet ID. The receipt must be `completed-reviewed`, match the plan source digest and exact predecessor packet/studio/repository/operation, and contain an artifact revision digest plus review evidence. Invalid or duplicate receipts fail closed.
 
-This makes Art Studio the visual-direction authority for 2D/UI work and for hybrid 3D visual targets while preserving the existing governed provider, review and workspace flows. A packet marked ready means only that its declared prerequisites exist; it does not authorize a provider run and it never counts as human creative approval.
+Art Studio emits the same receipt format for its own reviewed output through `createGameProductionReceipt(...)`. A receipt establishes provenance and a concrete reviewed revision; it does not itself confer human creative approval or downstream execution authority.
 
-For hybrid work, the reviewed Art Studio target should lock silhouette, palette, materials, camera/readability and shape language before 3D Studio begins production. Environment packets should consume an Environment Studio receipt first when gameplay-space intent is involved.
+Use `node tools/game_production_intake_cli.mjs --plan <plan.json> --completed-receipt <receipt.json>` for agent-safe admission.
+
+For hybrid 3D work, Art Studio should lock silhouette, palette, material language, camera/readability and target display scale before 3D production begins. Existing provider admission, production workers, project-art workspaces and final review remain authoritative after intake.
