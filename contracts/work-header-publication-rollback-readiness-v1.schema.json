@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evavo.work-header-publication-rollback-readiness.v1",
+  "title": "EVAVO Work Header Publication Rollback Readiness Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "positiveInt": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": [
+    "contract",
+    "schemaSha256",
+    "rollbackState",
+    "executionResultReceiptPath",
+    "executionResultReceiptSha256",
+    "executionResultReceiptByteLength",
+    "route",
+    "candidateId",
+    "candidateSha256",
+    "candidateByteLength",
+    "targetKind",
+    "targetIdentifier",
+    "publishedTargetPath",
+    "publishedTargetSha256",
+    "publishedTargetByteLength",
+    "rollbackBackupPath",
+    "rollbackBackupSha256",
+    "rollbackBackupByteLength",
+    "previousTargetSnapshotSha256",
+    "previousTargetSnapshotByteLength",
+    "executionResultReverified",
+    "currentPublishedTargetReverified",
+    "rollbackBackupReverified",
+    "currentPublishedTargetMatchesCandidate",
+    "rollbackBackupMatchesPreviousTarget",
+    "rollbackPreparationOnly",
+    "rollbackExecutionAllowed",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed"
+  ],
+  "properties": {
+    "contract": {
+      "const": "evavo.work-header-publication-rollback-readiness.v1"
+    },
+    "schemaSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackState": {
+      "const": "rollback-ready-unexecuted"
+    },
+    "executionResultReceiptPath": {
+      "$ref": "#/$defs/path"
+    },
+    "executionResultReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "executionResultReceiptByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "route": {
+      "type": "string",
+      "pattern": "^/work/[a-z0-9-]+$"
+    },
+    "candidateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "candidateSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidateByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "targetKind": {
+      "enum": [
+        "website-header-source-update",
+        "cloudinary-stable-id-replacement"
+      ]
+    },
+    "targetIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "publishedTargetPath": {
+      "$ref": "#/$defs/path"
+    },
+    "publishedTargetSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "publishedTargetByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "rollbackBackupPath": {
+      "$ref": "#/$defs/path"
+    },
+    "rollbackBackupSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackBackupByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "previousTargetSnapshotSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "previousTargetSnapshotByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "executionResultReverified": {
+      "const": true
+    },
+    "currentPublishedTargetReverified": {
+      "const": true
+    },
+    "rollbackBackupReverified": {
+      "const": true
+    },
+    "currentPublishedTargetMatchesCandidate": {
+      "const": true
+    },
+    "rollbackBackupMatchesPreviousTarget": {
+      "const": true
+    },
+    "rollbackPreparationOnly": {
+      "const": true
+    },
+    "rollbackExecutionAllowed": {
+      "const": false
+    },
+    "publicationAllowed": {
+      "const": false
+    },
+    "cloudOverwriteAllowed": {
+      "const": false
+    },
+    "websiteMutationAllowed": {
+      "const": false
+    }
+  }
+}
