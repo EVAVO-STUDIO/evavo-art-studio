@@ -21,16 +21,22 @@ test("execution authorization schema remains fail-closed and non-mutating", asyn
   assert.equal(schema.properties.websiteMutationAllowed.const, false);
 });
 
-test("execution authorization requires exact deliberate confirmation and fresh rollback evidence", async () => {
+test("execution authorization requires exact deliberate confirmation and target-aware current-target recheck", async () => {
   const source = await text("./work_header_publication_execution_authorization_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.0.0"',
+    'SERVER_VERSION = "1.1.0"',
     'CONTRACT = "evavo.work-header-publication-execution-authorization.v1"',
     'PLAN_CONTRACT = "evavo.work-header-publication-transaction-plan.v1"',
     "confirmExecutionAuthorization=true is required",
     "I explicitly authorize execution of this exact reviewed publication transaction.",
+    "recheckPublicationTarget",
+    "assertRecheckMatchesSnapshot",
     "currentTargetRecheckPath",
-    "Current target changed after transaction planning",
+    "currentTargetRecheckUrl",
+    "targetAwareCurrentTargetRecheck: true",
+    "cloudinaryUsesLiveRemoteRecheck: true",
+    "cloudinaryUnversionedStableDeliveryUrlRequired: true",
+    "cloudinaryCallerLocalRecheckRejected: true",
     "Rollback backup no longer exactly matches",
     "Exact reviewed candidate bytes changed after transaction planning",
     "executionAuthorizedForOneTransactionOnly: true",
@@ -42,6 +48,19 @@ test("execution authorization requires exact deliberate confirmation and fresh r
     "evavo_authorize_work_header_publication_execution",
     "evavo_verify_work_header_publication_execution_authorization",
   ]) assert.ok(source.includes(token), `missing authorization safety token: ${token}`);
+});
+
+test("shared target recheck rejects version-pinned Cloudinary history as current-target proof", async () => {
+  const source = await text("./lib/publication_target_recheck.mjs");
+  for (const token of [
+    'CLOUDINARY_CLOUD = "dntogqtey"',
+    'CLOUDINARY_HOST = "res.cloudinary.com"',
+    "Network",
+  ].slice(0, 2)) assert.ok(source.includes(token), `missing governed Cloudinary token: ${token}`);
+  assert.ok(source.includes("unversioned stable delivery URL"));
+  assert.ok(source.includes('cache: "no-store"'));
+  assert.ok(source.includes("currentTargetRecheckUrl"));
+  assert.ok(source.includes("Cloudinary publication authorization must use currentTargetRecheckUrl"));
 });
 
 test("MCP registration exposes execution authorization without an executor", async () => {
