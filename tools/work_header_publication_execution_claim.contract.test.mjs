@@ -19,15 +19,23 @@ test("execution claim schema remains fail-closed and digest-bound", async () => 
   for (const field of ["executionAllowed", "publicationAllowed", "cloudOverwriteAllowed", "websiteMutationAllowed"]) assert.equal(schema.properties[field].const, false);
 });
 
-test("execution claim tool creates one deterministic create-only claim and grants no mutation authority", async () => {
+test("execution claim tool creates one deterministic target-aware create-only claim and grants no mutation authority", async () => {
   const source = (await read("./work_header_publication_execution_claim_mcp.mjs")).toString("utf8");
   for (const token of [
-    'SERVER_VERSION = "1.0.1"',
+    'SERVER_VERSION = "1.1.0"',
     'CONTRACT = "evavo.work-header-publication-execution-claim.v1"',
     "deterministicClaimPath(review.authorizationFile.path)",
     'return `${authorizationPath}.execution-claim.json`',
     "writeCreateOnlyBundle",
     "confirmSingleUseClaim=true is required",
+    "recheckPublicationTarget",
+    "assertRecheckMatchesSnapshot",
+    "currentTargetRecheckPath",
+    "currentTargetRecheckUrl",
+    "targetAwareCurrentTargetRecheck: true",
+    "cloudinaryUsesLiveRemoteRecheck: true",
+    "cloudinaryUnversionedStableDeliveryUrlRequired: true",
+    "cloudinaryCallerLocalRecheckRejected: true",
     "secondClaimForSameAuthorizationRejected: true",
     "claimInvalidOnAnyEvidenceDrift: true",
     "authorizationReverificationRequired: true",
@@ -41,6 +49,14 @@ test("execution claim tool creates one deterministic create-only claim and grant
     "websiteMutationAllowed: false",
   ]) assert.ok(source.includes(token), `missing execution-claim token: ${token}`);
   for (const forbidden of ["cloudinary.uploader", "upload_stream", "renameSync(", "copyFileSync(", "writeFileSync(", "unlinkSync("]) assert.equal(source.includes(forbidden), false, `execution claim must not mutate target via ${forbidden}`);
+});
+
+test("execution claim rechecks the target again immediately after authorization", async () => {
+  const source = (await read("./work_header_publication_execution_claim_mcp.mjs")).toString("utf8");
+  assert.ok(source.includes("single-use execution claim"));
+  assert.ok(source.includes("review.recheck.mode"));
+  assert.ok(source.includes('review.recheck.mode === "live-remote-cloudinary"'));
+  assert.ok(source.includes("Any live Cloudinary or local website-source drift invalidates the claim."));
 });
 
 test("MCP configuration exposes the execution claim after authorization", async () => {
