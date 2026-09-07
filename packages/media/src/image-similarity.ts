@@ -12,6 +12,10 @@ export interface ImageSimilarityResult {
   readonly sourceHeight: number;
   readonly candidateWidth: number;
   readonly candidateHeight: number;
+  readonly differenceHashDistance: number;
+  readonly differenceHashSimilarity: number;
+  readonly averageHashDistance: number;
+  readonly averageHashSimilarity: number;
   readonly perceptualDistance: number;
   readonly perceptualSimilarity: number;
   readonly nearDuplicate: boolean;
@@ -20,9 +24,7 @@ export interface ImageSimilarityResult {
 
 function threshold(value: number | undefined): number {
   if (value === undefined) return 0.92;
-  if (!Number.isFinite(value) || value < 0 || value > 1) {
-    throw new Error("nearDuplicateThreshold must be between 0 and 1.");
-  }
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error("nearDuplicateThreshold must be between 0 and 1.");
   return value;
 }
 
@@ -32,13 +34,17 @@ async function dimensions(encoded: Buffer) {
   return { width: meta.width, height: meta.height };
 }
 
-async function differenceHash(encoded: Buffer): Promise<bigint> {
-  const data = await sharp(encoded, { failOn: "error" })
+async function grayscale(encoded: Buffer, width: number, height: number): Promise<Buffer> {
+  return sharp(encoded, { failOn: "error" })
     .flatten({ background: "#000000" })
     .greyscale()
-    .resize(9, 8, { fit: "fill", kernel: "lanczos3" })
+    .resize(width, height, { fit: "fill", kernel: "lanczos3" })
     .raw()
     .toBuffer();
+}
+
+async function differenceHash(encoded: Buffer): Promise<bigint> {
+  const data = await grayscale(encoded, 9, 8);
   let bits = 0n;
   let bit = 0n;
   for (let y = 0; y < 8; y += 1) {
@@ -48,6 +54,18 @@ async function differenceHash(encoded: Buffer): Promise<bigint> {
       if (left > right) bits |= 1n << bit;
       bit += 1n;
     }
+  }
+  return bits;
+}
+
+async function averageHash(encoded: Buffer): Promise<bigint> {
+  const data = await grayscale(encoded, 8, 8);
+  let sum = 0;
+  for (const value of data) sum += value;
+  const mean = sum / data.length;
+  let bits = 0n;
+  for (let index = 0; index < data.length; index += 1) {
+    if (data[index]! >= mean) bits |= 1n << BigInt(index);
   }
   return bits;
 }
@@ -63,10 +81,9 @@ function popcount64(value: bigint): number {
 }
 
 /**
- * Detects exact and near-duplicate imagery so a page does not accidentally use
- * the same visual, a resized derivative, or an almost-identical crop for both
- * its hero and supporting media. The perceptual score is intentionally a QA
- * signal rather than an art-direction decision.
+ * Detect exact and near-duplicate imagery. The perceptual score combines dHash
+ * shape/edge ordering with aHash tone/layout occupancy so flat images and broad
+ * gradients cannot collide merely because both have no descending edges.
  */
 export async function compareImageSimilarity(
   source: Buffer,
@@ -75,21 +92,23 @@ export async function compareImageSimilarity(
 ): Promise<ImageSimilarityResult> {
   if (!source.length || !candidate.length) throw new Error("Image similarity inputs must not be empty.");
   const nearDuplicateThreshold = threshold(spec.nearDuplicateThreshold);
-  const [a, b, ah, bh] = await Promise.all([
+  const [a, b, dhA, dhB, ahA, ahB] = await Promise.all([
     dimensions(source),
     dimensions(candidate),
     differenceHash(source),
     differenceHash(candidate),
+    averageHash(source),
+    averageHash(candidate),
   ]);
   const exactBinaryMatch = createHash("sha256").update(source).digest("hex") === createHash("sha256").update(candidate).digest("hex");
-  const perceptualDistance = popcount64(ah ^ bh);
-  const perceptualSimilarity = 1 - perceptualDistance / 64;
+  const differenceHashDistance = popcount64(dhA ^ dhB);
+  const averageHashDistance = popcount64(ahA ^ ahB);
+  const differenceHashSimilarity = 1 - differenceHashDistance / 64;
+  const averageHashSimilarity = 1 - averageHashDistance / 64;
+  const perceptualSimilarity = differenceHashSimilarity * 0.6 + averageHashSimilarity * 0.4;
+  const perceptualDistance = Math.round((1 - perceptualSimilarity) * 64 * 1000) / 1000;
   const nearDuplicate = exactBinaryMatch || perceptualSimilarity >= nearDuplicateThreshold;
-  const recommendation = exactBinaryMatch
-    ? "reject-duplicate"
-    : nearDuplicate
-      ? "review-similarity"
-      : "distinct";
+  const recommendation = exactBinaryMatch ? "reject-duplicate" : nearDuplicate ? "review-similarity" : "distinct";
   return Object.freeze({
     exactBinaryMatch,
     sameDecodedDimensions: a.width === b.width && a.height === b.height,
@@ -97,6 +116,10 @@ export async function compareImageSimilarity(
     sourceHeight: a.height,
     candidateWidth: b.width,
     candidateHeight: b.height,
+    differenceHashDistance,
+    differenceHashSimilarity,
+    averageHashDistance,
+    averageHashSimilarity,
     perceptualDistance,
     perceptualSimilarity,
     nearDuplicate,
