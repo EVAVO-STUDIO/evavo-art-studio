@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evavo.work-header-publication-page-postflight-admission.v1",
+  "title": "EVAVO Work header live publication page postflight admission",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "schemaSha256",
+    "admissionState",
+    "publicationPostflightReceiptPath",
+    "publicationPostflightReceiptSha256",
+    "publicationPostflightReceiptByteLength",
+    "websitePagePostflightReportPath",
+    "websitePagePostflightReportSha256",
+    "websitePagePostflightReportByteLength",
+    "route",
+    "candidateSha256",
+    "candidateByteLength",
+    "desktopScreenshot",
+    "mobileScreenshot",
+    "browserLoadedCandidateBytesVerifiedAcrossProfiles",
+    "runtimeMediaAndLayoutVerified",
+    "rollbackBackupStillReady",
+    "evidenceOnly",
+    "publicationAllowed",
+    "cloudOverwriteAllowed",
+    "websiteMutationAllowed"
+  ],
+  "properties": {
+    "contract": { "const": "evavo.work-header-publication-page-postflight-admission.v1" },
+    "schemaSha256": { "$ref": "#/$defs/sha256" },
+    "admissionState": { "const": "live-page-verified-rollback-ready" },
+    "publicationPostflightReceiptPath": { "type": "string", "minLength": 1 },
+    "publicationPostflightReceiptSha256": { "$ref": "#/$defs/sha256" },
+    "publicationPostflightReceiptByteLength": { "type": "integer", "minimum": 1 },
+    "websitePagePostflightReportPath": { "type": "string", "minLength": 1 },
+    "websitePagePostflightReportSha256": { "$ref": "#/$defs/sha256" },
+    "websitePagePostflightReportByteLength": { "type": "integer", "minimum": 1 },
+    "route": { "type": "string", "pattern": "^/work/[a-z0-9-]+$" },
+    "candidateSha256": { "$ref": "#/$defs/sha256" },
+    "candidateByteLength": { "type": "integer", "minimum": 1 },
+    "desktopScreenshot": { "$ref": "#/$defs/fileBinding" },
+    "mobileScreenshot": { "$ref": "#/$defs/fileBinding" },
+    "browserLoadedCandidateBytesVerifiedAcrossProfiles": { "const": true },
+    "runtimeMediaAndLayoutVerified": { "const": true },
+    "rollbackBackupStillReady": { "const": true },
+    "evidenceOnly": { "const": true },
+    "publicationAllowed": { "const": false },
+    "cloudOverwriteAllowed": { "const": false },
+    "websiteMutationAllowed": { "const": false }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "byteLength"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
