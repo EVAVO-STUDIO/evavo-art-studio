@@ -76,3 +76,13 @@ test("rollback result only attests an already external rollback and proves exact
     'websiteMutationAllowed: false',
   ]) assert.ok(source.includes(token), `missing rollback result token: ${token}`);
 });
+
+test("MCP configuration exposes rollback claim and result without adding mutation authority", async () => {
+  const config = await text("../.mcp.json");
+  for (const token of [
+    '"evavo-work-header-publication-rollback-execution-claim-v1"',
+    '"tools/work_header_publication_rollback_execution_claim_mcp.mjs"',
+    '"evavo-work-header-publication-rollback-execution-result-v1"',
+    '"tools/work_header_publication_rollback_execution_result_mcp.mjs"',
+  ]) assert.ok(config.includes(token), `missing rollback MCP registration token: ${token}`);
+});
