@@ -1,7 +1,7 @@
 {
   "contract": "evavo.work-header-publication-execution-lifecycle-policy.v1",
-  "schemaVersion": "1.1",
-  "purpose": "Bind the reviewed Work-header publication transaction, single-use execution authorization/claim, evidence-only execution result, publication postflight, and explicit rollback lifecycle without granting direct mutation authority to review tooling.",
+  "schemaVersion": "1.2",
+  "purpose": "Bind the reviewed Work-header publication transaction, single-use execution authorization/claim, evidence-only execution result, publication postflight, explicit rollback lifecycle, and terminal rollback postflight closure without granting direct mutation authority to review tooling.",
   "transactionPlan": {
     "contract": "evavo.work-header-publication-transaction-plan.v1",
     "schemaPath": "contracts/work-header-publication-transaction-plan-v1.schema.json",
@@ -110,6 +110,21 @@
       "postRollbackTargetMustDifferFromCandidate": true,
       "deterministicCreateOnlyResultRequired": true,
       "resultIsEvidenceOnly": true
+    },
+    "postflight": {
+      "contract": "evavo.work-header-publication-rollback-postflight.v1",
+      "schemaPath": "contracts/work-header-publication-rollback-postflight-v1.schema.json",
+      "schemaSha256": "42e349a9fa2da8b6c80ee304e24b91b1ee4cac4adacadc1d68410fb7f47ffe3b",
+      "createTool": "evavo_prepare_work_header_publication_rollback_postflight",
+      "verifyTool": "evavo_verify_work_header_publication_rollback_postflight",
+      "requiredState": "rolled-back-verified-closed",
+      "rollbackExecutionResultReverificationRequired": true,
+      "publicationPostflightLineageReverificationRequired": true,
+      "liveTargetMustExactlyMatchPreviousTarget": true,
+      "liveTargetMustDifferFromCandidate": true,
+      "rollbackBackupMustStillMatchLiveTarget": true,
+      "terminalTransactionClosureEvidence": true,
+      "postflightEvidenceOnly": true
     }
   },
   "globalSafety": {
@@ -118,6 +133,7 @@
     "currentTargetRecheckRequiredBeforeClaim": true,
     "rollbackEvidenceRequiredBeforeForwardExecution": true,
     "postflightRequiredBeforeRollbackAuthorization": true,
+    "rollbackPostflightRequiredToCloseTransaction": true,
     "automaticExecutionForbidden": true,
     "automaticRollbackForbidden": true,
     "reviewToolDirectMutationForbidden": true,
