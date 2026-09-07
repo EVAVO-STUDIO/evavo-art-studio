@@ -6,9 +6,10 @@ import readline from "node:readline";
 
 import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
+import { assertRecheckMatchesSnapshot, recheckPublicationTarget } from "./lib/publication_target_recheck.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-execution-authorization";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-execution-authorization.v1";
 const SCHEMA_SHA256 = "f56a746773e4e08db8e2d22c5bcc0fa50f8416bbfedbc6f8c18c26326ea3dff4";
@@ -57,7 +58,7 @@ async function resolveCandidateFromPlan(plan) {
   if (candidate.sha256 !== plan.candidateSha256 || candidate.byteLength !== plan.candidateByteLength) throw new Error("Exact reviewed candidate bytes changed after transaction planning.");
   return Object.freeze({ prepFile, prep, decisionFile, decision, packetFile, packet, candidate });
 }
-async function verifyPlan(planReceiptPath, currentTargetRecheckPath) {
+async function verifyPlan(planReceiptPath, recheckArgs = {}) {
   const planFile = await bound(planReceiptPath);
   const plan = JSON.parse(planFile.bytes.toString("utf8"));
   if (plan.contract !== PLAN_CONTRACT || plan.schemaSha256 !== PLAN_SCHEMA_SHA256 || plan.transactionState !== "planned-unexecuted" || !TARGET_KINDS.has(plan.targetKind)) throw new Error("Publication transaction plan contract/schema/state is invalid or stale.");
@@ -69,8 +70,14 @@ async function verifyPlan(planReceiptPath, currentTargetRecheckPath) {
   const backup = await bound(plan.rollbackEvidence?.backupPath);
   if (backup.sha256 !== plan.rollbackEvidence?.backupSha256 || backup.byteLength !== plan.rollbackEvidence?.backupByteLength || plan.rollbackEvidence?.rollbackReady !== true || plan.rollbackEvidence?.restoreTargetIdentifier !== plan.targetIdentifier) throw new Error("Rollback backup changed or is no longer ready.");
   if (backup.path === snapshot.path || backup.sha256 !== snapshot.sha256 || backup.byteLength !== snapshot.byteLength) throw new Error("Rollback backup no longer exactly matches the planned current-target snapshot.");
-  const recheck = await bound(currentTargetRecheckPath);
-  if (recheck.sha256 !== snapshot.sha256 || recheck.byteLength !== snapshot.byteLength) throw new Error("Current target changed after transaction planning; execution authorization is stale and must not be issued.");
+  const recheck = await recheckPublicationTarget({
+    targetKind: plan.targetKind,
+    targetIdentifier: plan.targetIdentifier,
+    currentTargetRecheckPath: recheckArgs.currentTargetRecheckPath,
+    currentTargetRecheckUrl: recheckArgs.currentTargetRecheckUrl,
+    readLocal: bound,
+  });
+  assertRecheckMatchesSnapshot(recheck, snapshot, "execution authorization");
   return Object.freeze({ planFile, plan, candidateChain, snapshot, backup, recheck });
 }
 
@@ -80,7 +87,7 @@ async function authorize(args) {
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
   if (args.confirmExecutionAuthorization !== true) throw new Error("confirmExecutionAuthorization=true is required and must come from an explicit caller action.");
   if (args.confirmationStatement !== CONFIRMATION_STATEMENT) throw new Error(`confirmationStatement must exactly equal: ${CONFIRMATION_STATEMENT}`);
-  const review = await verifyPlan(args.transactionPlanReceiptPath, args.currentTargetRecheckPath);
+  const review = await verifyPlan(args.transactionPlanReceiptPath, args);
   const plan = review.plan;
   const receipt = {
     contract: CONTRACT,
@@ -115,35 +122,39 @@ async function authorize(args) {
   const receiptPath = await allowed(args.receiptPath, true);
   const payload = `${JSON.stringify(receipt, null, 2)}\n`;
   await writeCreateOnlyBundle([{ path: receiptPath, data: payload, encoding: "utf8" }]);
-  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), route: plan.route, candidateId: plan.candidateId, candidateSha256: plan.candidateSha256, targetKind: plan.targetKind, targetIdentifier: plan.targetIdentifier, authorizationState: "authorized-unexecuted", executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), route: plan.route, candidateId: plan.candidateId, candidateSha256: plan.candidateSha256, targetKind: plan.targetKind, targetIdentifier: plan.targetIdentifier, currentTargetRecheckMode: review.recheck.mode, liveRemoteCurrentTargetVerified: review.recheck.mode === "live-remote-cloudinary", authorizationState: "authorized-unexecuted", executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
-async function verifyAuthorization(receiptPath, currentTargetRecheckPath) {
+async function verifyAuthorization(receiptPath, recheckArgs = {}) {
   await assertCurrentSchemaDigest();
   const receiptFile = await bound(receiptPath);
   const value = JSON.parse(receiptFile.bytes.toString("utf8"));
   if (value.contract !== CONTRACT || value.schemaSha256 !== SCHEMA_SHA256 || value.authorizationState !== "authorized-unexecuted" || value.explicitExecutionConfirmation !== true || value.confirmationStatement !== CONFIRMATION_STATEMENT) throw new Error("Execution-authorization receipt contract/schema/confirmation is invalid or stale.");
   assertNoMutationAuthority(value, "Execution-authorization receipt");
   if (value.executionAuthorizedForOneTransactionOnly !== true || value.authorizationExpiresOnAnyEvidenceDrift !== true || value.transactionPlanReverified !== true || value.candidateBytesReverified !== true || value.currentTargetStillMatchesSnapshot !== true || value.rollbackBackupStillMatchesSnapshot !== true) throw new Error("Execution-authorization receipt lacks required single-transaction safety invariants.");
-  const review = await verifyPlan(value.transactionPlanReceiptPath, currentTargetRecheckPath);
+  const review = await verifyPlan(value.transactionPlanReceiptPath, recheckArgs);
   if (review.planFile.sha256 !== value.transactionPlanReceiptSha256 || review.planFile.byteLength !== value.transactionPlanReceiptByteLength) throw new Error("Execution authorization is bound to changed transaction-plan bytes.");
   if (review.plan.route !== value.route || review.plan.candidateId !== value.candidateId || review.plan.candidateSha256 !== value.candidateSha256 || review.plan.candidateByteLength !== value.candidateByteLength || review.plan.targetKind !== value.targetKind || review.plan.targetIdentifier !== value.targetIdentifier) throw new Error("Execution authorization candidate/target identity drifted from transaction plan.");
   if (review.snapshot.sha256 !== value.currentTargetSnapshotSha256 || review.snapshot.byteLength !== value.currentTargetSnapshotByteLength || review.backup.sha256 !== value.rollbackBackupSha256 || review.backup.byteLength !== value.rollbackBackupByteLength) throw new Error("Execution authorization snapshot/rollback evidence drifted.");
-  return Object.freeze({ ok: true, receiptPath: receiptFile.path, receiptSha256: receiptFile.sha256, receiptByteLength: receiptFile.byteLength, schemaSha256: SCHEMA_SHA256, transactionPlanReverified: true, candidateBytesReverified: true, currentTargetStillMatchesSnapshot: true, rollbackBackupStillMatchesSnapshot: true, authorizationValidForOneTransactionOnly: true, authorizationState: "authorized-unexecuted", executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, receiptPath: receiptFile.path, receiptSha256: receiptFile.sha256, receiptByteLength: receiptFile.byteLength, schemaSha256: SCHEMA_SHA256, transactionPlanReverified: true, candidateBytesReverified: true, currentTargetStillMatchesSnapshot: true, rollbackBackupStillMatchesSnapshot: true, currentTargetRecheckMode: review.recheck.mode, liveRemoteCurrentTargetVerified: review.recheck.mode === "live-remote-cloudinary", authorizationValidForOneTransactionOnly: true, authorizationState: "authorized-unexecuted", executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
+const recheckProperties = {
+  currentTargetRecheckPath: { type: "string", minLength: 1 },
+  currentTargetRecheckUrl: { type: "string", minLength: 1 },
+};
 const tools = [
-  { name: "evavo_work_header_publication_execution_authorization_capabilities", description: "Describe the explicit single-transaction execution-authorization gate. It records deliberate execution consent after re-verifying the transaction plan, exact candidate, unchanged target and rollback backup, but still performs no mutation.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_authorize_work_header_publication_execution", description: "Create a create-only execution-authorization receipt only after exact explicit confirmation and fresh reverification of the reviewed transaction, candidate, target snapshot and rollback backup. This tool never mutates website or Cloudinary targets.", inputSchema: { type: "object", properties: { transactionPlanReceiptPath: { type: "string", minLength: 1 }, currentTargetRecheckPath: { type: "string", minLength: 1 }, confirmationStatement: { type: "string" }, confirmExecutionAuthorization: { type: "boolean" }, receiptPath: { type: "string", minLength: 1 }, confirmLocalWrite: { type: "boolean" } }, required: ["transactionPlanReceiptPath", "currentTargetRecheckPath", "confirmationStatement", "confirmExecutionAuthorization", "receiptPath", "confirmLocalWrite"], additionalProperties: false } },
-  { name: "evavo_verify_work_header_publication_execution_authorization", description: "Read-only reverification of an execution authorization against the exact transaction plan, candidate bytes, current-target recheck and rollback backup. Any evidence drift invalidates authorization. It performs no mutation.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 }, currentTargetRecheckPath: { type: "string", minLength: 1 } }, required: ["receiptPath", "currentTargetRecheckPath"], additionalProperties: false } },
+  { name: "evavo_work_header_publication_execution_authorization_capabilities", description: "Describe the explicit single-transaction execution-authorization gate with target-aware current-target reverification. Website source targets use a governed local path; Cloudinary stable-ID targets are fetched live from the unversioned governed delivery URL. No mutation is performed.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_authorize_work_header_publication_execution", description: "Create a create-only execution-authorization receipt only after explicit confirmation and fresh target-aware reverification. Cloudinary authorization refuses caller-supplied local target snapshots and fetches the live unversioned stable-ID URL itself immediately before authorization.", inputSchema: { type: "object", properties: { transactionPlanReceiptPath: { type: "string", minLength: 1 }, ...recheckProperties, confirmationStatement: { type: "string" }, confirmExecutionAuthorization: { type: "boolean" }, receiptPath: { type: "string", minLength: 1 }, confirmLocalWrite: { type: "boolean" } }, required: ["transactionPlanReceiptPath", "confirmationStatement", "confirmExecutionAuthorization", "receiptPath", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_work_header_publication_execution_authorization", description: "Read-only target-aware reverification of an execution authorization. Cloudinary targets must still match the planned pre-publication bytes when fetched live from the governed unversioned stable-ID URL.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 }, ...recheckProperties }, required: ["receiptPath"], additionalProperties: false } },
 ];
 function capabilities() {
-  return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, explicitExecutionConfirmationRequired: true, exactConfirmationStatementRequired: true, transactionPlanReverificationRequired: true, candidateBytesReverificationRequired: true, currentTargetRecheckRequired: true, rollbackBackupReverificationRequired: true, singleTransactionAuthorizationOnly: true, authorizationExpiresOnAnyEvidenceDrift: true, createOnlyReceiptWrite: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
+  return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, explicitExecutionConfirmationRequired: true, exactConfirmationStatementRequired: true, transactionPlanReverificationRequired: true, candidateBytesReverificationRequired: true, currentTargetRecheckRequired: true, targetAwareCurrentTargetRecheck: true, websiteSourceUsesGovernedLocalRecheck: true, cloudinaryUsesLiveRemoteRecheck: true, cloudinaryUnversionedStableDeliveryUrlRequired: true, cloudinaryCallerLocalRecheckRejected: true, rollbackBackupReverificationRequired: true, singleTransactionAuthorizationOnly: true, authorizationExpiresOnAnyEvidenceDrift: true, createOnlyReceiptWrite: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
 }
 async function callTool(name, args) {
   if (name === "evavo_work_header_publication_execution_authorization_capabilities") return capabilities();
   if (name === "evavo_authorize_work_header_publication_execution") return authorize(args ?? {});
-  if (name === "evavo_verify_work_header_publication_execution_authorization") return verifyAuthorization(args?.receiptPath, args?.currentTargetRecheckPath);
+  if (name === "evavo_verify_work_header_publication_execution_authorization") return verifyAuthorization(args?.receiptPath, args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 const response = (id, result) => ({ jsonrpc: "2.0", id, result });
