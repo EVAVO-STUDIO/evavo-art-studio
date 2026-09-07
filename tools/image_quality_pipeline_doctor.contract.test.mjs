@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers review through rollback readiness", async () => {
+test("image quality doctor covers review through postflight-gated rollback result", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_26"',
-    'SERVER_VERSION = "1.26.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_27"',
+    'SERVER_VERSION = "1.27.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -25,9 +25,11 @@ test("image quality doctor covers review through rollback readiness", async () =
     'id: "work-publication-execution-authorization"',
     'id: "work-publication-execution-claim"',
     'id: "work-publication-execution-result"',
-    'id: "work-publication-execution-result-schema"',
     'id: "work-publication-rollback-readiness"',
-    'id: "work-publication-rollback-readiness-schema"',
+    'id: "work-publication-postflight"',
+    'id: "work-publication-rollback-authorization"',
+    'id: "work-publication-rollback-execution-claim"',
+    'id: "work-publication-rollback-execution-result"',
     'id: "mcp-registration"',
     "executionPerformed: false",
     "sourceMutationPerformed: false",
@@ -51,7 +53,7 @@ test("doctor retains exact trigger-bound Chrome lineage through review", async (
   ]) assert.ok(source.includes(token), `missing trigger-bound review token: ${token}`);
 });
 
-test("doctor requires explicit approval, rollback planning, authorization and single-use claim", async () => {
+test("doctor requires explicit approval, rollback planning, authorization and single-use publication claim", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
     'CONTRACT = "evavo.work-header-approval-decision.v1"',
@@ -68,41 +70,47 @@ test("doctor requires explicit approval, rollback planning, authorization and si
   ]) assert.ok(source.includes(token), `missing publication safety token: ${token}`);
 });
 
-test("doctor requires evidence-only execution result and non-executing rollback readiness", async () => {
+test("doctor requires postflight before rollback authorization and single-use rollback evidence", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'CONTRACT = "evavo.work-header-publication-execution-result.v1"',
-    'SCHEMA_SHA256 = "6d94ca926dea8c5c0fdc025c3d65a8692ae5c8c6e61db2d37a536ae352d52445"',
-    "observedExternalExecutionOnly: true",
-    "deterministicCreateOnlyResultPath: true",
-    "postExecutionTargetMustExactlyMatchCandidate: true",
-    "rollbackBackupMustRemainPreserved: true",
-    "resultIsEvidenceOnly: true",
-    'CONTRACT = "evavo.work-header-publication-rollback-readiness.v1"',
-    'SCHEMA_SHA256 = "cc56d28b46f98cea1f97b46aa9988522c6b97424ee853a7c6c968a45ffd77f6d"',
-    "currentPublishedTargetMustStillMatchCandidate: true",
-    "rollbackBackupMustExactlyMatchPreviousTarget: true",
-    "separateRollbackBackupRequired: true",
-    "deterministicCreateOnlyReceipt: true",
-    "rollbackPreparationOnly: true",
+    'CONTRACT = "evavo.work-header-publication-postflight.v1"',
+    'SCHEMA_SHA256 = "5a1a2a9a329d3ce4eecd81981e3aa35cd2d6d2d3487f78b6b56672bacca99ae8"',
+    "currentLiveTargetMustExactlyMatchReviewedCandidate: true",
+    "rollbackBackupMustRemainReady: true",
+    "postflightEvidenceOnly: true",
+    'CONTRACT = "evavo.work-header-publication-rollback-authorization.v1"',
+    'SCHEMA_SHA256 = "3f23166dc2901ba09f222682b2d6e2be4ab84e4d0ad4d469ae9c041e3bac211b"',
+    "explicitRollbackConfirmationRequired: true",
+    "publicationPostflightReverificationRequired: true",
+    "singleRollbackTransactionAuthorizationOnly: true",
+    "authorizationExpiresOnAnyEvidenceDrift: true",
+    'CONTRACT = "evavo.work-header-publication-rollback-execution-claim.v1"',
+    'SCHEMA_SHA256 = "2abc5c031803e2d29c40fe80dcc118ca4ee984e3f0a9a1fe7da17455acbf4e78"',
+    "confirmSingleUseRollbackClaim=true is required",
+    "claimInvalidOnAnyEvidenceDrift",
+    'CONTRACT = "evavo.work-header-publication-rollback-execution-result.v1"',
+    'SCHEMA_SHA256 = "2c963f8ba6adb05deb871e62c0803d78c55f68da551127c01b07c82df2480352"',
+    "publicationPostflightReceiptPath",
+    "rollback-claimed-unexecuted",
     "rollbackExecutionAllowed: false",
-    "publicationRollbackReadinessBoundaryChecked: true",
-    "rollbackReadinessCurrentPublishedTargetMatchChecked: true",
-    "rollbackReadinessPreviousTargetBackupMatchChecked: true",
-    "rollbackExecutionAuthorityAbsent: true",
-  ]) assert.ok(source.includes(token), `missing execution/rollback doctor token: ${token}`);
+    "rollbackAuthorizationPostflightGateChecked: true",
+    "rollbackSingleUseClaimBoundaryChecked: true",
+    "rollbackExecutionResultEvidenceBoundaryChecked: true",
+    "rollbackMutationAuthorityAbsent: true",
+  ]) assert.ok(source.includes(token), `missing postflight/rollback doctor token: ${token}`);
 });
 
-test("MCP configuration exposes attestation and rollback readiness but no mutation executor", async () => {
+test("MCP configuration exposes complete evidence chain but no mutation executor", async () => {
   const config = await read("../.mcp.json");
   for (const token of [
     '"evavo-image-quality-pipeline-doctor-v1"',
     '"evavo-work-header-publication-execution-authorization-v1"',
     '"evavo-work-header-publication-execution-claim-v1"',
     '"evavo-work-header-publication-execution-result-v1"',
-    '"tools/work_header_publication_execution_result_mcp.mjs"',
     '"evavo-work-header-publication-rollback-readiness-v1"',
-    '"tools/work_header_publication_rollback_readiness_mcp.mjs"',
+    '"evavo-work-header-publication-rollback-authorization-v1"',
+    '"evavo-work-header-publication-rollback-execution-claim-v1"',
+    '"evavo-work-header-publication-rollback-execution-result-v1"',
   ]) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
   assert.ok(!config.includes('"evavo-work-header-publication-executor-v1"'));
   assert.ok(!config.includes('"evavo-work-header-publication-rollback-executor-v1"'));
