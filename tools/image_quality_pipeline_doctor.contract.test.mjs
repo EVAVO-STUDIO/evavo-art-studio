@@ -7,8 +7,8 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 test("image quality doctor covers review through target-aware publication and postflight-gated rollback result", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_28"',
-    'SERVER_VERSION = "1.28.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_29"',
+    'SERVER_VERSION = "1.29.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -18,7 +18,7 @@ test("image quality doctor covers review through target-aware publication and po
     'id: "work-preview-core-v8"',
     'id: "work-preview-mcp-v180"',
     'id: "work-page-review-input-safety"',
-    'id: "work-page-review-v210"',
+    'id: "work-page-review-v220"',
     'id: "work-explicit-approval-decision"',
     'id: "work-publication-preparation"',
     'id: "work-publication-transaction-plan"',
@@ -38,6 +38,23 @@ test("image quality doctor covers review through target-aware publication and po
   ]) assert.ok(source.includes(token), `missing doctor contract token: ${token}`);
 });
 
+test("doctor requires deterministic page-review input, evidence and proof reverification", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    "normalizedReviewInputsPersisted: true",
+    "normalizedPageReviewInputsPersisted: true",
+    "pageReviewEvidenceRecomputedDuringVerification: true",
+    "pageReviewProofRecomputedDuringVerification: true",
+    "tamperedPageReviewScoresFlagsOrNotesRejected: true",
+    "Page-render evidence changed after review or no longer recomputes from persisted normalized review inputs.",
+    "Page-render proof no longer recomputes from exact screenshots and normalized review inputs.",
+    "pageReviewEvidenceRecomputedAndMatched: true",
+    "pageReviewProofRecomputedAndMatched: true",
+    'SERVER_VERSION = "2.2.0"',
+    "fullReceiptLineageVerifiedBeforeApprovalPacket: true",
+  ]) assert.ok(source.includes(token), `missing deterministic page-review token: ${token}`);
+});
+
 test("doctor retains exact trigger-bound Chrome lineage through review", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
@@ -49,8 +66,6 @@ test("doctor retains exact trigger-bound Chrome lineage through review", async (
     "exactTriggeredBrowserRequestBindingRequired: true",
     'exactTriggeredBrowserRequestMethod: "GET"',
     "exactTriggeredBrowserRequestBindingChecked: true",
-    'SERVER_VERSION = "2.1.0"',
-    "fullReceiptLineageVerifiedBeforeApprovalPacket: true",
   ]) assert.ok(source.includes(token), `missing trigger-bound review token: ${token}`);
 });
 
