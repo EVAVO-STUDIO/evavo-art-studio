@@ -34,25 +34,27 @@ test("reference colour restoration bridge stays deterministic and fail closed", 
 });
 
 test("MCP exposes plan, readiness and explicit create-only execution", async () => {
-  const source = await read("./reference_colour_restoration_bridge_mcp.mjs");
+  const source = await read("./reference_colour_restoration_guarded_mcp.mjs");
   for (const token of [
-    'SERVER_VERSION = "1.0.0"',
+    'SERVER_VERSION = "1.1.0"',
     "evavo_reference_colour_restoration_bridge_capabilities",
     "evavo_reference_colour_restoration_readiness",
     "evavo_plan_reference_colour_restoration_review_set",
     "evavo_run_reference_colour_restoration_review_set",
+    "assertReferenceColourRestorationPlanResult",
+    "assertReferenceColourRestorationExecutionResult",
     "confirmLocalWrite",
     "confirmRealReference",
     "subjectMatchConfirmedByHuman",
     "referenceProvenance",
-  ]) assert.ok(source.includes(token), `missing MCP surface token: ${token}`);
+  ]) assert.ok(source.includes(token), `missing guarded MCP surface token: ${token}`);
 });
 
-test("standalone existing-image suite registers enhancer execution bridge", async () => {
+test("standalone existing-image suite registers guarded enhancer execution bridge", async () => {
   const source = await read("../.mcp.existing-image-polish-v1.json");
   for (const token of [
     '"evavo-reference-colour-restoration-bridge-v1"',
-    '"tools/reference_colour_restoration_bridge_mcp.mjs"',
+    '"tools/reference_colour_restoration_guarded_mcp.mjs"',
     '"EVAVO_REFERENCE_COLOUR_RESTORATION_ALLOW_EXECUTION": "true"',
     '"EVAVO_REFERENCE_COLOUR_RESTORATION_ENHANCER_ROOT": "C:\\\\GitRepos\\\\evavo-image-enhancement-studio"',
     '"EVAVO_REFERENCE_COLOUR_RESTORATION_PROVIDER": "evavo-image-enhancement-studio:reference-colourization-v1"',
