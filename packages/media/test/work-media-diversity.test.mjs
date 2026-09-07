@@ -8,6 +8,10 @@ async function solid(value) {
   return sharp({ create: { width: 64, height: 64, channels: 3, background: { r: value, g: value, b: value } } }).png().toBuffer();
 }
 
+async function solidRgb(r, g, b) {
+  return sharp({ create: { width: 64, height: 64, channels: 3, background: { r, g, b } } }).png().toBuffer();
+}
+
 async function split(left, right) {
   const raw = Buffer.alloc(64 * 64 * 3);
   for (let y = 0; y < 64; y += 1) for (let x = 0; x < 64; x += 1) {
@@ -24,9 +28,26 @@ test("rejects exact duplicate storytelling across Work routes", async () => {
     { id: "a-header", route: "/work/a", role: "header", image },
     { id: "b-header", route: "/work/b", role: "header", image: Buffer.from(image) },
   ] });
+  assert.equal(result.contract, "evavo.work-media-diversity.v1_1");
+  assert.equal(result.evidence.similarityModel, "dhash-ahash-rgb-grid-v1");
   assert.equal(result.evidence.distinctnessPass, false);
   assert.equal(result.evidence.duplicatePairs.length, 1);
   assert.equal(result.evidence.duplicateClusters.length, 1);
+  assert.equal(result.evidence.pairs[0].colorGridSimilarity, 1);
+});
+
+test("color-aware evidence avoids false cross-route duplicate from grayscale-only structure", async () => {
+  const result = await reviewWorkMediaDiversity({ images: [
+    { id: "red", route: "/work/red", role: "header", image: await solidRgb(255, 0, 0) },
+    { id: "blue", route: "/work/blue", role: "header", image: await solidRgb(0, 0, 255) },
+  ], nearDuplicateThreshold: 0.92, reviewSimilarityThreshold: 0.84 });
+  assert.equal(result.evidence.duplicatePairs.length, 0);
+  assert.equal(result.evidence.nearDuplicatePairs.length, 0);
+  assert.equal(result.evidence.crossRouteNearDuplicateCount, 0);
+  assert.equal(result.evidence.distinctnessPass, true);
+  assert.equal(result.evidence.pairs[0].differenceHashSimilarity, 1);
+  assert.equal(result.evidence.pairs[0].averageHashSimilarity, 1);
+  assert.ok(result.evidence.pairs[0].colorGridSimilarity < 0.5);
 });
 
 test("allows clearly distinct Work imagery while keeping visual review required", async () => {
@@ -38,6 +59,12 @@ test("allows clearly distinct Work imagery while keeping visual review required"
   assert.equal(result.evidence.duplicatePairs.length, 0);
   assert.equal(result.evidence.visualReviewRequired, true);
   assert.equal(result.evidence.automaticReplacementAllowed, false);
+  for (const pair of result.evidence.pairs) {
+    assert.equal(typeof pair.differenceHashSimilarity, "number");
+    assert.equal(typeof pair.averageHashSimilarity, "number");
+    assert.equal(typeof pair.colorGridSimilarity, "number");
+    assert.equal(typeof pair.colorGridMeanAbsoluteDifference, "number");
+  }
 });
 
 test("validates routes and threshold ordering", async () => {
