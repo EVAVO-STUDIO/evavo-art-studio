@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.com.au/contracts/creative-production-gate-receipt-v1.schema.json",
+  "title": "EVAVO Creative Production Gate Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "schemaVersion", "status", "gateId", "sourceDigest", "gateDependencies", "evidenceRefs", "review", "authority"],
+  "properties": {
+    "kind": {"const": "creative-production-gate-receipt"},
+    "schemaVersion": {"const": "1.0.0"},
+    "status": {"const": "approved-reviewed"},
+    "gateId": {"type": "string", "minLength": 1, "maxLength": 240},
+    "sourceDigest": {"type": "string", "minLength": 1, "maxLength": 256},
+    "gateDependencies": {"type": "array", "uniqueItems": true, "maxItems": 500, "items": {"type": "string", "minLength": 1, "maxLength": 240}},
+    "evidenceRefs": {"type": "array", "minItems": 1, "maxItems": 500, "items": {"type": "object", "required": ["kind", "ref"], "properties": {"kind": {"type": "string", "minLength": 1}, "ref": {"type": "string", "minLength": 1}, "digest": {"type": "string", "minLength": 1}}, "additionalProperties": true}},
+    "review": {"type": "object", "required": ["status", "reviewer", "evidenceDigest"], "properties": {"status": {"const": "reviewed"}, "reviewer": {"type": "string", "minLength": 1}, "evidenceDigest": {"type": "string", "minLength": 1}}, "additionalProperties": true},
+    "authority": {"type": "object", "additionalProperties": false, "required": ["recordsExternalApproval", "executesProduction", "grantsAdditionalApproval", "mutatesConsumerRepository", "publishes"], "properties": {"recordsExternalApproval": {"const": true}, "executesProduction": {"const": false}, "grantsAdditionalApproval": {"const": false}, "mutatesConsumerRepository": {"const": false}, "publishes": {"const": false}}}
+  }
+}
