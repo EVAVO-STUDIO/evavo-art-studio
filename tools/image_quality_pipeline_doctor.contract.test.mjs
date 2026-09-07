@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers review through postflight-gated rollback result", async () => {
+test("image quality doctor covers review through target-aware publication and postflight-gated rollback result", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_27"',
-    'SERVER_VERSION = "1.27.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_28"',
+    'SERVER_VERSION = "1.28.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -22,6 +22,7 @@ test("image quality doctor covers review through postflight-gated rollback resul
     'id: "work-explicit-approval-decision"',
     'id: "work-publication-preparation"',
     'id: "work-publication-transaction-plan"',
+    'id: "work-publication-target-aware-recheck"',
     'id: "work-publication-execution-authorization"',
     'id: "work-publication-execution-claim"',
     'id: "work-publication-execution-result"',
@@ -51,6 +52,23 @@ test("doctor retains exact trigger-bound Chrome lineage through review", async (
     'SERVER_VERSION = "2.1.0"',
     "fullReceiptLineageVerifiedBeforeApprovalPacket: true",
   ]) assert.ok(source.includes(token), `missing trigger-bound review token: ${token}`);
+});
+
+test("doctor requires live target-aware authorization and claim for Cloudinary stable IDs", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    'tools/lib/publication_target_recheck.mjs',
+    'CLOUDINARY_HOST = "res.cloudinary.com"',
+    'CLOUDINARY_CLOUD = "dntogqtey"',
+    "unversioned stable delivery URL",
+    'SERVER_VERSION = "1.1.0"',
+    "targetAwareCurrentTargetRecheck: true",
+    "cloudinaryUsesLiveRemoteRecheck: true",
+    "cloudinaryUnversionedStableDeliveryUrlRequired: true",
+    "cloudinaryCallerLocalRecheckRejected: true",
+    "publicationTargetAwareRecheckChecked: true",
+    "cloudinaryLiveStableTargetRecheckChecked: true",
+  ]) assert.ok(source.includes(token), `missing target-aware publication token: ${token}`);
 });
 
 test("doctor requires explicit approval, rollback planning, authorization and single-use publication claim", async () => {
