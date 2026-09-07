@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import{admitGameProductionPlan}from'./game-production-intake.mjs';
+const env={id:'asset-1/01-environment',kind:'creative-production-packet',status:'queued-not-executed',sourceDigest:'digest',sourceAssetId:'asset-1',sourceCategory:'environment',title:'Environment',studio:'environment-studio',repository:'EVAVO-STUDIO/environment-studio',operation:'compile',deliverable:'specification',dependsOn:['gate/style-approved'],brief:{},acceptance:[],sourceRefs:[],notes:[],authority:{execute:false,approve:false,mutateConsumerRepository:false,publish:false}};
+const art={...env,id:'asset-1/02-art',title:'Visual target',studio:'art-studio',repository:'EVAVO-STUDIO/evavo-art-studio',operation:'produce-game-concept-art',deliverable:'approved visual target',dependsOn:[env.id]};const plan={kind:'creative-production-plan',schemaVersion:'1.0.0',source:{sourceDigest:'digest'},packets:[env,art]};
+test('filters exact art packets',()=>assert.equal(admitGameProductionPlan(plan).packetCount,1));
+test('requires predecessor receipt',()=>assert.equal(admitGameProductionPlan(plan).status,'blocked-on-dependencies'));
+test('receipt does not imply approval',()=>{const x=admitGameProductionPlan(plan,{completedPacketIds:[env.id]});assert.equal(x.readyCount,1);assert.equal(x.packets[0].intake.approvalGranted,false);});
