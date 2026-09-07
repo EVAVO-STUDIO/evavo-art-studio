@@ -16,6 +16,8 @@ export interface ImageSimilarityResult {
   readonly differenceHashSimilarity: number;
   readonly averageHashDistance: number;
   readonly averageHashSimilarity: number;
+  readonly colorGridMeanAbsoluteDifference: number;
+  readonly colorGridSimilarity: number;
   readonly perceptualDistance: number;
   readonly perceptualSimilarity: number;
   readonly nearDuplicate: boolean;
@@ -39,6 +41,15 @@ async function grayscale(encoded: Buffer, width: number, height: number): Promis
     .flatten({ background: "#000000" })
     .greyscale()
     .resize(width, height, { fit: "fill", kernel: "lanczos3" })
+    .raw()
+    .toBuffer();
+}
+
+async function rgbGrid(encoded: Buffer): Promise<Buffer> {
+  return sharp(encoded, { failOn: "error" })
+    .flatten({ background: "#000000" })
+    .removeAlpha()
+    .resize(4, 4, { fit: "fill", kernel: "lanczos3" })
     .raw()
     .toBuffer();
 }
@@ -80,10 +91,22 @@ function popcount64(value: bigint): number {
   return count;
 }
 
+function compareColorGrid(left: Buffer, right: Buffer): { meanAbsoluteDifference: number; similarity: number } {
+  if (left.length !== right.length || left.length !== 4 * 4 * 3) throw new Error("Color-grid signatures have invalid dimensions.");
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) difference += Math.abs(left[index]! - right[index]!);
+  const meanAbsoluteDifference = difference / left.length;
+  const similarity = 1 - meanAbsoluteDifference / 255;
+  return {
+    meanAbsoluteDifference: Math.round(meanAbsoluteDifference * 1000) / 1000,
+    similarity: Math.round(similarity * 1_000_000) / 1_000_000,
+  };
+}
+
 /**
- * Detect exact and near-duplicate imagery. The perceptual score combines dHash
- * shape/edge ordering with aHash tone/layout occupancy so flat images and broad
- * gradients cannot collide merely because both have no descending edges.
+ * Detect exact and near-duplicate imagery with independent shape, tone and color
+ * evidence. The spatial RGB grid prevents recolored or hue-shifted artwork from
+ * being treated as the same visual merely because its grayscale structure matches.
  */
 export async function compareImageSimilarity(
   source: Buffer,
@@ -92,20 +115,23 @@ export async function compareImageSimilarity(
 ): Promise<ImageSimilarityResult> {
   if (!source.length || !candidate.length) throw new Error("Image similarity inputs must not be empty.");
   const nearDuplicateThreshold = threshold(spec.nearDuplicateThreshold);
-  const [a, b, dhA, dhB, ahA, ahB] = await Promise.all([
+  const [a, b, dhA, dhB, ahA, ahB, colorA, colorB] = await Promise.all([
     dimensions(source),
     dimensions(candidate),
     differenceHash(source),
     differenceHash(candidate),
     averageHash(source),
     averageHash(candidate),
+    rgbGrid(source),
+    rgbGrid(candidate),
   ]);
   const exactBinaryMatch = createHash("sha256").update(source).digest("hex") === createHash("sha256").update(candidate).digest("hex");
   const differenceHashDistance = popcount64(dhA ^ dhB);
   const averageHashDistance = popcount64(ahA ^ ahB);
   const differenceHashSimilarity = 1 - differenceHashDistance / 64;
   const averageHashSimilarity = 1 - averageHashDistance / 64;
-  const perceptualSimilarity = differenceHashSimilarity * 0.6 + averageHashSimilarity * 0.4;
+  const color = compareColorGrid(colorA, colorB);
+  const perceptualSimilarity = differenceHashSimilarity * 0.5 + averageHashSimilarity * 0.3 + color.similarity * 0.2;
   const perceptualDistance = Math.round((1 - perceptualSimilarity) * 64 * 1000) / 1000;
   const nearDuplicate = exactBinaryMatch || perceptualSimilarity >= nearDuplicateThreshold;
   const recommendation = exactBinaryMatch ? "reject-duplicate" : nearDuplicate ? "review-similarity" : "distinct";
@@ -120,6 +146,8 @@ export async function compareImageSimilarity(
     differenceHashSimilarity,
     averageHashDistance,
     averageHashSimilarity,
+    colorGridMeanAbsoluteDifference: color.meanAbsoluteDifference,
+    colorGridSimilarity: color.similarity,
     perceptualDistance,
     perceptualSimilarity,
     nearDuplicate,
