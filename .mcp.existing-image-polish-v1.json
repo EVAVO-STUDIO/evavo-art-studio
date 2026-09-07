@@ -9,7 +9,7 @@
     },
     "evavo-reference-colour-restoration-bridge-v1": {
       "command": "node",
-      "args": ["tools/reference_colour_restoration_bridge_mcp.mjs"],
+      "args": ["tools/reference_colour_restoration_guarded_mcp.mjs"],
       "env": {
         "EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
         "EVAVO_REFERENCE_COLOUR_RESTORATION_ALLOW_EXECUTION": "true",
