@@ -1,5 +1,10 @@
 {
   "mcpServers": {
+    "evavo-existing-image-restoration-intake-v1": {
+      "command": "node",
+      "args": ["tools/existing_image_restoration_intake_mcp.mjs"],
+      "env": {}
+    },
     "evavo-existing-image-polish-v1": {
       "command": "node",
       "args": ["tools/existing_image_polish_mcp.mjs"],
