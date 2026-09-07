@@ -36,6 +36,7 @@ export * from "./localized-edit.js";
 export * from "./edit-mask.js";
 export * from "./work-header-quality.js";
 export * from "./work-header-candidate-review.js";
+export * from "./work-media-diversity.js";
 export * from "./work-header-review-lineage.js";
 export * from "./work-header-visual-critique.js";
 export * from "./work-header-selection-resolver.js";
