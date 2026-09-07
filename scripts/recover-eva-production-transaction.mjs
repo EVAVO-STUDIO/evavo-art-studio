@@ -14,7 +14,11 @@ const DEFAULT_TARGET_ROOT = path.join(
   'project-art-production',
   'eva-female-v2-recovered',
 );
-const STORAGE_SCRIPT_RELATIVE = 'scripts/materialize-exact-storage-transaction.py';
+const EXACT_TRANSACTION_SCRIPT_RELATIVE = 'scripts/materialize-exact-storage-transaction.py';
+const STORED_ART_RECOVERY_SCRIPT_RELATIVE = 'scripts/recover-art-ingest-transaction.py';
+const DEFAULT_VAULT_ID = 'art';
+const DEFAULT_PROJECT_ID = 'eva-female-v2';
+const REVIEWED_ATLAS_MANIFEST_SHA256 = '3f1fb235df718487ec9bb33fa7b1611eff93c5e97da28eb589dccfb68d4723a4';
 const EXPECTED_WEBP_COUNT = 180;
 const EXPECTED_EVIDENCE = Object.freeze([
   'atlas-manifest.json',
@@ -146,13 +150,34 @@ function exactReceiptMap(receipt) {
   }
   const map = new Map();
   for (const item of receipt.items) {
-    if (!item || typeof item.logicalPath !== 'string' || typeof item.sha256 !== 'string') {
+    if (
+      !item
+      || typeof item.logicalPath !== 'string'
+      || typeof item.sha256 !== 'string'
+      || !Number.isInteger(item.bytes)
+      || item.bytes < 1
+    ) {
       fail('EVA_RECOVERY_RECEIPT_INVALID', 'Storage receipt contains an invalid item identity.');
     }
     if (map.has(item.logicalPath)) fail('EVA_RECOVERY_RECEIPT_DUPLICATE', `Duplicate receipt path: ${item.logicalPath}`);
     map.set(item.logicalPath, item);
   }
   return map;
+}
+
+function verifyReviewedAtlasIdentity(receipt) {
+  const atlasItems = receipt.items.filter(
+    (item) => path.posix.basename(String(item?.logicalPath ?? '')).toLowerCase() === 'atlas-manifest.json',
+  );
+  if (
+    atlasItems.length !== 1
+    || atlasItems[0].sha256 !== REVIEWED_ATLAS_MANIFEST_SHA256
+  ) {
+    fail(
+      'EVA_RECOVERY_REVIEWED_ATLAS_MISMATCH',
+      'Recovered transaction is not bound to the atlas manifest currently admitted by the EVA website runtime.',
+    );
+  }
 }
 
 function verifyRecoveredTree(targetRoot, receipt) {
@@ -166,6 +191,7 @@ function verifyRecoveredTree(targetRoot, receipt) {
     fail('EVA_RECOVERY_OUTPUT_COUNT_MISMATCH', `Recovered transaction contains ${state.fileCount} files; expected ${EXPECTED_ITEM_COUNT}.`);
   }
   const expected = exactReceiptMap(receipt);
+  verifyReviewedAtlasIdentity(receipt);
   let webpCount = 0;
   const evidence = new Set();
   for (const file of state.files) {
@@ -193,65 +219,95 @@ function verifyRecoveredTree(targetRoot, receipt) {
   };
 }
 
+function runStorageRecovery({ python, storageRepository, manifest, vaultId, projectId, sessionId, targetRoot }) {
+  const common = [
+    '--target-root', targetRoot,
+    '--vault-id', vaultId,
+    '--expected-item-count', String(EXPECTED_ITEM_COUNT),
+    '--expected-webp-count', String(EXPECTED_WEBP_COUNT),
+    '--expected-evidence-count', String(EXPECTED_EVIDENCE_COUNT),
+  ];
+  let storageScript;
+  let arguments;
+  let mode;
+  if (manifest) {
+    storageScript = absoluteOrdinaryFile(
+      path.join(storageRepository, EXACT_TRANSACTION_SCRIPT_RELATIVE),
+      'EVAVO Storage exact transaction materializer',
+    );
+    arguments = [storageScript, '--manifest', absoluteOrdinaryFile(manifest, 'manifest'), ...common];
+    mode = 'explicit-manifest';
+  } else {
+    storageScript = absoluteOrdinaryFile(
+      path.join(storageRepository, STORED_ART_RECOVERY_SCRIPT_RELATIVE),
+      'EVAVO Storage retained Art transaction recovery',
+    );
+    arguments = [
+      storageScript,
+      '--project-id', projectId,
+      ...common,
+      '--required-item-sha', `atlas-manifest.json=${REVIEWED_ATLAS_MANIFEST_SHA256}`,
+    ];
+    if (sessionId) arguments.push('--session-id', sessionId);
+    mode = 'retained-storage';
+  }
+  const execution = spawnSync(
+    python,
+    arguments,
+    {
+      cwd: storageRepository,
+      encoding: 'utf8',
+      env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONUTF8: '1' },
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  if (execution.error) {
+    fail('EVA_RECOVERY_STORAGE_EXECUTION_FAILED', execution.error.message);
+  }
+  if (execution.status !== 0) {
+    fail(
+      'EVA_RECOVERY_STORAGE_EXECUTION_FAILED',
+      String(execution.stderr || execution.stdout || 'EVAVO Storage recovery failed.').trim().slice(0, 2000),
+    );
+  }
+  try {
+    return { mode, receipt: JSON.parse(String(execution.stdout || '').trim()) };
+  } catch (error) {
+    fail('EVA_RECOVERY_STORAGE_RECEIPT_INVALID', `EVAVO Storage returned invalid recovery JSON: ${error.message}`);
+  }
+}
+
 const manifest = value('--manifest');
-const vaultId = value('--vault-id');
+const exactVaultId = safeId(value('--vault-id') ?? DEFAULT_VAULT_ID, 'vaultId');
+const exactProjectId = safeId(value('--project-id') ?? DEFAULT_PROJECT_ID, 'projectId');
+const sessionId = value('--session-id') ? safeId(value('--session-id'), 'sessionId') : undefined;
 const storageRepository = path.resolve(value('--storage-repo') ?? process.env.EVAVO_STORAGE_REPOSITORY ?? DEFAULT_STORAGE_REPOSITORY);
 const targetRoot = ensureRecoveryTarget(value('--target-root') ?? DEFAULT_TARGET_ROOT);
 const python = value('--python') ?? process.env.EVAVO_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
 
-if (!manifest || !vaultId) {
-  fail(
-    'EVA_RECOVERY_USAGE',
-    'usage: recover-eva-production-transaction.mjs --manifest <probe-or-storage-receipt.json> --vault-id <vault> [--target-root <dir>] [--storage-repo <evavo-storage>] [--python <python>]',
-  );
-}
-const exactManifest = absoluteOrdinaryFile(manifest, 'manifest');
-const exactVaultId = safeId(vaultId, 'vaultId');
-const storageScript = absoluteOrdinaryFile(path.join(storageRepository, STORAGE_SCRIPT_RELATIVE), 'EVAVO Storage transaction materializer');
-
-const execution = spawnSync(
+const { mode, receipt } = runStorageRecovery({
   python,
-  [
-    storageScript,
-    '--manifest', exactManifest,
-    '--target-root', targetRoot,
-    '--vault-id', exactVaultId,
-    '--expected-item-count', String(EXPECTED_ITEM_COUNT),
-    '--expected-webp-count', String(EXPECTED_WEBP_COUNT),
-    '--expected-evidence-count', String(EXPECTED_EVIDENCE_COUNT),
-  ],
-  {
-    cwd: storageRepository,
-    encoding: 'utf8',
-    env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONUTF8: '1' },
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  },
-);
+  storageRepository,
+  manifest,
+  vaultId: exactVaultId,
+  projectId: exactProjectId,
+  sessionId,
+  targetRoot,
+});
 
-if (execution.error) {
-  fail('EVA_RECOVERY_STORAGE_EXECUTION_FAILED', execution.error.message);
-}
-if (execution.status !== 0) {
-  fail(
-    'EVA_RECOVERY_STORAGE_EXECUTION_FAILED',
-    String(execution.stderr || execution.stdout || 'EVAVO Storage recovery failed.').trim().slice(0, 2000),
-  );
-}
-
-let receipt;
-try {
-  receipt = JSON.parse(String(execution.stdout || '').trim());
-} catch (error) {
-  fail('EVA_RECOVERY_STORAGE_RECEIPT_INVALID', `EVAVO Storage returned invalid recovery JSON: ${error.message}`);
-}
+const allowedKinds = new Set([
+  'evavo-storage-exact-transaction-materialization',
+  'evavo-storage-art-ingest-transaction-recovery',
+]);
 if (
-  receipt?.kind !== 'evavo-storage-exact-transaction-materialization'
+  !allowedKinds.has(receipt?.kind)
   || receipt?.ok !== true
   || receipt?.itemCount !== EXPECTED_ITEM_COUNT
   || receipt?.webpCount !== EXPECTED_WEBP_COUNT
   || receipt?.evidenceCount !== EXPECTED_EVIDENCE_COUNT
   || receipt?.vaultId !== exactVaultId
+  || (mode === 'retained-storage' && receipt?.projectId !== exactProjectId)
 ) {
   fail('EVA_RECOVERY_STORAGE_RECEIPT_INVALID', 'EVAVO Storage recovery receipt does not satisfy the exact EVA transaction contract.');
 }
@@ -266,9 +322,14 @@ console.log(JSON.stringify({
   schema: 'evavo.eva-production-transaction-recovery-receipt.v1',
   status: 'passed',
   characterId: 'eva-female',
-  sourceManifestSha256: receipt.sourceManifestSha256,
-  storageReceiptSha256: receipt.receiptSha256,
-  transactionInventorySha256: receipt.inventorySha256,
+  recoveryMode: mode,
+  vaultId: exactVaultId,
+  projectId: exactProjectId,
+  sessionId: receipt.sessionId ?? sessionId ?? null,
+  reviewedAtlasManifestSha256: REVIEWED_ATLAS_MANIFEST_SHA256,
+  sourceManifestSha256: receipt.sourceManifestSha256 ?? receipt.storedHandoff?.sha256 ?? null,
+  storageReceiptSha256: receipt.receiptSha256 ?? receipt.transactionReceiptSha256 ?? null,
+  transactionInventorySha256: receipt.inventorySha256 ?? receipt.transactionInventorySha256 ?? null,
   itemCount: verified.fileCount,
   webpCount: verified.webpCount,
   evidenceCount: verified.evidenceCount,
