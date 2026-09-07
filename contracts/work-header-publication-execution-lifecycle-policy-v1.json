@@ -1,0 +1,115 @@
+{
+  "contract": "evavo.work-header-publication-execution-lifecycle-policy.v1",
+  "schemaVersion": "1.0",
+  "purpose": "Bind the reviewed Work-header publication transaction, single-use execution authorization/claim, evidence-only execution result, and explicit rollback lifecycle without granting direct mutation authority to review tooling.",
+  "transactionPlan": {
+    "contract": "evavo.work-header-publication-transaction-plan.v1",
+    "schemaPath": "contracts/work-header-publication-transaction-plan-v1.schema.json",
+    "schemaSha256": "f9e11403cabe947e50f0681300527fc164d551e2a8c4615f16bd723e2550d73f",
+    "createTool": "evavo_plan_work_header_publication_transaction",
+    "verifyTool": "evavo_verify_work_header_publication_transaction_plan",
+    "requiredState": "planned-unexecuted"
+  },
+  "forwardExecution": {
+    "authorization": {
+      "contract": "evavo.work-header-publication-execution-authorization.v1",
+      "schemaPath": "contracts/work-header-publication-execution-authorization-v1.schema.json",
+      "schemaSha256": "f56a746773e4e08db8e2d22c5bcc0fa50f8416bbfedbc6f8c18c26326ea3dff4",
+      "createTool": "evavo_authorize_work_header_publication_execution",
+      "verifyTool": "evavo_verify_work_header_publication_execution_authorization",
+      "requiredState": "authorized-unexecuted",
+      "explicitConfirmationRequired": true,
+      "singleTransactionOnly": true,
+      "expiresOnEvidenceDrift": true
+    },
+    "claim": {
+      "contract": "evavo.work-header-publication-execution-claim.v1",
+      "schemaPath": "contracts/work-header-publication-execution-claim-v1.schema.json",
+      "schemaSha256": "0b7ee89628c1e55f057161d41f7cea4e3addcdefc442b51823ed507a1b612116",
+      "createTool": "evavo_claim_work_header_publication_execution",
+      "verifyTool": "evavo_verify_work_header_publication_execution_claim",
+      "requiredState": "claimed-unexecuted",
+      "deterministicCreateOnlyPathRequired": true,
+      "singleUseClaimRequired": true,
+      "secondClaimRejected": true,
+      "expiresOnEvidenceDrift": true
+    },
+    "result": {
+      "contract": "evavo.work-header-publication-execution-result.v1",
+      "schemaPath": "contracts/work-header-publication-execution-result-v1.schema.json",
+      "schemaSha256": "6d94ca926dea8c5c0fdc025c3d65a8692ae5c8c6e61db2d37a536ae352d52445",
+      "attestTool": "evavo_attest_work_header_publication_execution_result",
+      "verifyTool": "evavo_verify_work_header_publication_execution_result",
+      "requiredState": "executed-verified",
+      "observedExternalExecutionOnly": true,
+      "postExecutionTargetMustExactlyMatchCandidate": true,
+      "postExecutionTargetMustDifferFromPreviousTarget": true,
+      "rollbackBackupMustRemainPreserved": true,
+      "deterministicCreateOnlyResultRequired": true,
+      "resultIsEvidenceOnly": true
+    }
+  },
+  "rollback": {
+    "readiness": {
+      "contract": "evavo.work-header-publication-rollback-readiness.v1",
+      "schemaPath": "contracts/work-header-publication-rollback-readiness-v1.schema.json",
+      "schemaSha256": "cc56d28b46f98cea1f97b46aa9988522c6b97424ee853a7c6c968a45ffd77f6d",
+      "createTool": "evavo_prepare_work_header_publication_rollback",
+      "verifyTool": "evavo_verify_work_header_publication_rollback_readiness",
+      "requiredState": "rollback-ready-unexecuted",
+      "currentPublishedTargetMustStillMatchCandidate": true,
+      "rollbackBackupMustExactlyMatchPreviousTarget": true,
+      "separateRollbackBackupRequired": true
+    },
+    "authorization": {
+      "contract": "evavo.work-header-publication-rollback-authorization.v1",
+      "schemaPath": "contracts/work-header-publication-rollback-authorization-v1.schema.json",
+      "schemaSha256": "926c76be30d9d84f880613e703f542f7bf1c7c16d003db395565b46ad084ccb4",
+      "createTool": "evavo_authorize_work_header_publication_rollback",
+      "verifyTool": "evavo_verify_work_header_publication_rollback_authorization",
+      "requiredState": "rollback-authorized-unexecuted",
+      "explicitConfirmationRequired": true,
+      "singleTransactionOnly": true,
+      "expiresOnEvidenceDrift": true
+    },
+    "claim": {
+      "contract": "evavo.work-header-publication-rollback-execution-claim.v1",
+      "schemaPath": "contracts/work-header-publication-rollback-execution-claim-v1.schema.json",
+      "schemaSha256": "2abc5c031803e2d29c40fe80dcc118ca4ee984e3f0a9a1fe7da17455acbf4e78",
+      "createTool": "evavo_claim_work_header_publication_rollback_execution",
+      "verifyTool": "evavo_verify_work_header_publication_rollback_execution_claim",
+      "requiredState": "rollback-claimed-unexecuted",
+      "deterministicCreateOnlyPathRequired": true,
+      "singleUseClaimRequired": true,
+      "secondClaimRejected": true,
+      "expiresOnEvidenceDrift": true
+    },
+    "result": {
+      "contract": "evavo.work-header-publication-rollback-execution-result.v1",
+      "schemaPath": "contracts/work-header-publication-rollback-execution-result-v1.schema.json",
+      "schemaSha256": "2c963f8ba6adb05deb871e62c0803d78c55f68da551127c01b07c82df2480352",
+      "attestTool": "evavo_attest_work_header_publication_rollback_execution_result",
+      "verifyTool": "evavo_verify_work_header_publication_rollback_execution_result",
+      "requiredState": "rollback-executed-verified",
+      "observedExternalRollbackOnly": true,
+      "postRollbackTargetMustExactlyMatchPreviousTarget": true,
+      "postRollbackTargetMustDifferFromCandidate": true,
+      "deterministicCreateOnlyResultRequired": true,
+      "resultIsEvidenceOnly": true
+    }
+  },
+  "globalSafety": {
+    "exactCandidateBytesRequired": true,
+    "fullReceiptLineageRequired": true,
+    "currentTargetRecheckRequiredBeforeClaim": true,
+    "rollbackEvidenceRequiredBeforeForwardExecution": true,
+    "automaticExecutionForbidden": true,
+    "automaticRollbackForbidden": true,
+    "reviewToolDirectMutationForbidden": true,
+    "executionAllowed": false,
+    "rollbackExecutionAllowed": false,
+    "publicationAllowed": false,
+    "cloudOverwriteAllowed": false,
+    "websiteMutationAllowed": false
+  }
+}
