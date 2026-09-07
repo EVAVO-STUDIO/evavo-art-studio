@@ -8,7 +8,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-execution-claim";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.0.1";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-execution-claim.v1";
 const SCHEMA_SHA256 = "0b7ee89628c1e55f057161d41f7cea4e3addcdefc442b51823ed507a1b612116";
@@ -29,21 +29,20 @@ async function assertCurrentSchemaDigest() {
   const current = sha256(bytes);
   if (current !== SCHEMA_SHA256) throw new Error(`Execution-claim schema bytes drifted from governed SHA-256 (${current}).`);
 }
-
 async function bound(filePath) {
   const resolved = await allowed(filePath, false);
   const bytes = await readFile(resolved);
   if (!bytes.length) throw new Error(`Evidence file is empty: ${resolved}`);
   return Object.freeze({ path: resolved, bytes, sha256: sha256(bytes), byteLength: bytes.length });
 }
-
 function assertNoMutationAuthority(value, label) {
-  if (value?.executionAllowed !== false || value?.publicationAllowed !== false || value?.cloudOverwriteAllowed !== false || value?.websiteMutationAllowed !== false) {
-    throw new Error(`${label} carries forbidden direct execution or mutation authority.`);
-  }
+  if (value?.executionAllowed !== false || value?.publicationAllowed !== false || value?.cloudOverwriteAllowed !== false || value?.websiteMutationAllowed !== false) throw new Error(`${label} carries forbidden direct execution or mutation authority.`);
+}
+function deterministicClaimPath(authorizationPath) {
+  return `${authorizationPath}.execution-claim.json`;
 }
 
-async function resolveCandidateFromPlan(plan) {
+async function reverifyCandidate(plan) {
   const preparationFile = await bound(plan.publicationPreparationReceiptPath);
   if (preparationFile.sha256 !== plan.publicationPreparationReceiptSha256 || preparationFile.byteLength !== plan.publicationPreparationReceiptByteLength) throw new Error("Transaction plan is bound to changed publication-preparation bytes.");
   const preparation = JSON.parse(preparationFile.bytes.toString("utf8"));
@@ -61,10 +60,9 @@ async function resolveCandidateFromPlan(plan) {
   if (packetFile.sha256 !== decision.evidenceIdentity?.approvalPacketSha256 || packetFile.byteLength !== decision.evidenceIdentity?.approvalPacketByteLength) throw new Error("Approval-packet bytes changed after transaction planning.");
   const packet = JSON.parse(packetFile.bytes.toString("utf8"));
   if (packet.contract !== "evavo.work-header-approval-packet.v2" || packet.fullReceiptLineageVerified !== true || packet.browserResponseMetadataBound !== true) throw new Error("Approval packet no longer proves full reviewed browser lineage.");
-
   const candidate = await bound(packet.immutablePreviewCandidateArtifactPath);
   if (candidate.sha256 !== plan.candidateSha256 || candidate.byteLength !== plan.candidateByteLength) throw new Error("Exact reviewed candidate bytes changed after transaction planning.");
-  return Object.freeze({ preparationFile, preparation, decisionFile, decision, packetFile, packet, candidate });
+  return Object.freeze({ candidate, preparationFile, decisionFile, packetFile });
 }
 
 async function verifyAuthorizationChain(authorizationReceiptPath, currentTargetRecheckPath) {
@@ -82,21 +80,16 @@ async function verifyAuthorizationChain(authorizationReceiptPath, currentTargetR
   if (plan.explicitExecutionConfirmationRequired !== true || plan.backupCapturedBeforeExecution !== true || plan.rollbackEvidenceVerifiedBeforeExecution !== true) throw new Error("Publication transaction plan lacks execution-confirmation or rollback prerequisites.");
   if (plan.route !== authorization.route || plan.candidateId !== authorization.candidateId || plan.candidateSha256 !== authorization.candidateSha256 || plan.candidateByteLength !== authorization.candidateByteLength || plan.targetKind !== authorization.targetKind || plan.targetIdentifier !== authorization.targetIdentifier) throw new Error("Execution authorization candidate/target identity drifted from transaction plan.");
 
-  const candidateChain = await resolveCandidateFromPlan(plan);
+  const candidateChain = await reverifyCandidate(plan);
   const snapshot = await bound(plan.currentTargetSnapshot?.path);
   if (snapshot.sha256 !== plan.currentTargetSnapshot?.sha256 || snapshot.byteLength !== plan.currentTargetSnapshot?.byteLength || plan.currentTargetSnapshot?.immutableEvidence !== true) throw new Error("Current-target snapshot changed after transaction planning.");
   const backup = await bound(plan.rollbackEvidence?.backupPath);
   if (backup.sha256 !== plan.rollbackEvidence?.backupSha256 || backup.byteLength !== plan.rollbackEvidence?.backupByteLength || plan.rollbackEvidence?.rollbackReady !== true || plan.rollbackEvidence?.restoreTargetIdentifier !== plan.targetIdentifier) throw new Error("Rollback backup changed or is no longer ready.");
   if (backup.path === snapshot.path || backup.sha256 !== snapshot.sha256 || backup.byteLength !== snapshot.byteLength) throw new Error("Rollback backup no longer exactly matches the planned current-target snapshot.");
   if (snapshot.sha256 !== authorization.currentTargetSnapshotSha256 || snapshot.byteLength !== authorization.currentTargetSnapshotByteLength || backup.sha256 !== authorization.rollbackBackupSha256 || backup.byteLength !== authorization.rollbackBackupByteLength) throw new Error("Authorization snapshot/rollback evidence drifted from the transaction plan.");
-
   const recheck = await bound(currentTargetRecheckPath);
-  if (recheck.sha256 !== snapshot.sha256 || recheck.byteLength !== snapshot.byteLength) throw new Error("Current target changed after execution authorization; single-use claim must not be issued.");
+  if (recheck.sha256 !== snapshot.sha256 || recheck.byteLength !== snapshot.byteLength) throw new Error("Current target changed after execution authorization; single-use claim must not be issued or reused.");
   return Object.freeze({ authorizationFile, authorization, planFile, plan, candidateChain, snapshot, backup, recheck });
-}
-
-function deterministicClaimPath(authorizationPath) {
-  return `${authorizationPath}.execution-claim.json`;
 }
 
 async function claim(args) {
@@ -145,14 +138,12 @@ async function claim(args) {
 async function verifyClaim(authorizationReceiptPath, currentTargetRecheckPath) {
   await assertCurrentSchemaDigest();
   const authorizationFile = await bound(authorizationReceiptPath);
-  const claimPath = deterministicClaimPath(authorizationFile.path);
-  const claimFile = await bound(claimPath);
+  const claimFile = await bound(deterministicClaimPath(authorizationFile.path));
   const value = JSON.parse(claimFile.bytes.toString("utf8"));
   if (value.contract !== CONTRACT || value.schemaSha256 !== SCHEMA_SHA256 || value.claimState !== "claimed-unexecuted") throw new Error("Single-use execution claim contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(value, "Single-use execution claim");
   if (value.deterministicClaimPathRequired !== true || value.singleUseClaimEstablished !== true || value.claimInvalidOnAnyEvidenceDrift !== true || value.currentTargetRecheckedAtClaim !== true || value.rollbackBackupReverifiedAtClaim !== true || value.authorizationReverifiedAtClaim !== true) throw new Error("Single-use execution claim lacks required safety invariants.");
   if (value.authorizationReceiptPath !== authorizationFile.path || value.authorizationReceiptSha256 !== authorizationFile.sha256 || value.authorizationReceiptByteLength !== authorizationFile.byteLength) throw new Error("Single-use execution claim is bound to changed authorization bytes.");
-
   const review = await verifyAuthorizationChain(authorizationFile.path, currentTargetRecheckPath);
   if (review.planFile.path !== value.transactionPlanReceiptPath || review.planFile.sha256 !== value.transactionPlanReceiptSha256 || review.planFile.byteLength !== value.transactionPlanReceiptByteLength) throw new Error("Single-use execution claim transaction-plan lineage drifted.");
   if (review.plan.route !== value.route || review.plan.candidateId !== value.candidateId || review.plan.candidateSha256 !== value.candidateSha256 || review.plan.candidateByteLength !== value.candidateByteLength || review.plan.targetKind !== value.targetKind || review.plan.targetIdentifier !== value.targetIdentifier) throw new Error("Single-use execution claim candidate/target identity drifted.");
@@ -165,11 +156,9 @@ const tools = [
   { name: "evavo_claim_work_header_publication_execution", description: "Atomically establish the deterministic one-time claim for an exact execution authorization after freshly reverifying authorization, transaction plan, candidate bytes, current target and rollback backup. A second claim for the same authorization fails because the deterministic claim receipt is create-only.", inputSchema: { type: "object", properties: { authorizationReceiptPath: { type: "string", minLength: 1 }, currentTargetRecheckPath: { type: "string", minLength: 1 }, confirmSingleUseClaim: { type: "boolean" }, confirmLocalWrite: { type: "boolean" } }, required: ["authorizationReceiptPath", "currentTargetRecheckPath", "confirmSingleUseClaim", "confirmLocalWrite"], additionalProperties: false } },
   { name: "evavo_verify_work_header_publication_execution_claim", description: "Read-only reverification of the deterministic single-use execution claim against the exact authorization, transaction plan, candidate bytes, unchanged target and rollback backup. Any evidence drift invalidates the claim.", inputSchema: { type: "object", properties: { authorizationReceiptPath: { type: "string", minLength: 1 }, currentTargetRecheckPath: { type: "string", minLength: 1 } }, required: ["authorizationReceiptPath", "currentTargetRecheckPath"], additionalProperties: false } }
 ];
-
 function capabilities() {
   return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, deterministicClaimPathRequired: true, createOnlySingleUseClaim: true, authorizationReverificationRequired: true, transactionPlanReverificationRequired: true, candidateBytesReverificationRequired: true, currentTargetRecheckRequired: true, rollbackBackupReverificationRequired: true, secondClaimForSameAuthorizationRejected: true, claimInvalidOnAnyEvidenceDrift: true, executionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
 }
-
 async function callTool(name, args) {
   if (name === "evavo_work_header_publication_execution_claim_capabilities") return capabilities();
   if (name === "evavo_claim_work_header_publication_execution") return claim(args ?? {});
@@ -191,6 +180,6 @@ for await (const line of rl) {
     else outgoing = response(message.id, toolResult({ ok: false, message: `Unsupported method ${JSON.stringify(message.method)}.` }, true));
     if (outgoing) process.stdout.write(`${JSON.stringify(outgoing)}\n`);
   } catch (error) {
-    process.stdout.write(`${JSON.stringify(response(null, toolResult({ ok: false, message: error instanceof Error ? error.message : String(error) }, true))}\n`);
+    process.stdout.write(`${JSON.stringify(response(null, toolResult({ ok: false, message: error instanceof Error ? error.message : String(error) }, true)))}\n`);
   }
 }
