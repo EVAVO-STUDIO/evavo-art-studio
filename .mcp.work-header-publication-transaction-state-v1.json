@@ -1,0 +1,19 @@
+{
+  "name": "evavo-work-header-publication-transaction-state-v1",
+  "command": "node",
+  "args": ["tools/work_header_publication_transaction_state_mcp.mjs"],
+  "env": {
+    "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+    "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
+  },
+  "contract": "evavo.work-header-publication-transaction-state.v1",
+  "schema": "contracts/work-header-publication-transaction-state-v1.schema.json",
+  "schemaSha256": "0c88d1977075832287f9acf73500e7211687a594b0b0650f4dcadf367024583c",
+  "authority": {
+    "executionAllowed": false,
+    "rollbackExecutionAllowed": false,
+    "publicationAllowed": false,
+    "cloudOverwriteAllowed": false,
+    "websiteMutationAllowed": false
+  }
+}
