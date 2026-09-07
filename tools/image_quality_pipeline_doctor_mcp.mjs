@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.28.0";
+const SERVER_VERSION = "1.29.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -19,8 +19,8 @@ const CHECKS = Object.freeze([
   { id: "enhancement-session", file: "tools/enhancement_review_session_mcp.mjs", tokens: ["evavo.enhancement-art-review-session.v1_5", "evavo_verify_enhancement_review_session", "proofSha256AndLengthBound: true"] },
   { id: "work-preview-core-v8", file: "packages/media/src/work-header-preview-admission.ts", tokens: ["evavo.work-header-candidate-preview-capture.v8", "browserResponseBodyIdentityVerified", "browserResponseMetadataBound", "exactTriggeredBrowserRequestBindingVerified", "browserResponseBindings", "exactTriggeredRequestsBoundAcrossProfiles", "browserCandidateRequestBindingRequired", "atomicEvidenceBundleVerified: true"] },
   { id: "work-preview-mcp-v180", file: "tools/work_header_preview_admission_mcp.mjs", tokens: ['SERVER_VERSION = "1.8.0"', 'acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v8"', "exactTriggeredBrowserRequestBindingRequired: true", 'exactTriggeredBrowserRequestMethod: "GET"', "browserResponseMetadataShaAndLengthBound: true", "browserResponseMetadataPersistedPerProfile: true", "exactTriggeredBrowserRequestBindingVerified: true", "evavo_verify_work_header_preview_admission"] },
-  { id: "work-page-review-input-safety", file: "packages/media/src/work-header-page-render-review.ts", tokens: ["MAX_SCREENSHOT_BYTES", "MAX_NOTES = 24", "MAX_NOTE_CHARACTERS = 500", "MAX_NOTES_CHARACTERS = 4_000", "pageSlug must be a canonical Work detail route under /work/.", "must be boolean.", "notes exceed the"] },
-  { id: "work-page-review-v210", file: "tools/work_header_page_render_review_mcp.mjs", tokens: ['SERVER_VERSION = "2.1.0"', "exactTriggeredBrowserRequestBindingRequiredFromAdmission: true", "exactTriggeredBrowserRequestBindingPersistedInPageReceipt: true", "exactTriggeredBrowserRequestBindingReverifiedBeforeApprovalPacket: true", "selectionReceiptShaAndLengthBound: true", "candidateReviewReceiptShaAndLengthBound: true", "previewAdmissionReceiptShaAndLengthBound: true", "previewManifestShaAndLengthBound: true", "pageSourceBindingsShaAndLengthReverified: true", "fullReceiptLineageVerifiedBeforeApprovalPacket: true", "approvalPacketReverificationAvailable: true", "approvalPacketCoreRecomputedDuringVerification: true", "staleApprovalPacketLineageRejected: true", "evavo_verify_work_header_approval_packet", "automaticPublicationAllowed: false"] },
+  { id: "work-page-review-input-safety", file: "packages/media/src/work-header-page-render-review.ts", tokens: ["MAX_SCREENSHOT_BYTES", "MAX_NOTES = 24", "MAX_NOTE_CHARACTERS = 500", "MAX_NOTES_CHARACTERS = 4_000", "normalizedReviewInputsPersisted: true", "reviewInputs", "pageSlug must be a canonical Work detail route under /work/.", "must be boolean.", "notes exceed the"] },
+  { id: "work-page-review-v220", file: "tools/work_header_page_render_review_mcp.mjs", tokens: ['SERVER_VERSION = "2.2.0"', "normalizedPageReviewInputsPersisted: true", "pageReviewEvidenceRecomputedDuringVerification: true", "pageReviewProofRecomputedDuringVerification: true", "tamperedPageReviewScoresFlagsOrNotesRejected: true", "Page-render evidence changed after review or no longer recomputes from persisted normalized review inputs.", "Page-render proof no longer recomputes from exact screenshots and normalized review inputs.", "pageReviewEvidenceRecomputedAndMatched: true", "pageReviewProofRecomputedAndMatched: true", "exactTriggeredBrowserRequestBindingRequiredFromAdmission: true", "selectionReceiptShaAndLengthBound: true", "candidateReviewReceiptShaAndLengthBound: true", "previewAdmissionReceiptShaAndLengthBound: true", "previewManifestShaAndLengthBound: true", "pageSourceBindingsShaAndLengthReverified: true", "fullReceiptLineageVerifiedBeforeApprovalPacket: true", "approvalPacketReverificationAvailable: true", "approvalPacketCoreRecomputedDuringVerification: true", "staleApprovalPacketLineageRejected: true", "evavo_verify_work_header_approval_packet", "automaticPublicationAllowed: false"] },
   { id: "work-explicit-approval-decision", file: "tools/work_header_approval_decision_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-approval-decision.v1"', "explicitReviewerDecisionRequired: true", "automaticDecisionAllowed: false", "approvalPacketReverificationRequired: true", "approvedDecisionAllowsPublicationPreparationOnly: true", "publicationAllowed: false", "cloudOverwriteAllowed: false", "websiteMutationAllowed: false"] },
   { id: "work-publication-preparation", file: "tools/work_header_publication_preparation_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-preparation.v1"', "explicitApprovedDecisionRequired: true", "approvalDecisionReverificationRequired: true", "backupRequiredBeforeExecution: true", "rollbackEvidenceRequiredBeforeExecution: true", "executionAllowed: false", "publicationAllowed: false"] },
   { id: "work-publication-transaction-plan", file: "tools/work_header_publication_transaction_plan_mcp.mjs", tokens: ['CONTRACT = "evavo.work-header-publication-transaction-plan.v1"', "explicitExecutionConfirmationRequired: true", "currentTargetSnapshotRequired: true", "separateRollbackBackupRequired: true", "exactRollbackByteMatchRequired: true", "executionAllowed: false", "publicationAllowed: false"] },
@@ -51,7 +51,7 @@ async function inspect() {
   }
   const blockers = checks.filter((check) => !check.ok).map((check) => check.id);
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_28",
+    contract: "evavo.image-quality-pipeline-doctor.v1_29",
     ready: blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
@@ -61,22 +61,26 @@ async function inspect() {
     publicationAllowed: false,
     nextAction: blockers.length
       ? "Repair failing image-quality contract surfaces before trusting publication or rollback evidence."
-      : "Static image-quality evidence now runs from preservation through exact browser review, explicit approval, rollback-safe publication planning, target-aware live current-target checks at authorization and single-use claim, execution evidence, publication postflight and the complete postflight-gated rollback chain. Cloudinary authorization/claim cannot substitute a stale caller-local copy for the live stable-ID target.",
+      : "Static image-quality evidence now runs from preservation through exact browser review, deterministic page-review score/flag/note recomputation, explicit approval, rollback-safe publication planning, target-aware live current-target checks at authorization and single-use claim, execution evidence, publication postflight and the complete postflight-gated rollback chain.",
   });
 }
 
 const tools = Object.freeze([
   { name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only EVAVO image quality pipeline doctor.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, exact reviewed-image lineage, target-aware publication TOCTOU protection, post-publication verification and rollback evidence without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, deterministic reviewed-image evidence, target-aware publication TOCTOU protection, post-publication verification and rollback evidence without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
 ]);
 function capabilities() {
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_28",
+    contract: "evavo.image-quality-pipeline-doctor.v1_29",
     serverVersion: SERVER_VERSION,
     readOnly: true,
     browserResponseBodyLineageChecked: true,
     exactTriggeredBrowserRequestBindingChecked: true,
     fullPageReviewReceiptLineageChecked: true,
+    normalizedPageReviewInputsChecked: true,
+    pageReviewEvidenceRecomputationChecked: true,
+    pageReviewProofRecomputationChecked: true,
+    tamperedPageReviewScoresFlagsOrNotesRejected: true,
     approvalPacketReverificationChecked: true,
     explicitReviewerDecisionBoundaryChecked: true,
     publicationPreparationBoundaryChecked: true,
