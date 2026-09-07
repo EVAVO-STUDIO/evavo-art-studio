@@ -8,6 +8,9 @@
     "contract",
     "schemaSha256",
     "resultState",
+    "publicationPostflightReceiptPath",
+    "publicationPostflightReceiptSha256",
+    "publicationPostflightReceiptByteLength",
     "rollbackReadinessReceiptPath",
     "rollbackReadinessReceiptSha256",
     "rollbackReadinessReceiptByteLength",
@@ -28,6 +31,7 @@
     "postRollbackTargetPath",
     "postRollbackTargetSha256",
     "postRollbackTargetByteLength",
+    "publicationPostflightReverifiedBeforeRollbackAttestation",
     "rollbackReadinessReverifiedBeforeAttestation",
     "rollbackBackupReverified",
     "postRollbackTargetMatchesPreviousTarget",
@@ -39,124 +43,41 @@
     "websiteMutationAllowed"
   ],
   "properties": {
-    "contract": {
-      "const": "evavo.work-header-publication-rollback-result.v1"
-    },
-    "schemaSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "resultState": {
-      "const": "rollback-executed-verified"
-    },
-    "rollbackReadinessReceiptPath": {
-      "type": "string",
-      "minLength": 1
-    },
-    "rollbackReadinessReceiptSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "rollbackReadinessReceiptByteLength": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "executionResultReceiptPath": {
-      "type": "string",
-      "minLength": 1
-    },
-    "executionResultReceiptSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "executionResultReceiptByteLength": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "route": {
-      "type": "string",
-      "pattern": "^/work/[a-z0-9-]+$"
-    },
-    "candidateId": {
-      "type": "string",
-      "minLength": 1
-    },
-    "candidateSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "candidateByteLength": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "targetKind": {
-      "enum": [
-        "website-header-source-update",
-        "cloudinary-stable-id-replacement"
-      ]
-    },
-    "targetIdentifier": {
-      "type": "string",
-      "minLength": 1
-    },
-    "previousPublishedTargetSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "previousPublishedTargetByteLength": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "rollbackBackupPath": {
-      "type": "string",
-      "minLength": 1
-    },
-    "rollbackBackupSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "rollbackBackupByteLength": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "postRollbackTargetPath": {
-      "type": "string",
-      "minLength": 1
-    },
-    "postRollbackTargetSha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "postRollbackTargetByteLength": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "rollbackReadinessReverifiedBeforeAttestation": {
-      "const": true
-    },
-    "rollbackBackupReverified": {
-      "const": true
-    },
-    "postRollbackTargetMatchesPreviousTarget": {
-      "const": true
-    },
-    "postRollbackTargetDiffersFromPublishedCandidate": {
-      "const": true
-    },
-    "rollbackResultIsEvidenceOnly": {
-      "const": true
-    },
-    "rollbackExecutionAllowed": {
-      "const": false
-    },
-    "publicationAllowed": {
-      "const": false
-    },
-    "cloudOverwriteAllowed": {
-      "const": false
-    },
-    "websiteMutationAllowed": {
-      "const": false
-    }
+    "contract": { "const": "evavo.work-header-publication-rollback-result.v1" },
+    "schemaSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "resultState": { "const": "rollback-executed-verified" },
+    "publicationPostflightReceiptPath": { "type": "string", "minLength": 1 },
+    "publicationPostflightReceiptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "publicationPostflightReceiptByteLength": { "type": "integer", "minimum": 1 },
+    "rollbackReadinessReceiptPath": { "type": "string", "minLength": 1 },
+    "rollbackReadinessReceiptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "rollbackReadinessReceiptByteLength": { "type": "integer", "minimum": 1 },
+    "executionResultReceiptPath": { "type": "string", "minLength": 1 },
+    "executionResultReceiptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "executionResultReceiptByteLength": { "type": "integer", "minimum": 1 },
+    "route": { "type": "string", "pattern": "^/work/[a-z0-9-]+$" },
+    "candidateId": { "type": "string", "minLength": 1 },
+    "candidateSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "candidateByteLength": { "type": "integer", "minimum": 1 },
+    "targetKind": { "enum": ["website-header-source-update", "cloudinary-stable-id-replacement"] },
+    "targetIdentifier": { "type": "string", "minLength": 1 },
+    "previousPublishedTargetSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "previousPublishedTargetByteLength": { "type": "integer", "minimum": 1 },
+    "rollbackBackupPath": { "type": "string", "minLength": 1 },
+    "rollbackBackupSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "rollbackBackupByteLength": { "type": "integer", "minimum": 1 },
+    "postRollbackTargetPath": { "type": "string", "minLength": 1 },
+    "postRollbackTargetSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "postRollbackTargetByteLength": { "type": "integer", "minimum": 1 },
+    "publicationPostflightReverifiedBeforeRollbackAttestation": { "const": true },
+    "rollbackReadinessReverifiedBeforeAttestation": { "const": true },
+    "rollbackBackupReverified": { "const": true },
+    "postRollbackTargetMatchesPreviousTarget": { "const": true },
+    "postRollbackTargetDiffersFromPublishedCandidate": { "const": true },
+    "rollbackResultIsEvidenceOnly": { "const": true },
+    "rollbackExecutionAllowed": { "const": false },
+    "publicationAllowed": { "const": false },
+    "cloudOverwriteAllowed": { "const": false },
+    "websiteMutationAllowed": { "const": false }
   }
 }
