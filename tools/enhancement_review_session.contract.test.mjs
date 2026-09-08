@@ -13,9 +13,24 @@ test("enhancement review admits manifest before trusting manifest supplied sourc
   assert.ok(candidateRead > admission, "candidate path is trusted before manifest admission");
 });
 
+test("enhancement review session requires v1_2 durable review integrity and deterministic recomputation", () => {
+  for (const token of [
+    'SERVER_VERSION = "1.8.0"',
+    'REQUIRED_IMAGE_REVIEW_SESSION_CONTRACT = "evavo.image-review-session.v1_2"',
+    'REQUIRED_IMAGE_REVIEW_INTEGRITY_CONTRACT = "evavo.image-review-evidence-integrity.v1"',
+    "reviewEvidenceSha256",
+    "imageReviewEvidenceSha256Required: true",
+    "imageReviewEvidenceCanonicalDigestRequired: true",
+    "imageReviewEvidenceRecomputedDuringEnhancementVerification: true",
+    "imageReviewEvidenceTamperRejected: true",
+    "orchestrateImageReview",
+    "Durable image-review receipt review evidence was modified after review.",
+    "Durable image-review evidence no longer matches deterministic review-engine recomputation.",
+  ]) assert.ok(source.includes(token), `missing durable-review integrity token: ${token}`);
+});
+
 test("enhancement review session pins schema geometry proofs and unapproved authority", () => {
   for (const token of [
-    'SERVER_VERSION = "1.7.0"',
     'contract: "evavo.enhancement-art-review-session.v1_5"',
     "manifestAdmissionBeforeManifestPathReads: true",
     "exactManifestSchemaDigestRequired: true",
@@ -23,6 +38,8 @@ test("enhancement review session pins schema geometry proofs and unapproved auth
     "manifestGeometryPreservationRequired: true",
     "manifestAdmissionVerified: true",
     "manifestGeometryPreservationVerified: true",
+    "imageReviewEvidenceIntegrityVerified: true",
+    "imageReviewEvidenceRecomputedAndMatched: true",
     "proofBindings",
     "proofSha256AndLengthBound: true",
     "enhancementReviewSessionReverificationAvailable: true",
@@ -33,12 +50,13 @@ test("enhancement review session pins schema geometry proofs and unapproved auth
   ]) assert.ok(source.includes(token), `missing hardened enhancement-session token: ${token}`);
 });
 
-test("enhancement session verifier rejects stale lineage and proof bytes", () => {
+test("enhancement session verifier rejects stale lineage proof bytes and review evidence", () => {
   for (const token of [
     "evavo_verify_enhancement_review_session",
     "verifyEnhancementReviewSession",
     "Enhancement manifest bytes changed after review session creation.",
     "Durable image-review session binding changed after enhancement review.",
+    "Durable image-review evidence integrity changed after enhancement review.",
     "proof bytes changed after enhancement review.",
     "staleManifestSourceCandidateOrProofEvidenceRejected: true",
   ]) assert.ok(source.includes(token), `missing enhancement-session verification token: ${token}`);
