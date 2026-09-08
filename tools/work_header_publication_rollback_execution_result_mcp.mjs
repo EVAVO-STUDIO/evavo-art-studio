@@ -8,7 +8,7 @@ import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-rollback-execution-result";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-rollback-execution-result.v1";
 const SCHEMA_SHA256 = "2c963f8ba6adb05deb871e62c0803d78c55f68da551127c01b07c82df2480352";
@@ -16,9 +16,13 @@ const SCHEMA_URL = new URL("../contracts/work-header-publication-rollback-execut
 const CLAIM_CONTRACT = "evavo.work-header-publication-rollback-execution-claim.v1";
 const CLAIM_SCHEMA_SHA256 = "2abc5c031803e2d29c40fe80dcc118ca4ee984e3f0a9a1fe7da17455acbf4e78";
 const AUTHORIZATION_CONTRACT = "evavo.work-header-publication-rollback-authorization.v1";
-const AUTHORIZATION_SCHEMA_SHA256 = "3f23166dc2901ba09f222682b2d6e2be4ab84e4d0ad4d469ae9c041e3bac211b";
+const AUTHORIZATION_SCHEMA_SHA256 = "751c202db89dc1438a822eccf45365071d96be0eabe6680d372103d0f7b6c6e9";
 const READINESS_CONTRACT = "evavo.work-header-publication-rollback-readiness.v1";
 const READINESS_SCHEMA_SHA256 = "cc56d28b46f98cea1f97b46aa9988522c6b97424ee853a7c6c968a45ffd77f6d";
+const RECOVERABILITY_CONTRACT = "evavo.work-header-publication-recoverability.v1";
+const RECOVERABILITY_SCHEMA_SHA256 = "c2fceba4d6d9bfa7ed4d1ec252c74d133a30b5e7f4a33847cc8fd354c275ae15";
+const TRANSACTION_STATE_CONTRACT = "evavo.work-header-publication-transaction-state.v1";
+const TRANSACTION_STATE_SCHEMA_SHA256 = "0c88d1977075832287f9acf73500e7211687a594b0b0650f4dcadf367024583c";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
 const allowed = (p, output = false) => assertAllowedLocalPath(p, { envName: ROOTS_ENV, output, label: "work header publication rollback execution result" });
@@ -41,6 +45,26 @@ function assertNoMutationAuthority(value, label) {
 }
 function deterministicResultPath(claimPath) { return `${claimPath}.rollback-result.json`; }
 
+async function reverifyRecoverabilityFromAuthorization(authorization, readiness, backup) {
+  const recoverabilityFile = await bound(authorization.recoverabilityReceiptPath);
+  if (recoverabilityFile.sha256 !== authorization.recoverabilityReceiptSha256 || recoverabilityFile.byteLength !== authorization.recoverabilityReceiptByteLength) throw new Error("Rollback authorization recoverability evidence changed after authorization.");
+  const recoverability = JSON.parse(recoverabilityFile.bytes.toString("utf8"));
+  if (recoverability.contract !== RECOVERABILITY_CONTRACT || recoverability.schemaSha256 !== RECOVERABILITY_SCHEMA_SHA256 || recoverability.recoverabilityState !== "published-rollback-recovery-ready") throw new Error("Publication recoverability contract/schema/state is invalid or stale.");
+  assertNoMutationAuthority(recoverability, "Publication recoverability");
+  for (const field of ["transactionStateReverified", "sourcePostflightBindingReverified", "liveTargetReverified", "liveTargetMatchesCandidate", "rollbackBackupReverified", "rollbackBackupDiffersFromCandidate", "targetAwareLiveRecheckRequired", "recoverabilityEvidenceOnly"]) if (recoverability[field] !== true) throw new Error(`Publication recoverability lacks required invariant ${field}.`);
+  for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) if (recoverability[field] !== readiness[field]) throw new Error(`Publication recoverability identity drifted from readiness for ${field}.`);
+  if (recoverability.rollbackBackupPath !== backup.path || recoverability.rollbackBackupSha256 !== backup.sha256 || recoverability.rollbackBackupByteLength !== backup.byteLength) throw new Error("Publication recoverability rollback-backup binding drifted.");
+  if (recoverability.rollbackBackupSha256 === readiness.candidateSha256 && recoverability.rollbackBackupByteLength === readiness.candidateByteLength) throw new Error("Publication recoverability backup is not distinct from the candidate.");
+
+  const transactionFile = await bound(recoverability.transactionStateReceiptPath);
+  if (transactionFile.sha256 !== recoverability.transactionStateReceiptSha256 || transactionFile.byteLength !== recoverability.transactionStateReceiptByteLength) throw new Error("Publication recoverability transaction-state evidence changed.");
+  const transaction = JSON.parse(transactionFile.bytes.toString("utf8"));
+  if (transaction.contract !== TRANSACTION_STATE_CONTRACT || transaction.schemaSha256 !== TRANSACTION_STATE_SCHEMA_SHA256 || transaction.transactionState !== "published-verified-rollback-ready" || transaction.terminal !== false || transaction.rollbackReadyWhenPublished !== true) throw new Error("Publication recoverability transaction-state contract/schema/state is invalid or stale.");
+  for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) if (transaction[field] !== readiness[field]) throw new Error(`Recoverability transaction-state identity drifted for ${field}.`);
+  if (transaction.rollbackBackupPath !== backup.path || transaction.rollbackBackupSha256 !== backup.sha256 || transaction.rollbackBackupByteLength !== backup.byteLength) throw new Error("Recoverability transaction-state backup binding drifted.");
+  return Object.freeze({ recoverabilityFile, recoverability, transactionFile, transaction });
+}
+
 async function reverifyClaimLineage(claimReceiptPath) {
   const claimFile = await bound(claimReceiptPath);
   const claim = JSON.parse(claimFile.bytes.toString("utf8"));
@@ -53,8 +77,9 @@ async function reverifyClaimLineage(claimReceiptPath) {
   const authorization = JSON.parse(authorizationFile.bytes.toString("utf8"));
   if (authorization.contract !== AUTHORIZATION_CONTRACT || authorization.schemaSha256 !== AUTHORIZATION_SCHEMA_SHA256 || authorization.authorizationState !== "rollback-authorized-unexecuted") throw new Error("Rollback authorization contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(authorization, "Rollback authorization");
-  for (const field of ["explicitRollbackConfirmation", "rollbackReadinessReverified", "publicationPostflightReverified", "postflightLiveTargetMatchedCandidateAtVerification", "postflightRollbackBackupStillReady", "rollbackAuthorizedForOneTransactionOnly", "authorizationExpiresOnAnyEvidenceDrift"]) if (authorization[field] !== true) throw new Error(`Rollback authorization lacks required postflight-gated invariant ${field}.`);
+  for (const field of ["explicitRollbackConfirmation", "rollbackReadinessReverified", "publicationPostflightReverified", "recoverabilityReverified", "recoverabilityLiveTargetMatchedCandidateAtVerification", "recoverabilityRollbackBackupStillReady", "postflightLiveTargetMatchedCandidateAtVerification", "postflightRollbackBackupStillReady", "rollbackAuthorizedForOneTransactionOnly", "authorizationExpiresOnAnyEvidenceDrift"]) if (authorization[field] !== true) throw new Error(`Rollback authorization lacks required recoverability/postflight-gated invariant ${field}.`);
   if (typeof authorization.publicationPostflightReceiptPath !== "string" || !/^[0-9a-f]{64}$/u.test(String(authorization.publicationPostflightReceiptSha256 ?? "")) || !Number.isInteger(authorization.publicationPostflightReceiptByteLength) || authorization.publicationPostflightReceiptByteLength < 1) throw new Error("Rollback authorization is missing durable publication-postflight lineage.");
+  if (typeof authorization.recoverabilityReceiptPath !== "string" || !/^[0-9a-f]{64}$/u.test(String(authorization.recoverabilityReceiptSha256 ?? "")) || !Number.isInteger(authorization.recoverabilityReceiptByteLength) || authorization.recoverabilityReceiptByteLength < 1) throw new Error("Rollback authorization is missing durable publication-recoverability lineage.");
 
   const readinessFile = await bound(claim.rollbackReadinessReceiptPath);
   if (readinessFile.sha256 !== claim.rollbackReadinessReceiptSha256 || readinessFile.byteLength !== claim.rollbackReadinessReceiptByteLength || readinessFile.path !== authorization.rollbackReadinessReceiptPath || readinessFile.sha256 !== authorization.rollbackReadinessReceiptSha256 || readinessFile.byteLength !== authorization.rollbackReadinessReceiptByteLength) throw new Error("Rollback claim readiness lineage changed after claim creation.");
@@ -66,7 +91,8 @@ async function reverifyClaimLineage(claimReceiptPath) {
   for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) if (claim[field] !== authorization[field] || claim[field] !== readiness[field]) throw new Error(`Rollback execution identity drifted for ${field}.`);
   const backup = await bound(claim.rollbackBackupPath);
   if (backup.sha256 !== claim.rollbackBackupSha256 || backup.byteLength !== claim.rollbackBackupByteLength || backup.path !== readiness.rollbackBackupPath || backup.sha256 !== readiness.rollbackBackupSha256 || backup.byteLength !== readiness.rollbackBackupByteLength || backup.sha256 !== claim.previousTargetSnapshotSha256 || backup.byteLength !== claim.previousTargetSnapshotByteLength || backup.sha256 !== readiness.previousTargetSnapshotSha256 || backup.byteLength !== readiness.previousTargetSnapshotByteLength) throw new Error("Rollback backup no longer exactly matches the previous-target snapshot bytes.");
-  return Object.freeze({ claimFile, claim, authorizationFile, authorization, readinessFile, readiness, backup });
+  const recoverability = await reverifyRecoverabilityFromAuthorization(authorization, readiness, backup);
+  return Object.freeze({ claimFile, claim, authorizationFile, authorization, readinessFile, readiness, backup, recoverability });
 }
 
 async function attest(args) {
@@ -99,7 +125,7 @@ async function attest(args) {
   };
   const payload = `${JSON.stringify(receipt, null, 2)}\n`;
   await writeCreateOnlyBundle([{ path: resultPath, data: payload, encoding: "utf8" }]);
-  return Object.freeze({ ok: true, resultPath, resultSha256: sha256(Buffer.from(payload, "utf8")), resultState: receipt.resultState, route: receipt.route, candidateId: receipt.candidateId, publicationPostflightGateInheritedFromAuthorization: true, postRollbackTargetMatchesPreviousTarget: true, postRollbackTargetDiffersFromCandidate: true, resultIsEvidenceOnly: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, resultPath, resultSha256: sha256(Buffer.from(payload, "utf8")), resultState: receipt.resultState, route: receipt.route, candidateId: receipt.candidateId, publicationPostflightGateInheritedFromAuthorization: true, recoverabilityGateInheritedFromAuthorization: true, postRollbackTargetMatchesPreviousTarget: true, postRollbackTargetDiffersFromCandidate: true, resultIsEvidenceOnly: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
 async function verifyResult(claimReceiptPath) {
@@ -119,15 +145,15 @@ async function verifyResult(claimReceiptPath) {
   const postTarget = await bound(value.postRollbackTargetPath);
   if (postTarget.path !== review.claim.publishedTargetPath || postTarget.sha256 !== value.postRollbackTargetSha256 || postTarget.byteLength !== value.postRollbackTargetByteLength || postTarget.sha256 !== review.backup.sha256 || postTarget.byteLength !== review.backup.byteLength) throw new Error("Current post-rollback target no longer exactly matches the previous-target backup bytes.");
   if (postTarget.sha256 === review.claim.candidateSha256 && postTarget.byteLength === review.claim.candidateByteLength) throw new Error("Current post-rollback target unexpectedly matches the rolled-back candidate.");
-  return Object.freeze({ ok: true, resultPath: resultFile.path, resultSha256: resultFile.sha256, resultByteLength: resultFile.byteLength, publicationPostflightGateInheritedFromAuthorization: true, postRollbackTargetMatchesPreviousTarget: true, postRollbackTargetDiffersFromCandidate: true, resultIsEvidenceOnly: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, resultPath: resultFile.path, resultSha256: resultFile.sha256, resultByteLength: resultFile.byteLength, publicationPostflightGateInheritedFromAuthorization: true, recoverabilityGateInheritedFromAuthorization: true, postRollbackTargetMatchesPreviousTarget: true, postRollbackTargetDiffersFromCandidate: true, resultIsEvidenceOnly: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
 const tools = [
-  { name: "evavo_work_header_publication_rollback_execution_result_capabilities", description: "Describe evidence-only rollback attestation after a postflight-gated single-use rollback authorization and claim. This tool never performs rollback.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_attest_work_header_publication_rollback_execution_result", description: "After an external rollback, reverify the postflight-gated rollback claim/authorization/readiness/backup and prove the target now exactly equals the previous target. Creates deterministic evidence only.", inputSchema: { type: "object", properties: { claimReceiptPath: { type: "string", minLength: 1 }, postRollbackTargetPath: { type: "string", minLength: 1 }, confirmObservedExternalRollback: { type: "boolean" }, confirmLocalWrite: { type: "boolean" } }, required: ["claimReceiptPath", "postRollbackTargetPath", "confirmObservedExternalRollback", "confirmLocalWrite"], additionalProperties: false } },
-  { name: "evavo_verify_work_header_publication_rollback_execution_result", description: "Read-only reverification of the rollback execution-result against the exact postflight-gated claim, authorization, readiness, previous-target backup and current rolled-back target bytes.", inputSchema: { type: "object", properties: { claimReceiptPath: { type: "string", minLength: 1 } }, required: ["claimReceiptPath"], additionalProperties: false } },
+  { name: "evavo_work_header_publication_rollback_execution_result_capabilities", description: "Describe evidence-only rollback attestation after a recoverability-gated single-use rollback authorization and claim. This tool never performs rollback.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_attest_work_header_publication_rollback_execution_result", description: "After an external rollback, reverify the recoverability-gated rollback claim/authorization/readiness/backup and prove the target now exactly equals the previous target. Creates deterministic evidence only.", inputSchema: { type: "object", properties: { claimReceiptPath: { type: "string", minLength: 1 }, postRollbackTargetPath: { type: "string", minLength: 1 }, confirmObservedExternalRollback: { type: "boolean" }, confirmLocalWrite: { type: "boolean" } }, required: ["claimReceiptPath", "postRollbackTargetPath", "confirmObservedExternalRollback", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_work_header_publication_rollback_execution_result", description: "Read-only reverification of the rollback execution-result against the exact recoverability-gated claim, authorization, readiness, previous-target backup and current rolled-back target bytes.", inputSchema: { type: "object", properties: { claimReceiptPath: { type: "string", minLength: 1 } }, required: ["claimReceiptPath"], additionalProperties: false } },
 ];
-function capabilities() { return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, observedExternalRollbackOnly: true, publicationPostflightGateInheritedFromAuthorization: true, deterministicCreateOnlyResultPath: true, claimReverificationRequired: true, authorizationReverificationRequired: true, rollbackReadinessReverificationRequired: true, rollbackBackupReverificationRequired: true, postRollbackTargetMustExactlyMatchPreviousTarget: true, postRollbackTargetMustDifferFromCandidate: true, resultIsEvidenceOnly: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() }); }
+function capabilities() { return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, observedExternalRollbackOnly: true, publicationPostflightGateInheritedFromAuthorization: true, recoverabilityGateInheritedFromAuthorization: true, recoverabilityReceiptReverificationRequiredBeforeAttestation: true, deterministicCreateOnlyResultPath: true, claimReverificationRequired: true, authorizationReverificationRequired: true, rollbackReadinessReverificationRequired: true, rollbackBackupReverificationRequired: true, postRollbackTargetMustExactlyMatchPreviousTarget: true, postRollbackTargetMustDifferFromCandidate: true, resultIsEvidenceOnly: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() }); }
 async function callTool(name, args) {
   if (name === "evavo_work_header_publication_rollback_execution_result_capabilities") return capabilities();
   if (name === "evavo_attest_work_header_publication_rollback_execution_result") return attest(args ?? {});
