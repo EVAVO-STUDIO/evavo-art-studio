@@ -3,411 +3,181 @@
   "contractVersion": "evavo_repository_capabilities_v1",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "authority": "art-studio",
-  "summary": "EVAVO's governed art-production, source-review, mastering, pixel-font, delivery, provider-routing and runtime-validation authority. Art Studio can prepare and validate bounded creative assets, but Git mutation and mainline publication remain delegated to EVAVO GitHub MCP and Development Studio.",
+  "summary": "EVAVO's governed art and animation production, source-review, mastering, pixel-font, delivery, provider-routing and runtime-validation authority. Art Studio can prepare, produce, review and package bounded creative assets and animation evidence, while automatic creative approval, target-repository mutation, Git publication and downstream runtime admission remain separate authorities.",
   "capabilities": [
     {
       "id": "art.source.review",
       "title": "Inventory and visually review immutable source art",
       "description": "Inventory RAW_ART, build bounded visual catalogues and prepare reviewed source-safe work sessions without modifying owner-supplied originals.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "mcp"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm raw-art:folder:scan",
-        "pnpm raw-art:folder:plan",
-        "pnpm raw-art:visual:build",
-        "pnpm raw-art:visual:verify",
-        "pnpm raw-art:folder:mcp",
-        "pnpm raw-art:visual:mcp"
-      ],
-      "tags": [
-        "raw-art",
-        "inventory",
-        "visual-review",
-        "source-preservation"
-      ],
-      "requires": [
-        "Readable immutable RAW_ART source",
-        "Writable bounded evidence directory",
-        "Human or governed-agent visual decisions before promotion"
-      ]
+      "interfaces": ["automation", "cli", "mcp"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm raw-art:folder:scan", "pnpm raw-art:folder:plan", "pnpm raw-art:visual:build", "pnpm raw-art:visual:verify", "pnpm raw-art:folder:mcp", "pnpm raw-art:visual:mcp"],
+      "tags": ["raw-art", "inventory", "visual-review", "source-preservation"],
+      "requires": ["Readable immutable RAW_ART source", "Writable bounded evidence directory", "Human or governed-agent visual decisions before promotion"]
     },
     {
       "id": "art.project.workspace",
       "title": "Create governed Project Art workspaces",
       "description": "Compile and execute path-bounded intake plans, retain immutable originals and working copies, and expose persistent Project Art workspace tools without transferring media bytes through MCP.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "mcp"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm project-art:intake:compile",
-        "pnpm project-art:intake:run",
-        "pnpm project-art:workspace:persistent",
-        "pnpm project-art:workspace:mcp",
-        "pnpm project-art:intake:check"
-      ],
-      "tags": [
-        "project-art",
-        "workspace",
-        "intake",
-        "provenance"
-      ],
-      "requires": [
-        "Allowed source roots",
-        "Create-only output root",
-        "Hash-stable source files"
-      ]
+      "interfaces": ["automation", "cli", "mcp"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm project-art:intake:compile", "pnpm project-art:intake:run", "pnpm project-art:workspace:persistent", "pnpm project-art:workspace:mcp", "pnpm project-art:intake:check"],
+      "tags": ["project-art", "workspace", "intake", "provenance"],
+      "requires": ["Allowed source roots", "Create-only output root", "Hash-stable source files"]
     },
     {
       "id": "art.project.mastering",
-      "title": "Master frames, motion and deterministic atlases",
-      "description": "Validate alpha and frame assurance, build deterministic sprite atlases and engine metadata, and review motion and loop closure while preserving source evidence.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "testing"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm project-art:atlas:compile",
-        "pnpm project-art:atlas:run",
-        "pnpm project-art:mastering:check",
-        "pnpm project-art:loop:check",
-        "pnpm project-art:avatar-assurance:check"
-      ],
-      "tags": [
-        "mastering",
-        "sprites",
-        "alpha",
-        "motion",
-        "atlases"
-      ],
-      "requires": [
-        "Admitted source frames",
-        "Bounded output root",
-        "Reviewed alpha and motion evidence"
-      ]
+      "title": "Master frames, motion, avatar animation and deterministic atlases",
+      "description": "Validate alpha and frame assurance, perform granular image finishing, compile avatar-animation suites, review loops/continuity, build deterministic sprite atlases and engine metadata, and retain source evidence.",
+      "interfaces": ["automation", "cli", "mcp", "testing"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm project-art:atlas:compile", "pnpm project-art:atlas:run", "pnpm project-art:mastering:check", "pnpm project-art:granular-edits:check", "pnpm project-art:loop:check", "pnpm project-art:avatar-assurance:check", "pnpm project-art:avatar-animation:compile", "pnpm project-art:avatar-animation:mcp", "pnpm project-art:avatar-animation:check", "pnpm game-art:campaign:compile", "pnpm game-art:campaign:batch", "pnpm game-art:campaign:mcp"],
+      "tags": ["mastering", "sprites", "alpha", "motion", "avatar-animation", "atlases", "game-art-campaign"],
+      "requires": ["Admitted source frames", "Bounded output root", "Reviewed alpha, identity and motion evidence"]
     },
     {
       "id": "art.project.review",
       "title": "Build and finalise bounded art review evidence",
       "description": "Compile, build and finalise review packages with deterministic evidence and a read-oriented MCP surface; review completion does not itself approve or publish runtime assets.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "mcp"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm project-art:review:compile",
-        "pnpm project-art:review:build",
-        "pnpm project-art:review:finalize",
-        "pnpm project-art:review:mcp",
-        "pnpm project-art:review:check"
-      ],
-      "tags": [
-        "review",
-        "evidence",
-        "approval-boundary",
-        "project-art"
-      ],
-      "requires": [
-        "Compiled Project Art evidence",
-        "Explicit review decision for any later promotion"
-      ]
+      "interfaces": ["automation", "cli", "mcp"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm project-art:review:compile", "pnpm project-art:review:build", "pnpm project-art:review:finalize", "pnpm project-art:review:mcp", "pnpm project-art:review:check"],
+      "tags": ["review", "evidence", "approval-boundary", "project-art"],
+      "requires": ["Compiled Project Art evidence", "Explicit review decision for any later promotion"]
+    },
+    {
+      "id": "art.animation.pipeline",
+      "title": "Plan and govern canonical multi-studio animation production",
+      "description": "Compile camera-aware animation production profiles, determine dependency-safe drawing batches, run producer technical review, route independent Cel Animation Studio review, compile accepted runtime timing and coordinate target-specific next actions through the animation pipeline control plane v1.1.",
+      "interfaces": ["automation", "mcp", "library", "testing"],
+      "effects": ["read", "compute", "execute"],
+      "entrypoints": ["node tools/animation_pipeline_control_plane_v1_1_mcp.mjs", ".mcp.animation-pipeline-v1.json", "node tools/animation_production_profile_canonical_v1_mcp.mjs", ".mcp.animation-production-canonical-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
+      "tags": ["animation", "cel", "production-profile", "timing", "camera", "review", "godot", "video"],
+      "requires": ["Approved camera/identity/style/performance direction", "Exact profile content identity", "Independent Cel Animation Studio review before acceptance", "Separate named creative approval before canonical delivery"],
+      "authority": {"providerExecution": false, "automaticCreativeApproval": false, "artifactPromotion": false, "targetRepositoryMutation": false, "runtimeActivation": false, "publication": false}
+    },
+    {
+      "id": "art.animation.frame-ledger",
+      "title": "Track exact frame production with an event-sourced work ledger",
+      "description": "Create and verify animation frame ledgers bound to one approved profile, compile dependency-safe frame work orders, bind candidate receipts, atomically apply same-revision candidate batches and retain targeted-repair/independent-review evidence without treating generated images as accepted frames.",
+      "interfaces": ["automation", "mcp", "library", "testing"],
+      "effects": ["read", "compute", "execute"],
+      "entrypoints": ["node tools/animation_frame_work_ledger_v1_mcp.mjs", ".mcp.animation-frame-ledger-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
+      "tags": ["animation", "frames", "ledger", "work-orders", "candidate-receipts", "repair", "cel-review"],
+      "requires": ["Exact approved production-profile digest", "Latest ledger revision", "Complete same-revision receipt batches", "Content-digested identity/direction/dependency references", "Independent review before frame acceptance"],
+      "authority": {"providerExecution": false, "automaticCreativeApproval": false, "artifactPromotion": false, "targetRepositoryMutation": false, "runtimeActivation": false, "publication": false}
+    },
+    {
+      "id": "art.animation.delivery",
+      "title": "Compile canonical path-free Godot, Cel and Video animation delivery",
+      "description": "Compile and verify accepted animation sequence delivery from an approved profile, canonical accepted review, exact PNG bindings and separate named creative approval; preserve integer exposure timing and prepare target-specific intake without resolving media paths or activating runtimes.",
+      "interfaces": ["automation", "mcp", "library", "testing"],
+      "effects": ["read", "compute", "execute"],
+      "entrypoints": ["node tools/animation_sequence_delivery_canonical_v1_mcp.mjs", ".mcp.animation-production-canonical-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
+      "tags": ["animation", "delivery", "godot", "cel", "video", "timing", "artifact-lineage"],
+      "requires": ["Approved production profile", "Canonical accepted review", "Exact artifact hashes", "Separate named creative approval", "Downstream target-specific intake/runtime acceptance"],
+      "authority": {"mediaResolution": false, "transcoding": false, "interpolation": false, "runtimeActivation": false, "targetRepositoryMutation": false, "publication": false}
+    },
+    {
+      "id": "art.animation.character-family-preflight",
+      "title": "Preflight character-family animation campaign adapters and ownership",
+      "description": "Verify character-family campaign adapter coverage, task ownership, implementation SHA-256, repository-root containment, non-shell command safety, executable availability, environment requirements and credential-free manifests without executing any adapter.",
+      "interfaces": ["automation", "cli", "mcp", "testing"],
+      "effects": ["read", "compute", "execute"],
+      "entrypoints": ["node tools/animation_character_family_campaign_preflight_v1.mjs describe", "node tools/animation_character_family_campaign_preflight_v1.mjs inspect", "node tools/animation_character_family_campaign_preflight_v1.mjs verify", ".mcp.animation-character-family-campaign-preflight-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
+      "tags": ["animation", "character-family", "campaign", "preflight", "adapters", "supply-chain", "ownership"],
+      "requires": ["Exact family-plan digest", "Declared Art/Cel repository roots", "Digest-bound adapter entrypoints", "No credential-bearing manifest fields"],
+      "authority": {"providerExecution": false, "localExecution": false, "automaticCreativeApproval": false, "artifactPromotion": false, "repositoryMutation": false, "runtimeActivation": false, "publication": false}
+    },
+    {
+      "id": "art.animation.execution-supervisor",
+      "title": "Supervise explicitly enabled bounded animation execution",
+      "description": "Serve the animation execution supervisor with bounded local workspace/artifact roots, resolved Art/Cel repository identities and remote ComfyUI disabled by default. Execution and creative-approval writes are separate explicit opt-ins; publication and downstream runtime admission remain outside this authority.",
+      "interfaces": ["automation", "mcp"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["node scripts/start-animation-execution-supervisor-mcp-v1.mjs", "node scripts/start-animation-execution-supervisor-mcp-v1.mjs --enable-execution", ".mcp.animation-execution-supervisor-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
+      "tags": ["animation", "execution", "supervisor", "comfyui", "workspace", "gated-effects"],
+      "requires": ["Explicit --enable-execution for animation execution", "Independent --enable-approval-write only when authorised", "Bounded local workspace/artifact roots", "Sibling Art/Cel repository identity", "No implicit publication or target-runtime authority"]
     },
     {
       "id": "art.pixel-font.build",
       "title": "Build original deterministic pixel-font families",
       "description": "Author, audit, build, compare and validate independent EVAVO pixel-font masters and deterministic BMFont, PNG, BDF, JSON, grid and convenience derivative outputs.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "mcp",
-        "testing"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm pixel-font:v2:catalog",
-        "pnpm pixel-font:v2:audit",
-        "pnpm pixel-font:v2:build",
-        "pnpm pixel-font:v2:validate",
-        "pnpm pixel-font:v2:compare",
-        "pnpm pixel-font:v2:mcp",
-        "pnpm pixel-font:v2:check"
-      ],
-      "tags": [
-        "pixel-font",
-        "typography",
-        "godot",
-        "deterministic-build"
-      ],
-      "requires": [
-        "Python image toolchain",
-        "Authored family and face masters",
-        "Create-only output boundary"
-      ]
+      "interfaces": ["automation", "cli", "mcp", "testing"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm pixel-font:v2:catalog", "pnpm pixel-font:v2:audit", "pnpm pixel-font:v2:build", "pnpm pixel-font:v2:validate", "pnpm pixel-font:v2:compare", "pnpm pixel-font:v2:mcp", "pnpm pixel-font:v2:check"],
+      "tags": ["pixel-font", "typography", "godot", "deterministic-build"],
+      "requires": ["Python image toolchain", "Authored family and face masters", "Create-only output boundary"]
     },
     {
       "id": "art.delivery.optimize",
       "title": "Prepare web, image, audio and Godot delivery assets",
       "description": "Run governed web-asset processing, delivery optimisation, audio delivery and Godot sprite-effect tooling with exact source and output evidence.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "mcp",
-        "testing"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm web-asset:pipeline",
-        "pnpm web-asset:mcp",
-        "pnpm web-asset:check",
-        "pnpm optimize",
-        "pnpm audio:optimize",
-        "pnpm sprite-effects",
-        "pnpm media:check"
-      ],
-      "tags": [
-        "delivery",
-        "web-assets",
-        "image",
-        "audio",
-        "godot"
-      ],
-      "requires": [
-        "Admitted source media",
-        "Declared output profile",
-        "Writable bounded delivery directory"
-      ]
+      "interfaces": ["automation", "cli", "mcp", "testing"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm web-asset:pipeline", "pnpm web-asset:mcp", "pnpm web-asset:check", "pnpm optimize", "pnpm audio:optimize", "pnpm sprite-effects", "pnpm media:check"],
+      "tags": ["delivery", "web-assets", "image", "audio", "godot"],
+      "requires": ["Admitted source media", "Declared output profile", "Writable bounded delivery directory"]
     },
     {
       "id": "art.provider.plan",
       "title": "Plan and admit governed provider work",
       "description": "Compile provider runtime profiles, production queues, style profiles, workspace jobs, selection and admission evidence without treating planning or admission as provider execution or publication.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "testing"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm provider:runtime-profile:check",
-        "pnpm raw-art:queue",
-        "pnpm raw-art:style",
-        "pnpm raw-art:workspace-job",
-        "pnpm raw-art:provider-runtime",
-        "pnpm raw-art:provider-select",
-        "pnpm raw-art:provider-admit",
-        "pnpm raw-art:provider-review"
-      ],
-      "tags": [
-        "providers",
-        "planning",
-        "admission",
-        "production-queue"
-      ],
-      "requires": [
-        "Reviewed source and style evidence",
-        "Versioned provider capability profile",
-        "Separate execution authorization for live work"
-      ]
+      "interfaces": ["automation", "cli", "testing"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm provider:runtime-profile:check", "pnpm raw-art:queue", "pnpm raw-art:style", "pnpm raw-art:workspace-job", "pnpm raw-art:provider-runtime", "pnpm raw-art:provider-select", "pnpm raw-art:provider-admit", "pnpm raw-art:provider-review"],
+      "tags": ["providers", "planning", "admission", "production-queue"],
+      "requires": ["Reviewed source and style evidence", "Versioned provider capability profile", "Separate execution authorization for live work"]
     },
     {
       "id": "art.provider.execute",
       "title": "Execute explicitly authorised provider jobs",
       "description": "Run bounded provider workers only after exact plan, environment and per-call execution gates; provider receipts prove local or provider work only and confer no Git or mainline publication authority.",
-      "interfaces": [
-        "automation",
-        "cli"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "network",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm raw-art:provider-authorize",
-        "pnpm raw-art:provider-execute",
-        "pnpm worker:once",
-        "pnpm worker:until-idle"
-      ],
-      "tags": [
-        "providers",
-        "worker",
-        "execution",
-        "receipts"
-      ],
-      "requires": [
-        "Explicit provider execution gate",
-        "Exact authorised plan and expected source hashes",
-        "Per-call execution confirmation",
-        "Credential-scoped provider runtime"
-      ]
+      "interfaces": ["automation", "cli"],
+      "effects": ["read", "compute", "network", "write", "execute"],
+      "entrypoints": ["pnpm raw-art:provider-authorize", "pnpm raw-art:provider-execute", "pnpm worker:once", "pnpm worker:until-idle"],
+      "tags": ["providers", "worker", "execution", "receipts"],
+      "requires": ["Explicit provider execution gate", "Exact authorised plan and expected source hashes", "Per-call execution confirmation", "Credential-scoped provider runtime"]
     },
     {
       "id": "art.mcp.review",
       "title": "Serve bounded read-oriented Art Studio MCP review tools",
       "description": "Build and serve the review MCP profile for bounded inspection, planning and evidence access without granting general workspace, provider or publication mutation.",
-      "interfaces": [
-        "mcp"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm mcp:review:build",
-        "pnpm mcp:review:start",
-        "pnpm dev:mcp:review"
-      ],
-      "tags": [
-        "mcp",
-        "review",
-        "read-oriented",
-        "planning"
-      ],
-      "requires": [
-        "Review MCP profile",
-        "Repository-owned allowlists"
-      ]
+      "interfaces": ["mcp"],
+      "effects": ["read", "compute", "execute"],
+      "entrypoints": ["pnpm mcp:review:build", "pnpm mcp:review:start", "pnpm dev:mcp:review"],
+      "tags": ["mcp", "review", "read-oriented", "planning"],
+      "requires": ["Review MCP profile", "Repository-owned allowlists"]
     },
     {
       "id": "art.mcp.production",
       "title": "Serve separately gated Art Studio production MCP tools",
       "description": "Build and serve production or workspace-writer MCP profiles whose write, provider and execution effects remain individually gated and do not include Git publication.",
-      "interfaces": [
-        "mcp"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "network",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm mcp:production:build",
-        "pnpm mcp:production:start",
-        "pnpm dev:mcp:production",
-        "pnpm dev:mcp:workspace-writer"
-      ],
-      "tags": [
-        "mcp",
-        "production",
-        "workspace-writer",
-        "gated-effects"
-      ],
-      "requires": [
-        "Explicit production MCP gate",
-        "Per-effect authorization and confirmation",
-        "Allowed workspace roots",
-        "No Git or publication authority"
-      ]
+      "interfaces": ["mcp"],
+      "effects": ["read", "compute", "network", "write", "execute"],
+      "entrypoints": ["pnpm mcp:production:build", "pnpm mcp:production:start", "pnpm dev:mcp:production", "pnpm dev:mcp:workspace-writer"],
+      "tags": ["mcp", "production", "workspace-writer", "gated-effects"],
+      "requires": ["Explicit production MCP gate", "Per-effect authorization and confirmation", "Allowed workspace roots", "No Git or publication authority"]
     },
     {
       "id": "art.book.direction",
       "title": "Validate book-art creative direction",
       "description": "Validate repository-owned book creative-direction contracts and integration boundaries without generating an approval or publication decision.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "testing"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm book:creative-direction:check"
-      ],
-      "tags": [
-        "book-art",
-        "creative-direction",
-        "validation"
-      ],
-      "requires": [
-        "Repository-owned book-art direction contracts"
-      ]
+      "interfaces": ["automation", "cli", "testing"],
+      "effects": ["read", "compute", "execute"],
+      "entrypoints": ["pnpm book:creative-direction:check"],
+      "tags": ["book-art", "creative-direction", "validation"],
+      "requires": ["Repository-owned book-art direction contracts"]
     },
     {
       "id": "art.validation.execute",
       "title": "Run complete Art Studio validation",
-      "description": "Run exact toolchain, media, Project Art, RAW_ART, provider, type, test and build validation while retaining repository cleanliness and negative-authority boundaries.",
-      "interfaces": [
-        "automation",
-        "cli",
-        "testing"
-      ],
-      "effects": [
-        "read",
-        "compute",
-        "write",
-        "execute"
-      ],
-      "entrypoints": [
-        "pnpm toolchain:check",
-        "pnpm project-art:check",
-        "pnpm raw-art:folder:check",
-        "pnpm pixel-font:check",
-        "pnpm check"
-      ],
-      "tags": [
-        "validation",
-        "testing",
-        "build",
-        "evidence"
-      ],
-      "requires": [
-        "Node.js 22.14.0",
-        "pnpm 10.13.1",
-        "Python and pinned image-toolchain requirements where media checks run"
-      ]
+      "description": "Run exact toolchain, media, Project Art, animation-source, game-art campaign, RAW_ART, provider, type, test and build validation while retaining repository cleanliness and negative-authority boundaries.",
+      "interfaces": ["automation", "cli", "testing"],
+      "effects": ["read", "compute", "write", "execute"],
+      "entrypoints": ["pnpm toolchain:check", "pnpm animation-source:check", "pnpm project-art:check", "pnpm game-art:campaign:check", "pnpm raw-art:folder:check", "pnpm pixel-font:check", "pnpm check"],
+      "tags": ["validation", "testing", "build", "animation", "evidence"],
+      "requires": ["Node.js 22.14.0", "pnpm 10.13.1", "Python and pinned image-toolchain requirements where media checks run"]
     }
   ],
   "brain": {
@@ -417,6 +187,14 @@
       "source-art provenance and preservation",
       "visual style and creative-direction consistency",
       "sprite identity, motion and loop continuity",
+      "camera-aware animation production profiles and dependency-safe drawing batches",
+      "event-sourced frame work ledgers and candidate-receipt integrity",
+      "independent Cel Animation Studio moving-sequence review",
+      "targeted animation repair without redrawing accepted frames",
+      "exact integer exposure timing and accepted runtime clips",
+      "path-free Godot, Cel and Video animation sequence delivery",
+      "character-family animation campaign adapter preflight",
+      "separately gated animation execution supervision",
       "alpha, atlas and runtime media correctness",
       "pixel-font design and Godot integration",
       "delivery optimisation and asset packaging",
@@ -424,5 +202,5 @@
       "negative authority, recovery and publication boundaries"
     ]
   },
-  "reviewedAt": "2026-08-18T00:02:11Z"
+  "reviewedAt": "2026-09-08T10:34:00+10:00"
 }
