@@ -1,0 +1,156 @@
+#!/usr/bin/env node
+
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import readline from "node:readline";
+import { fileURLToPath } from "node:url";
+
+const SERVER_NAME = "evavo-work-header-publication-recoverability-doctor";
+const SERVER_VERSION = "1.0.0";
+const PROTOCOL_VERSION = "2025-03-26";
+const CONTRACT = "evavo.work-header-publication-recoverability-doctor.v1";
+const RECOVERABILITY_SCHEMA_SHA256 = "c2fceba4d6d9bfa7ed4d1ec252c74d133a30b5e7f4a33847cc8fd354c275ae15";
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+const CHECKS = Object.freeze([
+  Object.freeze({
+    id: "recoverability-schema",
+    file: "contracts/work-header-publication-recoverability-v1.schema.json",
+    exactSha256: RECOVERABILITY_SCHEMA_SHA256,
+    tokens: [
+      "evavo.work-header-publication-recoverability.v1",
+      "published-rollback-recovery-ready",
+      "rollbackBackupDiffersFromCandidate",
+      "recoverabilityEvidenceOnly",
+      '"rollbackExecutionAllowed": { "const": false }',
+      '"publicationAllowed": { "const": false }',
+    ],
+  }),
+  Object.freeze({
+    id: "recoverability-mcp",
+    file: "tools/work_header_publication_recoverability_mcp.mjs",
+    tokens: [
+      'SERVER_VERSION = "1.0.1"',
+      `SCHEMA_SHA256 = "${RECOVERABILITY_SCHEMA_SHA256}"`,
+      'TRANSACTION_STATE_CONTRACT = "evavo.work-header-publication-transaction-state.v1"',
+      'PUBLICATION_POSTFLIGHT_CONTRACT = "evavo.work-header-publication-postflight.v1"',
+      "recheckPublicationTarget",
+      "Current live publication target no longer matches the exact reviewed candidate bytes.",
+      "Rollback backup bytes drifted after publication.",
+      "Rollback backup is not a distinct previous-target snapshot; recoverability cannot be proven.",
+      "evavo_verify_work_header_publication_recoverability",
+      "targetAwareCurrentLiveRecheckRequired: true",
+      "rollbackBackupMustDifferFromCandidate: true",
+      "recoverabilityEvidenceOnly: true",
+      "rollbackExecutionAllowed: false",
+      "publicationAllowed: false",
+    ],
+  }),
+  Object.freeze({
+    id: "recoverability-sidecar",
+    file: ".mcp.work-header-publication-recoverability-v1.json",
+    tokens: [
+      "evavo-work-header-publication-recoverability-v1",
+      "tools/work_header_publication_recoverability_mcp.mjs",
+      "evavo.work-header-publication-recoverability.v1",
+      RECOVERABILITY_SCHEMA_SHA256,
+      '"rollbackExecutionAllowed": false',
+      '"publicationAllowed": false',
+    ],
+  }),
+  Object.freeze({
+    id: "recoverability-global-registration",
+    file: ".mcp.json",
+    tokens: [
+      '"evavo-work-header-publication-recoverability-v1"',
+      '"tools/work_header_publication_recoverability_mcp.mjs"',
+    ],
+  }),
+  Object.freeze({
+    id: "transaction-state-source",
+    file: "tools/work_header_publication_transaction_state_mcp.mjs",
+    tokens: [
+      'CONTRACT = "evavo.work-header-publication-transaction-state.v1"',
+      "published-verified-rollback-ready",
+      "rollbackBackupReverificationRequired: true",
+      "transactionStateEvidenceOnly: true",
+    ],
+  }),
+  Object.freeze({
+    id: "publication-postflight-source",
+    file: "tools/work_header_publication_postflight_mcp.mjs",
+    tokens: [
+      'CONTRACT = "evavo.work-header-publication-postflight.v1"',
+      "targetAwareLiveRecheckRequired: true",
+      "currentLiveTargetMustExactlyMatchReviewedCandidate: true",
+      "rollbackBackupMustRemainReady: true",
+      "postflightEvidenceOnly: true",
+    ],
+  }),
+]);
+
+async function inspect() {
+  const checks = [];
+  for (const check of CHECKS) {
+    const absolute = path.join(repoRoot, check.file);
+    try {
+      const bytes = await readFile(absolute);
+      const source = bytes.toString("utf8");
+      const missing = check.tokens.filter((token) => !source.includes(token));
+      const actualSha256 = sha256(bytes);
+      const digestOk = !check.exactSha256 || actualSha256 === check.exactSha256;
+      checks.push(Object.freeze({ id: check.id, file: check.file, ok: missing.length === 0 && digestOk, missing, actualSha256, expectedSha256: check.exactSha256 ?? null }));
+    } catch (error) {
+      checks.push(Object.freeze({ id: check.id, file: check.file, ok: false, missing: ["file-unreadable"], error: error instanceof Error ? error.message : String(error) }));
+    }
+  }
+  const blockers = checks.filter((check) => !check.ok).map((check) => check.id);
+  return Object.freeze({
+    contract: CONTRACT,
+    ready: blockers.length === 0,
+    blockerCount: blockers.length,
+    blockers,
+    checks,
+    recoverabilitySchemaSha256: RECOVERABILITY_SCHEMA_SHA256,
+    recoverabilityEvidenceOnly: true,
+    executionPerformed: false,
+    sourceMutationPerformed: false,
+    executionAllowed: false,
+    rollbackExecutionAllowed: false,
+    publicationAllowed: false,
+    cloudOverwriteAllowed: false,
+    websiteMutationAllowed: false,
+  });
+}
+
+const tools = Object.freeze([
+  Object.freeze({ name: "evavo_work_header_publication_recoverability_doctor_capabilities", description: "Describe the read-only static doctor for published Work-header recoverability evidence.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
+  Object.freeze({ name: "evavo_run_work_header_publication_recoverability_doctor", description: "Check the exact recoverability schema digest, MCP implementation, registrations and source transaction/postflight contracts without performing publication or rollback.", inputSchema: { type: "object", properties: {}, additionalProperties: false } }),
+]);
+const capabilities = () => Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, readOnly: true, recoverabilitySchemaSha256: RECOVERABILITY_SCHEMA_SHA256, targetAwareLiveRecheckChecked: true, rollbackBackupDistinctnessChecked: true, executionAllowed: false, rollbackExecutionAllowed: false, publicationAllowed: false, checkCount: CHECKS.length });
+async function callTool(name) {
+  if (name === "evavo_work_header_publication_recoverability_doctor_capabilities") return capabilities();
+  if (name === "evavo_run_work_header_publication_recoverability_doctor") return inspect();
+  throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
+}
+const response = (id, result) => ({ jsonrpc: "2.0", id, result });
+const toolResult = (payload, isError = false) => ({ content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError });
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+for await (const line of rl) {
+  if (!line.trim()) continue;
+  try {
+    const message = JSON.parse(line); let outgoing = null;
+    if (message.method === "initialize") outgoing = response(message.id, { protocolVersion: PROTOCOL_VERSION, capabilities: { tools: {} }, serverInfo: { name: SERVER_NAME, version: SERVER_VERSION } });
+    else if (message.method === "notifications/initialized") outgoing = null;
+    else if (message.method === "tools/list") outgoing = response(message.id, { tools });
+    else if (message.method === "tools/call") {
+      try { outgoing = response(message.id, toolResult(await callTool(message.params?.name))); }
+      catch (error) { outgoing = response(message.id, toolResult({ ok: false, message: error instanceof Error ? error.message : String(error) }, true)); }
+    } else outgoing = response(message.id, toolResult({ ok: false, message: `Unsupported method ${JSON.stringify(message.method)}.` }, true));
+    if (outgoing) process.stdout.write(`${JSON.stringify(outgoing)}\n`);
+  } catch (error) {
+    process.stdout.write(`${JSON.stringify(response(null, toolResult({ ok: false, message: String(error) }, true)))}\n`);
+  }
+}
