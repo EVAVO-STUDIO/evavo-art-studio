@@ -9,6 +9,10 @@ import {
   timestamp,
 } from './avatar-final-pass-provider-candidate-common.mjs';
 import {
+  assertIndependentEvaDenseMotionHumanReviewEvidence,
+  verifyEvaDenseMotionHumanReviewEvidence,
+} from './eva-dense-motion-family-approval-evidence.mjs';
+import {
   EVA_DENSE_MOTION_FAMILY_APPROVAL_SCHEMA_V2,
   EVA_DENSE_MOTION_FAMILY_RELEASE_ASSEMBLY_PROTOCOL_VERSION_V2,
   EVA_DENSE_MOTION_FAMILY_RELEASE_MANIFEST_SCHEMA_V2,
@@ -159,7 +163,7 @@ export function compileEvaDenseMotionFamilyFingerprintPlanV2({
   });
 }
 
-function verifyApproval(value, expectedRole, fingerprint, manifestAt) {
+function verifyApproval(familyEvidenceRoot, value, expectedRole, fingerprint, manifestAt) {
   assert(value?.schema === EVA_DENSE_MOTION_FAMILY_APPROVAL_SCHEMA_V2 && SHA256.test(value.approvalSha256), 'EVA_DENSE_FAMILY_MANIFEST_V2_APPROVAL_INVALID', expectedRole);
   const body = { ...value };
   delete body.approvalSha256;
@@ -168,17 +172,26 @@ function verifyApproval(value, expectedRole, fingerprint, manifestAt) {
     value.protocolVersion === EVA_DENSE_MOTION_FAMILY_RELEASE_ASSEMBLY_PROTOCOL_VERSION_V2 &&
       value.decision === 'approve-dense-motion-family-release-evidence' && value.role === expectedRole &&
       value.familyEvidenceFingerprint === fingerprint && value.reviewer?.actorClass === 'human' &&
-      SAFE_ID.test(value.reviewer?.actorId) && SHA256.test(value.reviewer?.evidenceSha256),
+      SAFE_ID.test(value.reviewer?.actorId) && typeof value.reviewer?.evidencePath === 'string' &&
+      SHA256.test(value.reviewer?.evidenceSha256),
     'EVA_DENSE_FAMILY_MANIFEST_V2_APPROVAL_INVALID',
     expectedRole,
   );
   timestamp(value.reviewedAt, `${expectedRole}.reviewedAt`);
   assert(Date.parse(value.reviewedAt) <= Date.parse(manifestAt), 'EVA_DENSE_FAMILY_MANIFEST_V2_APPROVAL_TIME_INVALID', expectedRole);
+  verifyEvaDenseMotionHumanReviewEvidence({
+    familyEvidenceRoot,
+    reviewer: value.reviewer,
+    role: expectedRole,
+    familyEvidenceFingerprint: fingerprint,
+    reviewedAt: value.reviewedAt,
+  });
   return Object.freeze({ ...value });
 }
 
 export function compileEvaDenseMotionFamilyReleaseManifestV2({
   fingerprintPlan,
+  familyEvidenceRoot: familyRootInput,
   ownerApproval,
   creativeDirectorApproval,
   technicalDirectorApproval,
@@ -190,15 +203,17 @@ export function compileEvaDenseMotionFamilyReleaseManifestV2({
       SHA256.test(fingerprintPlan.familyEvidenceFingerprint),
     'EVA_DENSE_FAMILY_MANIFEST_V2_FINGERPRINT_PLAN_INVALID',
   );
+  const familyEvidenceRoot = realDirectory(familyRootInput, 'familyEvidenceRoot');
   const at = timestamp(manifestedAt, 'manifestedAt');
   const fingerprint = fingerprintPlan.familyEvidenceFingerprint;
-  const owner = verifyApproval(ownerApproval, 'owner', fingerprint, at);
-  const creative = verifyApproval(creativeDirectorApproval, 'creative-director', fingerprint, at);
-  const technical = verifyApproval(technicalDirectorApproval, 'technical-director', fingerprint, at);
+  const owner = verifyApproval(familyEvidenceRoot, ownerApproval, 'owner', fingerprint, at);
+  const creative = verifyApproval(familyEvidenceRoot, creativeDirectorApproval, 'creative-director', fingerprint, at);
+  const technical = verifyApproval(familyEvidenceRoot, technicalDirectorApproval, 'technical-director', fingerprint, at);
   assert(
     new Set([owner.reviewer.actorId, creative.reviewer.actorId, technical.reviewer.actorId]).size === 3,
     'EVA_DENSE_FAMILY_MANIFEST_V2_APPROVER_INDEPENDENCE_REQUIRED',
   );
+  assertIndependentEvaDenseMotionHumanReviewEvidence([owner, creative, technical]);
   const body = {
     schema: EVA_DENSE_MOTION_FAMILY_RELEASE_MANIFEST_SCHEMA_V2,
     protocolVersion: EVA_DENSE_MOTION_FAMILY_RELEASE_ASSEMBLY_PROTOCOL_VERSION_V2,
@@ -219,12 +234,26 @@ export function compileEvaDenseMotionFamilyReleaseManifestV2({
       approvalsExternallyAuthored: true,
       automaticApprovalCreationAllowed: false,
       distinctHumanApproversRequired: true,
+      fileBackedHumanApprovalEvidenceRequired: true,
+      distinctHumanApprovalEvidenceRequired: true,
       approvalSubjectIsNonCircularFamilyEvidenceFingerprint: true,
     }),
   };
   return deepFreeze({ ...body, manifestSha256: sha256Document(body) });
 }
 
-export function readEvaDenseMotionFamilyApprovalFileV2(filePath, role, fingerprint, manifestAt) {
-  return verifyApproval(stableJson(filePath, `${role} approval`), role, fingerprint, manifestAt);
+export function readEvaDenseMotionFamilyApprovalFileV2(
+  filePath,
+  role,
+  fingerprint,
+  manifestAt,
+  familyEvidenceRoot,
+) {
+  return verifyApproval(
+    realDirectory(familyEvidenceRoot, 'familyEvidenceRoot'),
+    stableJson(filePath, `${role} approval`),
+    role,
+    fingerprint,
+    manifestAt,
+  );
 }
