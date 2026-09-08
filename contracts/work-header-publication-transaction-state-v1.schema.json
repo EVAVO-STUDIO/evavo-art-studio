@@ -7,6 +7,8 @@
   "required": [
     "contract",
     "schemaSha256",
+    "transactionId",
+    "transactionIdentityEvidenceOnly",
     "transactionState",
     "terminal",
     "sourcePostflightContract",
@@ -41,6 +43,8 @@
   "properties": {
     "contract": { "const": "evavo.work-header-publication-transaction-state.v1" },
     "schemaSha256": { "$ref": "#/$defs/sha256" },
+    "transactionId": { "$ref": "#/$defs/sha256" },
+    "transactionIdentityEvidenceOnly": { "const": true },
     "transactionState": { "enum": ["published-verified-rollback-ready", "rolled-back-verified-closed"] },
     "terminal": { "type": "boolean" },
     "sourcePostflightContract": { "enum": ["evavo.work-header-publication-postflight.v1", "evavo.work-header-publication-rollback-postflight.v1"] },
