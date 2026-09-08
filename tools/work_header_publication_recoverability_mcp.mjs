@@ -9,10 +9,10 @@ import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_pa
 import { recheckPublicationTarget } from "./lib/publication_target_recheck.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-recoverability";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.0.1";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-recoverability.v1";
-const SCHEMA_SHA256 = "d382c2614e0315d6206bfa0ec0c3a5cc2f36600811031053eb0e4dc901d32370";
+const SCHEMA_SHA256 = "c2fceba4d6d9bfa7ed4d1ec252c74d133a30b5e7f4a33847cc8fd354c275ae15";
 const SCHEMA_URL = new URL("../contracts/work-header-publication-recoverability-v1.schema.json", import.meta.url);
 const TRANSACTION_STATE_CONTRACT = "evavo.work-header-publication-transaction-state.v1";
 const TRANSACTION_STATE_SCHEMA_SHA256 = "0c88d1977075832287f9acf73500e7211687a594b0b0650f4dcadf367024583c";
