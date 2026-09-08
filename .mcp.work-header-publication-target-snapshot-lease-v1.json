@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "evavo-work-header-publication-target-snapshot-lease-v1": {
+      "command": "node",
+      "args": ["tools/work_header_publication_target_snapshot_lease_mcp.mjs"],
+      "env": {
+        "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+        "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true",
+        "EVAVO_WORK_HEADER_PUBLICATION_LEASE_ROOT": "%LOCALAPPDATA%\\EVAVO\\ArtStudio\\publication-target-leases"
+      },
+      "contract": "evavo.work-header-publication-target-snapshot-lease.v1",
+      "schemaSha256": "652a7d5fcbc2c44fb4edffb9d93f8305110c74c3b39ece7e4eca76c5d2c7bdc6",
+      "singleActiveLeasePerTargetSnapshot": true,
+      "publicationAndRollbackMutuallyExclusiveForSameTargetSnapshot": true,
+      "leaseEvidenceOnly": true,
+      "executionAllowed": false,
+      "rollbackExecutionAllowed": false,
+      "publicationAllowed": false,
+      "cloudOverwriteAllowed": false,
+      "websiteMutationAllowed": false
+    }
+  }
+}
