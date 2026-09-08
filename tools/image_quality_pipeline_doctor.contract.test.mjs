@@ -7,8 +7,8 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 test("image quality doctor covers review through target-aware publication and postflight-gated rollback", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_33"',
-    'SERVER_VERSION = "1.33.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_34"',
+    'SERVER_VERSION = "1.34.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -137,11 +137,23 @@ test("MCP configuration exposes complete evidence chain but no mutation executor
     '"evavo-work-header-publication-execution-claim-v1"',
     '"evavo-work-header-publication-execution-result-v1"',
     '"evavo-work-header-publication-rollback-readiness-v1"',
+    '"evavo-work-header-publication-postflight-v1"',
     '"evavo-work-header-publication-rollback-authorization-v1"',
     '"evavo-work-header-publication-rollback-execution-claim-v1"',
     '"evavo-work-header-publication-rollback-execution-result-v1"',
     '"evavo-work-header-publication-rollback-postflight-v1"',
+    '"evavo-work-header-publication-transaction-state-v1"',
   ]) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
   assert.ok(!config.includes('"evavo-work-header-publication-executor-v1"'));
   assert.ok(!config.includes('"evavo-work-header-publication-rollback-executor-v1"'));
+});
+
+test("doctor reports publication postflight and transaction-state MCP registration", async () => {
+  const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
+  for (const token of [
+    "publicationPostflightMcpRegistered: true",
+    "publicationTransactionStateMcpRegistered: true",
+    '"evavo-work-header-publication-postflight-v1"',
+    '"evavo-work-header-publication-transaction-state-v1"',
+  ]) assert.ok(source.includes(token), `missing registered terminal-evidence token: ${token}`);
 });
