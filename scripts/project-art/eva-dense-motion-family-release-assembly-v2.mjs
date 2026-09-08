@@ -9,6 +9,10 @@ import {
   timestamp,
 } from './avatar-final-pass-provider-candidate-common.mjs';
 import {
+  assertIndependentEvaDenseMotionHumanReviewEvidence,
+  verifyEvaDenseMotionHumanReviewEvidence,
+} from './eva-dense-motion-family-approval-evidence.mjs';
+import {
   EVA_DENSE_MOTION_CONTINUITY_EVIDENCE_SCHEMA,
 } from './eva-dense-motion-identity-continuity.mjs';
 import {
@@ -27,7 +31,7 @@ export const EVA_DENSE_MOTION_FAMILY_APPROVAL_SCHEMA_V2 =
 export const EVA_DENSE_MOTION_FAMILY_RELEASE_MANIFEST_SCHEMA_V2 =
   'evavo.project-art-eva-dense-motion-family-release-manifest.v2';
 export const EVA_DENSE_MOTION_FAMILY_RELEASE_ASSEMBLY_PROTOCOL_VERSION_V2 =
-  '2026-08-22.2';
+  '2026-09-08.1';
 
 const FRAME_COUNT = 10;
 const MAXIMUM_JSON_BYTES = 16 * 1024 * 1024;
@@ -176,7 +180,7 @@ function familyFingerprint({
   });
 }
 
-function familyApproval(value, role, fingerprint, assembledAt) {
+function familyApproval(familyEvidenceRoot, value, role, fingerprint, assembledAt) {
   verifySelfHash(
     value,
     'approvalSha256',
@@ -188,12 +192,20 @@ function familyApproval(value, role, fingerprint, assembledAt) {
       value.decision === 'approve-dense-motion-family-release-evidence' &&
       value.role === role && value.familyEvidenceFingerprint === fingerprint &&
       value.reviewer?.actorClass === 'human' && SAFE_ID.test(value.reviewer?.actorId) &&
+      typeof value.reviewer?.evidencePath === 'string' &&
       SHA256.test(value.reviewer?.evidenceSha256),
     'EVA_DENSE_FAMILY_V2_APPROVAL_INVALID',
     role,
   );
   timestamp(value.reviewedAt, `${role}.reviewedAt`);
   assert(Date.parse(value.reviewedAt) <= Date.parse(assembledAt), 'EVA_DENSE_FAMILY_V2_APPROVAL_TIME_INVALID');
+  verifyEvaDenseMotionHumanReviewEvidence({
+    familyEvidenceRoot,
+    reviewer: value.reviewer,
+    role,
+    familyEvidenceFingerprint: fingerprint,
+    reviewedAt: value.reviewedAt,
+  });
   return value;
 }
 
@@ -309,13 +321,14 @@ export function compileEvaDenseMotionFamilyReleaseEvidenceV2({
     'EVA_DENSE_FAMILY_V2_FINGERPRINT_MISMATCH',
   );
 
-  const owner = familyApproval(familyReleaseManifest.approvals?.owner, 'owner', fingerprint, at);
-  const creativeDirector = familyApproval(familyReleaseManifest.approvals?.creativeDirector, 'creative-director', fingerprint, at);
-  const technicalDirector = familyApproval(familyReleaseManifest.approvals?.technicalDirector, 'technical-director', fingerprint, at);
+  const owner = familyApproval(familyEvidenceRoot, familyReleaseManifest.approvals?.owner, 'owner', fingerprint, at);
+  const creativeDirector = familyApproval(familyEvidenceRoot, familyReleaseManifest.approvals?.creativeDirector, 'creative-director', fingerprint, at);
+  const technicalDirector = familyApproval(familyEvidenceRoot, familyReleaseManifest.approvals?.technicalDirector, 'technical-director', fingerprint, at);
   assert(
     new Set([owner.reviewer.actorId, creativeDirector.reviewer.actorId, technicalDirector.reviewer.actorId]).size === 3,
     'EVA_DENSE_FAMILY_V2_APPROVER_INDEPENDENCE_REQUIRED',
   );
+  assertIndependentEvaDenseMotionHumanReviewEvidence([owner, creativeDirector, technicalDirector]);
 
   const runtimeFrames = program.production.jobs.map((job) => runtimeFrame(workspaceRoot, program, job));
   const frames = runtimeFrames.map(({ value, frameFinisherReceiptSha256 }, index) => {
@@ -397,7 +410,9 @@ export function evaDenseMotionFamilyReleaseAssemblyV2Capabilities() {
     namedHumanOwnerApprovalRequired: true,
     namedHumanCreativeDirectorApprovalRequired: true,
     namedHumanTechnicalDirectorApprovalRequired: true,
+    fileBackedHumanApprovalEvidenceRequired: true,
     distinctFamilyApproversRequired: true,
+    distinctHumanApprovalEvidenceRequired: true,
     exactTenRuntimeFrameEvidenceRequired: true,
     exactTenContinuityEdgesRequired: true,
     runtime037OrNewerRequired: true,
