@@ -6,12 +6,13 @@ import readline from "node:readline";
 
 import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
+import { recheckPublicationTarget } from "./lib/publication_target_recheck.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-postflight";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-postflight.v1";
-const SCHEMA_SHA256 = "5a1a2a9a329d3ce4eecd81981e3aa35cd2d6d2d3487f78b6b56672bacca99ae8";
+const SCHEMA_SHA256 = "69b9a40178e78892c330e6f2b5bca33b3be8413ef81ef404c1dd9edad9d24ff2";
 const SCHEMA_URL = new URL("../contracts/work-header-publication-postflight-v1.schema.json", import.meta.url);
 const EXECUTION_RESULT_CONTRACT = "evavo.work-header-publication-execution-result.v1";
 const EXECUTION_RESULT_SCHEMA_SHA256 = "6d94ca926dea8c5c0fdc025c3d65a8692ae5c8c6e61db2d37a536ae352d52445";
@@ -28,12 +29,14 @@ async function assertCurrentSchemaDigest() {
   const current = sha256(bytes);
   if (current !== SCHEMA_SHA256) throw new Error(`Publication-postflight schema bytes drifted from governed SHA-256 (${current}).`);
 }
+
 async function bound(filePath) {
   const resolved = await allowed(filePath, false);
   const bytes = await readFile(resolved);
   if (!bytes.length) throw new Error(`Evidence file is empty: ${resolved}`);
   return Object.freeze({ path: resolved, bytes, sha256: sha256(bytes), byteLength: bytes.length });
 }
+
 function assertNoMutationAuthority(value, label) {
   for (const field of ["publicationAllowed", "cloudOverwriteAllowed", "websiteMutationAllowed"]) {
     if (value?.[field] !== false) throw new Error(`${label} carries forbidden mutation authority (${field}).`);
@@ -41,6 +44,7 @@ function assertNoMutationAuthority(value, label) {
   if (value?.executionAllowed !== undefined && value.executionAllowed !== false) throw new Error(`${label} carries forbidden execution authority.`);
   if (value?.rollbackExecutionAllowed !== undefined && value.rollbackExecutionAllowed !== false) throw new Error(`${label} carries forbidden rollback execution authority.`);
 }
+
 function deterministicReceiptPath(executionResultPath) {
   return `${executionResultPath}.postflight.json`;
 }
@@ -50,9 +54,11 @@ async function reverifyExecutionResult(executionResultReceiptPath) {
   const value = JSON.parse(file.bytes.toString("utf8"));
   if (value.contract !== EXECUTION_RESULT_CONTRACT || value.schemaSha256 !== EXECUTION_RESULT_SCHEMA_SHA256 || value.resultState !== "executed-verified") throw new Error("Execution-result receipt contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(value, "Execution-result receipt");
-  for (const field of ["claimReverifiedBeforeAttestation", "candidateBytesReverified", "postExecutionTargetMatchesCandidate", "postExecutionTargetDiffersFromPreviousTarget", "rollbackBackupPreserved", "resultIsEvidenceOnly"]) if (value[field] !== true) throw new Error(`Execution-result receipt lacks required invariant ${field}.`);
+  for (const field of ["claimReverifiedBeforeAttestation", "candidateBytesReverified", "postExecutionTargetMatchesCandidate", "postExecutionTargetDiffersFromPreviousTarget", "rollbackBackupPreserved", "resultIsEvidenceOnly"]) {
+    if (value[field] !== true) throw new Error(`Execution-result receipt lacks required invariant ${field}.`);
+  }
   const published = await bound(value.postExecutionTargetPath);
-  if (published.sha256 !== value.postExecutionTargetSha256 || published.byteLength !== value.postExecutionTargetByteLength || published.sha256 !== value.candidateSha256 || published.byteLength !== value.candidateByteLength) throw new Error("Execution-result published target no longer exactly matches the reviewed candidate bytes.");
+  if (published.sha256 !== value.postExecutionTargetSha256 || published.byteLength !== value.postExecutionTargetByteLength || published.sha256 !== value.candidateSha256 || published.byteLength !== value.candidateByteLength) throw new Error("Execution-result published target evidence no longer exactly matches the reviewed candidate bytes.");
   return Object.freeze({ file, value, published });
 }
 
@@ -62,33 +68,52 @@ async function reverifyRollbackReadiness(rollbackReadinessReceiptPath, execution
   if (value.contract !== ROLLBACK_READINESS_CONTRACT || value.schemaSha256 !== ROLLBACK_READINESS_SCHEMA_SHA256 || value.rollbackState !== "rollback-ready-unexecuted") throw new Error("Rollback-readiness receipt contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(value, "Rollback-readiness receipt");
   if (value.rollbackPreparationOnly !== true || value.rollbackExecutionAllowed !== false) throw new Error("Rollback-readiness receipt must remain preparation-only and non-executing.");
-  for (const field of ["executionResultReverified", "currentPublishedTargetReverified", "rollbackBackupReverified", "currentPublishedTargetMatchesCandidate", "rollbackBackupMatchesPreviousTarget"]) if (value[field] !== true) throw new Error(`Rollback-readiness receipt lacks required invariant ${field}.`);
+  for (const field of ["executionResultReverified", "currentPublishedTargetReverified", "rollbackBackupReverified", "currentPublishedTargetMatchesCandidate", "rollbackBackupMatchesPreviousTarget"]) {
+    if (value[field] !== true) throw new Error(`Rollback-readiness receipt lacks required invariant ${field}.`);
+  }
   if (value.executionResultReceiptPath !== execution.file.path || value.executionResultReceiptSha256 !== execution.file.sha256 || value.executionResultReceiptByteLength !== execution.file.byteLength) throw new Error("Rollback-readiness receipt is bound to changed execution-result evidence.");
-  for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) if (value[field] !== execution.value[field]) throw new Error(`Rollback-readiness identity drifted from execution result for ${field}.`);
+  for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) {
+    if (value[field] !== execution.value[field]) throw new Error(`Rollback-readiness identity drifted from execution result for ${field}.`);
+  }
   const published = await bound(value.publishedTargetPath);
-  if (published.sha256 !== value.publishedTargetSha256 || published.byteLength !== value.publishedTargetByteLength || published.sha256 !== execution.value.candidateSha256 || published.byteLength !== execution.value.candidateByteLength) throw new Error("Rollback-readiness published target no longer exactly matches the reviewed candidate.");
+  if (published.sha256 !== value.publishedTargetSha256 || published.byteLength !== value.publishedTargetByteLength || published.sha256 !== execution.value.candidateSha256 || published.byteLength !== execution.value.candidateByteLength) throw new Error("Rollback-readiness published-target evidence no longer exactly matches the reviewed candidate.");
   const backup = await bound(value.rollbackBackupPath);
   if (backup.sha256 !== value.rollbackBackupSha256 || backup.byteLength !== value.rollbackBackupByteLength || backup.sha256 !== execution.value.rollbackBackupSha256 || backup.byteLength !== execution.value.rollbackBackupByteLength) throw new Error("Rollback backup changed after readiness verification.");
-  if (backup.path === published.path) throw new Error("Rollback backup must remain physically separate from the published target.");
+  if (backup.path === published.path) throw new Error("Rollback backup must remain physically separate from the published-target evidence.");
   return Object.freeze({ file, value, published, backup });
 }
 
-async function reviewPostflight(executionResultReceiptPath, rollbackReadinessReceiptPath, liveTargetPath) {
+async function targetAwareLiveRecheck(execution, args) {
+  const live = await recheckPublicationTarget({
+    targetKind: execution.value.targetKind,
+    targetIdentifier: execution.value.targetIdentifier,
+    currentTargetRecheckPath: args.currentTargetRecheckPath,
+    currentTargetRecheckUrl: args.currentTargetRecheckUrl,
+    readLocal: bound,
+  });
+  if (live.sha256 !== execution.value.candidateSha256 || live.byteLength !== execution.value.candidateByteLength) throw new Error("Current published target no longer exactly matches the reviewed candidate bytes.");
+  return live;
+}
+
+async function reviewPostflight(executionResultReceiptPath, rollbackReadinessReceiptPath, recheckArgs) {
   const execution = await reverifyExecutionResult(executionResultReceiptPath);
   const rollback = await reverifyRollbackReadiness(rollbackReadinessReceiptPath, execution);
-  const live = await bound(liveTargetPath);
-  if (live.sha256 !== execution.value.candidateSha256 || live.byteLength !== execution.value.candidateByteLength) throw new Error("Current live target no longer exactly matches the reviewed candidate bytes.");
-  if (live.sha256 !== rollback.published.sha256 || live.byteLength !== rollback.published.byteLength) throw new Error("Current live target drifted from the rollback-readiness published-target evidence.");
-  if (rollback.backup.sha256 === live.sha256 && rollback.backup.byteLength === live.byteLength) throw new Error("Live target unexpectedly matches rollback backup; publication state is ambiguous.");
-  return Object.freeze({ execution, rollback, live });
+  const live = await targetAwareLiveRecheck(execution, recheckArgs);
+  if (live.sha256 !== rollback.published.sha256 || live.byteLength !== rollback.published.byteLength) throw new Error("Current published target drifted from rollback-readiness published-target evidence.");
+  if (rollback.backup.sha256 === live.sha256 && rollback.backup.byteLength === live.byteLength) throw new Error("Current published target unexpectedly matches rollback backup; publication state is ambiguous.");
+  const liveTargetReference = live.mode === "live-remote-cloudinary" ? live.url : live.path;
+  if (!liveTargetReference) throw new Error("Target-aware postflight did not produce a durable live-target reference.");
+  return Object.freeze({ execution, rollback, live, liveTargetReference });
 }
 
 async function prepare(args) {
   await assertCurrentSchemaDigest();
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required to create postflight evidence.");
   if (!writesEnabled()) throw new Error(`${WRITES_ENV}=true is required.`);
-  for (const name of ["executionResultReceiptPath", "rollbackReadinessReceiptPath", "liveTargetPath"]) if (typeof args[name] !== "string" || !args[name]) throw new Error(`${name} is required.`);
-  const review = await reviewPostflight(args.executionResultReceiptPath, args.rollbackReadinessReceiptPath, args.liveTargetPath);
+  for (const name of ["executionResultReceiptPath", "rollbackReadinessReceiptPath"]) {
+    if (typeof args[name] !== "string" || !args[name]) throw new Error(`${name} is required.`);
+  }
+  const review = await reviewPostflight(args.executionResultReceiptPath, args.rollbackReadinessReceiptPath, args);
   const receiptPath = await allowed(deterministicReceiptPath(review.execution.file.path), true);
   const receipt = {
     contract: CONTRACT,
@@ -106,7 +131,9 @@ async function prepare(args) {
     candidateByteLength: review.execution.value.candidateByteLength,
     targetKind: review.execution.value.targetKind,
     targetIdentifier: review.execution.value.targetIdentifier,
-    liveTargetPath: review.live.path,
+    liveTargetRecheckMode: review.live.mode,
+    liveTargetReference: review.liveTargetReference,
+    liveTargetFinalUrl: review.live.mode === "live-remote-cloudinary" ? review.live.finalUrl : null,
     liveTargetSha256: review.live.sha256,
     liveTargetByteLength: review.live.byteLength,
     rollbackBackupPath: review.rollback.backup.path,
@@ -114,8 +141,9 @@ async function prepare(args) {
     rollbackBackupByteLength: review.rollback.backup.byteLength,
     executionResultReverified: true,
     rollbackReadinessReverified: true,
-    liveTargetReverified: true,
+    targetAwareLiveRecheckVerified: true,
     liveTargetMatchesReviewedCandidate: true,
+    cloudinaryLiveRemoteRecheckRequiredWhenApplicable: true,
     rollbackBackupStillReady: true,
     postflightEvidenceOnly: true,
     publicationAllowed: false,
@@ -124,7 +152,7 @@ async function prepare(args) {
   };
   const payload = `${JSON.stringify(receipt, null, 2)}\n`;
   await writeCreateOnlyBundle([{ path: receiptPath, data: payload, encoding: "utf8" }]);
-  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), postflightState: receipt.postflightState, route: receipt.route, candidateId: receipt.candidateId, candidateSha256: receipt.candidateSha256, rollbackBackupStillReady: true, postflightEvidenceOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, receiptPath, receiptSha256: sha256(Buffer.from(payload, "utf8")), postflightState: receipt.postflightState, route: receipt.route, candidateId: receipt.candidateId, candidateSha256: receipt.candidateSha256, targetKind: receipt.targetKind, liveTargetRecheckMode: receipt.liveTargetRecheckMode, liveRemoteCloudinaryVerified: receipt.liveTargetRecheckMode === "live-remote-cloudinary", rollbackBackupStillReady: true, postflightEvidenceOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
 async function verify(receiptPath) {
@@ -133,30 +161,49 @@ async function verify(receiptPath) {
   const value = JSON.parse(file.bytes.toString("utf8"));
   if (value.contract !== CONTRACT || value.schemaSha256 !== SCHEMA_SHA256 || value.postflightState !== "published-verified-rollback-ready") throw new Error("Publication-postflight receipt contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(value, "Publication-postflight receipt");
-  for (const field of ["executionResultReverified", "rollbackReadinessReverified", "liveTargetReverified", "liveTargetMatchesReviewedCandidate", "rollbackBackupStillReady", "postflightEvidenceOnly"]) if (value[field] !== true) throw new Error(`Publication-postflight receipt lacks required invariant ${field}.`);
+  for (const field of ["executionResultReverified", "rollbackReadinessReverified", "targetAwareLiveRecheckVerified", "liveTargetMatchesReviewedCandidate", "cloudinaryLiveRemoteRecheckRequiredWhenApplicable", "rollbackBackupStillReady", "postflightEvidenceOnly"]) {
+    if (value[field] !== true) throw new Error(`Publication-postflight receipt lacks required invariant ${field}.`);
+  }
   const expectedPath = await allowed(deterministicReceiptPath(value.executionResultReceiptPath), false);
   if (file.path !== expectedPath) throw new Error("Publication-postflight receipt is not at the deterministic create-only path for its execution result.");
-  const review = await reviewPostflight(value.executionResultReceiptPath, value.rollbackReadinessReceiptPath, value.liveTargetPath);
+  const recheckArgs = value.liveTargetRecheckMode === "live-remote-cloudinary"
+    ? { currentTargetRecheckUrl: value.liveTargetReference }
+    : { currentTargetRecheckPath: value.liveTargetReference };
+  const review = await reviewPostflight(value.executionResultReceiptPath, value.rollbackReadinessReceiptPath, recheckArgs);
   if (review.execution.file.sha256 !== value.executionResultReceiptSha256 || review.execution.file.byteLength !== value.executionResultReceiptByteLength) throw new Error("Publication-postflight execution-result lineage drifted.");
   if (review.rollback.file.sha256 !== value.rollbackReadinessReceiptSha256 || review.rollback.file.byteLength !== value.rollbackReadinessReceiptByteLength) throw new Error("Publication-postflight rollback-readiness lineage drifted.");
-  for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) if (value[field] !== review.execution.value[field]) throw new Error(`Publication-postflight identity drifted for ${field}.`);
-  if (value.liveTargetPath !== review.live.path || value.liveTargetSha256 !== review.live.sha256 || value.liveTargetByteLength !== review.live.byteLength) throw new Error("Publication-postflight live-target binding drifted.");
+  for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) {
+    if (value[field] !== review.execution.value[field]) throw new Error(`Publication-postflight identity drifted for ${field}.`);
+  }
+  if (value.liveTargetRecheckMode !== review.live.mode || value.liveTargetReference !== review.liveTargetReference || value.liveTargetSha256 !== review.live.sha256 || value.liveTargetByteLength !== review.live.byteLength) throw new Error("Publication-postflight target-aware live binding drifted.");
+  const currentFinalUrl = review.live.mode === "live-remote-cloudinary" ? review.live.finalUrl : null;
+  if (value.liveTargetFinalUrl !== currentFinalUrl) throw new Error("Publication-postflight live target final URL drifted.");
   if (value.rollbackBackupPath !== review.rollback.backup.path || value.rollbackBackupSha256 !== review.rollback.backup.sha256 || value.rollbackBackupByteLength !== review.rollback.backup.byteLength) throw new Error("Publication-postflight rollback-backup binding drifted.");
-  return Object.freeze({ ok: true, receiptPath: file.path, receiptSha256: file.sha256, receiptByteLength: file.byteLength, postflightState: value.postflightState, executionResultReverified: true, rollbackReadinessReverified: true, liveTargetReverified: true, liveTargetMatchesReviewedCandidate: true, rollbackBackupStillReady: true, postflightEvidenceOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
+  return Object.freeze({ ok: true, receiptPath: file.path, receiptSha256: file.sha256, receiptByteLength: file.byteLength, postflightState: value.postflightState, executionResultReverified: true, rollbackReadinessReverified: true, targetAwareLiveRecheckVerified: true, liveTargetMatchesReviewedCandidate: true, liveTargetRecheckMode: value.liveTargetRecheckMode, liveRemoteCloudinaryVerified: value.liveTargetRecheckMode === "live-remote-cloudinary", rollbackBackupStillReady: true, postflightEvidenceOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false });
 }
 
+const recheckProperties = {
+  currentTargetRecheckPath: { type: "string", minLength: 1 },
+  currentTargetRecheckUrl: { type: "string", minLength: 1 },
+};
+
 const tools = [
-  { name: "evavo_work_header_publication_postflight_capabilities", description: "Describe read-only-after-external-execution Work-header postflight verification. It proves the current live target still equals the reviewed candidate and rollback remains ready; it cannot mutate website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_prepare_work_header_publication_postflight", description: "Reverify the execution result, rollback readiness and current live target bytes, then write deterministic create-only postflight evidence. No publication or rollback is performed.", inputSchema: { type: "object", properties: { executionResultReceiptPath: { type: "string", minLength: 1 }, rollbackReadinessReceiptPath: { type: "string", minLength: 1 }, liveTargetPath: { type: "string", minLength: 1 }, confirmLocalWrite: { type: "boolean" } }, required: ["executionResultReceiptPath", "rollbackReadinessReceiptPath", "liveTargetPath", "confirmLocalWrite"], additionalProperties: false } },
-  { name: "evavo_verify_work_header_publication_postflight", description: "Read-only reverification of publication postflight evidence against the exact execution result, rollback-readiness receipt, current live target and rollback backup.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
+  { name: "evavo_work_header_publication_postflight_capabilities", description: "Describe target-aware post-publication verification. Website source targets are re-read from a governed local path; Cloudinary stable-ID targets are fetched live from the governed unversioned delivery URL. No mutation is performed.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_prepare_work_header_publication_postflight", description: "Reverify execution result and rollback readiness, then target-aware recheck the actually published target. Cloudinary postflight refuses caller local files and fetches the unversioned stable-ID URL live; website source postflight uses the governed local source path.", inputSchema: { type: "object", properties: { executionResultReceiptPath: { type: "string", minLength: 1 }, rollbackReadinessReceiptPath: { type: "string", minLength: 1 }, ...recheckProperties, confirmLocalWrite: { type: "boolean" } }, required: ["executionResultReceiptPath", "rollbackReadinessReceiptPath", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_work_header_publication_postflight", description: "Read-only target-aware reverification of publication postflight evidence. Cloudinary stable-ID targets are fetched live again from the recorded governed unversioned URL; website source targets are re-read from the recorded governed path.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
 ];
-function capabilities() { return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, executionResultReverificationRequired: true, rollbackReadinessReverificationRequired: true, currentLiveTargetMustExactlyMatchReviewedCandidate: true, rollbackBackupMustRemainReady: true, deterministicCreateOnlyReceipt: true, postflightEvidenceOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() }); }
+
+function capabilities() {
+  return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, executionResultReverificationRequired: true, rollbackReadinessReverificationRequired: true, targetAwareLiveRecheckRequired: true, websiteSourceUsesGovernedLocalRecheck: true, cloudinaryUsesLiveRemoteRecheck: true, cloudinaryUnversionedStableDeliveryUrlRequired: true, cloudinaryCallerLocalRecheckRejected: true, currentLiveTargetMustExactlyMatchReviewedCandidate: true, rollbackBackupMustRemainReady: true, deterministicCreateOnlyReceipt: true, postflightEvidenceOnly: true, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() });
+}
+
 async function callTool(name, args) {
   if (name === "evavo_work_header_publication_postflight_capabilities") return capabilities();
   if (name === "evavo_prepare_work_header_publication_postflight") return prepare(args ?? {});
   if (name === "evavo_verify_work_header_publication_postflight") return verify(args?.receiptPath);
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
+
 const response = (id, result) => ({ jsonrpc: "2.0", id, result });
 const toolResult = (payload, isError = false) => ({ content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], structuredContent: payload, isError });
 const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
