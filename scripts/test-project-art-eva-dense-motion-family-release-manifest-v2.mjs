@@ -24,10 +24,15 @@ for (const marker of [
   "schema: 'evavo.project-art-eva-dense-motion-family-evidence-fingerprint.v1'",
   "requiredExternalApprovals: Object.freeze(['owner', 'creative-director', 'technical-director'])",
   'automaticApprovalCreationAllowed: false',
-  "verifyApproval(ownerApproval, 'owner'",
-  "verifyApproval(creativeDirectorApproval, 'creative-director'",
-  "verifyApproval(technicalDirectorApproval, 'technical-director'",
+  'verifyEvaDenseMotionHumanReviewEvidence',
+  'assertIndependentEvaDenseMotionHumanReviewEvidence([owner, creative, technical])',
+  "verifyApproval(familyEvidenceRoot, ownerApproval, 'owner'",
+  "verifyApproval(familyEvidenceRoot, creativeDirectorApproval, 'creative-director'",
+  "verifyApproval(familyEvidenceRoot, technicalDirectorApproval, 'technical-director'",
+  "typeof value.reviewer?.evidencePath === 'string'",
   'new Set([owner.reviewer.actorId, creative.reviewer.actorId, technical.reviewer.actorId]).size === 3',
+  'fileBackedHumanApprovalEvidenceRequired: true',
+  'distinctHumanApprovalEvidenceRequired: true',
   'approvalSubjectIsNonCircularFamilyEvidenceFingerprint: true',
 ]) assert.ok(moduleSource.includes(marker), marker);
 
@@ -40,10 +45,12 @@ for (const forbidden of [
 for (const marker of [
   "command === 'fingerprint'",
   "command === 'manifest'",
+  '--family-evidence-root',
   '--owner-approval',
   '--creative-director-approval',
   '--technical-director-approval',
   'readEvaDenseMotionFamilyApprovalFileV2',
+  'fileBackedHumanApprovalEvidenceRequired: result.policy.fileBackedHumanApprovalEvidenceRequired',
   'automaticApprovalCreationAllowed: result.policy.automaticApprovalCreationAllowed',
   'pathToFileURL(path.resolve(process.argv[1])).href',
 ]) assert.ok(cliSource.includes(marker), marker);
@@ -57,5 +64,6 @@ assert.equal(typeof cliMain, 'function');
 console.log('EVA dense family manifest v2 guard passed.');
 console.log('- fingerprint is available before human approvals exist');
 console.log('- manifest consumes externally authored approval files only');
+console.log('- manifest requires governed file-backed human review evidence');
 console.log('- owner, creative director and technical director must be distinct');
 console.log('- automatic approval creation remains unavailable');
