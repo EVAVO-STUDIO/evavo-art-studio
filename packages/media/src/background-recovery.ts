@@ -639,13 +639,30 @@ export function detectPaintedTransparencyCheckerboard(
       best.fitFraction >= 0.92 &&
       best.coverageFraction >= 0.3,
   );
+  // Image generators sometimes imitate a transparency preview with a warped,
+  // perspective-distorted grid. It no longer fits an exact tile lattice, but
+  // the opaque border is still overwhelmingly neutral and split between two
+  // strongly separated repeating tones. Treat that as blocking checkerboard
+  // evidence. Recovery remains guarded by its independent connected-matte and
+  // recomposition checks, so this broader admission check cannot silently cut
+  // out an uncertain background.
+  const warpedNeutralGrid = Boolean(
+    best &&
+      sampleSet.lowChromaFraction >= 0.9 &&
+      best.separation >= 24 &&
+      best.rmse <= 20 &&
+      best.fitFraction >= 0.54 &&
+      best.coverageFraction >= 0.65 &&
+      width / best.tileSize >= 8 &&
+      height / best.tileSize >= 8,
+  );
   const detected = Boolean(
     best &&
       // A thin real-alpha rim or a few token-transparent pixels must not let
       // an otherwise visible painted grid bypass classification.
       (sampleSet.opaqueFraction >= 0.25 ||
         sampleSet.visibleFraction >= 0.7) &&
-      (neutralGrid || chromaticGrid),
+      (neutralGrid || chromaticGrid || warpedNeutralGrid),
   );
   const confidence = detected && best
     ? Math.min(

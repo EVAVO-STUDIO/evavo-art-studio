@@ -394,6 +394,31 @@ test("background recovery recognises a 27-pixel low-contrast provider checkerboa
   assert.equal(result.evidence.recomposition.maximumAllowedMismatchFraction, 0);
 });
 
+test("transparency admission detects a warped opaque preview checkerboard", async () => {
+  const width = 384;
+  const height = 384;
+  const candidate = await raster(width, height, 4, (x, y) => {
+    if (x >= 100 && x <= 284 && y >= 72 && y <= 320) {
+      return [78, 96, 42, 255];
+    }
+    const warpedX = x + Math.sin(y / 31) * 8;
+    const warpedY = y + Math.sin(x / 37) * 7;
+    const parity =
+      (Math.floor(warpedX / 24) + Math.floor(warpedY / 24)) % 2;
+    const value = parity ? 126 : 188;
+    return [value, value, value, 255];
+  });
+  const decoded = await rgba(candidate);
+  const detection = detectPaintedTransparencyCheckerboard(
+    decoded.data,
+    decoded.info.width,
+    decoded.info.height,
+  );
+  assert.equal(detection.detected, true);
+  assert.ok(detection.lowChromaBorderFraction >= 0.9);
+  assert.ok(detection.colourSeparation >= 24);
+});
+
 test("checkerboard recovery can admit only a tiny explicit fraction of recomposition outliers", () => {
   assert.equal(checkerCompositeMismatchAccepted(78, 1_000_000, 0.0001), true);
   assert.equal(checkerCompositeMismatchAccepted(78, 1_000_000, 0.00001), false);
