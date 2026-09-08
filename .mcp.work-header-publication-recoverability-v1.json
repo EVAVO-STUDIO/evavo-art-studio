@@ -1,0 +1,19 @@
+{
+  "name": "evavo-work-header-publication-recoverability-v1",
+  "command": "node",
+  "args": ["tools/work_header_publication_recoverability_mcp.mjs"],
+  "env": {
+    "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+    "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES": "true"
+  },
+  "contract": "evavo.work-header-publication-recoverability.v1",
+  "schema": "contracts/work-header-publication-recoverability-v1.schema.json",
+  "schemaSha256": "d382c2614e0315d6206bfa0ec0c3a5cc2f36600811031053eb0e4dc901d32370",
+  "authority": {
+    "executionAllowed": false,
+    "rollbackExecutionAllowed": false,
+    "publicationAllowed": false,
+    "cloudOverwriteAllowed": false,
+    "websiteMutationAllowed": false
+  }
+}
