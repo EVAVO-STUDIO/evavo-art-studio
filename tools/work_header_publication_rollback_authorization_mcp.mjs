@@ -6,9 +6,10 @@ import readline from "node:readline";
 
 import { writeCreateOnlyBundle } from "./lib/create_only_bundle.mjs";
 import { assertAllowedLocalPath, configuredLocalRootCount } from "./lib/local_path_policy.mjs";
+import { recheckPublicationTarget } from "./lib/publication_target_recheck.mjs";
 
 const SERVER_NAME = "evavo-work-header-publication-rollback-authorization";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const CONTRACT = "evavo.work-header-publication-rollback-authorization.v1";
 const SCHEMA_SHA256 = "3f23166dc2901ba09f222682b2d6e2be4ab84e4d0ad4d469ae9c041e3bac211b";
@@ -17,7 +18,7 @@ const READINESS_CONTRACT = "evavo.work-header-publication-rollback-readiness.v1"
 const READINESS_SCHEMA_SHA256 = "cc56d28b46f98cea1f97b46aa9988522c6b97424ee853a7c6c968a45ffd77f6d";
 const EXECUTION_RESULT_CONTRACT = "evavo.work-header-publication-execution-result.v1";
 const POSTFLIGHT_CONTRACT = "evavo.work-header-publication-postflight.v1";
-const POSTFLIGHT_SCHEMA_SHA256 = "5a1a2a9a329d3ce4eecd81981e3aa35cd2d6d2d3487f78b6b56672bacca99ae8";
+const POSTFLIGHT_SCHEMA_SHA256 = "69b9a40178e78892c330e6f2b5bca33b3be8413ef81ef404c1dd9edad9d24ff2";
 const CONFIRMATION_STATEMENT = "I explicitly authorize rollback of this exact reviewed Work-header publication transaction.";
 const ROOTS_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOWED_ROOTS";
 const WRITES_ENV = "EVAVO_WORK_HEADER_REVIEW_ALLOW_WRITES";
@@ -71,13 +72,31 @@ async function reverifyPostflight(postflightReceiptPath, readinessReview) {
   const postflight = JSON.parse(postflightFile.bytes.toString("utf8"));
   if (postflight.contract !== POSTFLIGHT_CONTRACT || postflight.schemaSha256 !== POSTFLIGHT_SCHEMA_SHA256 || postflight.postflightState !== "published-verified-rollback-ready") throw new Error("Publication-postflight receipt contract/schema/state is invalid or stale.");
   assertNoMutationAuthority(postflight, "Publication-postflight receipt");
-  for (const field of ["executionResultReverified", "rollbackReadinessReverified", "liveTargetReverified", "liveTargetMatchesReviewedCandidate", "rollbackBackupStillReady", "postflightEvidenceOnly"]) if (postflight[field] !== true) throw new Error(`Publication-postflight receipt lacks required invariant ${field}.`);
+  for (const field of ["executionResultReverified", "rollbackReadinessReverified", "targetAwareLiveRecheckVerified", "liveTargetMatchesReviewedCandidate", "cloudinaryLiveRemoteRecheckRequiredWhenApplicable", "rollbackBackupStillReady", "postflightEvidenceOnly"]) if (postflight[field] !== true) throw new Error(`Publication-postflight receipt lacks required invariant ${field}.`);
   if (postflight.rollbackReadinessReceiptPath !== readinessReview.readinessFile.path || postflight.rollbackReadinessReceiptSha256 !== readinessReview.readinessFile.sha256 || postflight.rollbackReadinessReceiptByteLength !== readinessReview.readinessFile.byteLength) throw new Error("Publication-postflight receipt is bound to different rollback-readiness evidence.");
   if (postflight.executionResultReceiptPath !== readinessReview.resultFile.path || postflight.executionResultReceiptSha256 !== readinessReview.resultFile.sha256 || postflight.executionResultReceiptByteLength !== readinessReview.resultFile.byteLength) throw new Error("Publication-postflight receipt is bound to different execution-result evidence.");
   for (const field of ["route", "candidateId", "candidateSha256", "candidateByteLength", "targetKind", "targetIdentifier"]) if (postflight[field] !== readinessReview.readiness[field]) throw new Error(`Publication-postflight identity drifted for ${field}.`);
-  if (postflight.liveTargetPath !== readinessReview.publishedTarget.path || postflight.liveTargetSha256 !== readinessReview.publishedTarget.sha256 || postflight.liveTargetByteLength !== readinessReview.publishedTarget.byteLength) throw new Error("Publication-postflight live-target binding no longer matches current published candidate bytes.");
+
+  const recheckArgs = postflight.liveTargetRecheckMode === "live-remote-cloudinary"
+    ? { currentTargetRecheckUrl: postflight.liveTargetReference }
+    : postflight.liveTargetRecheckMode === "governed-local-website-source"
+      ? { currentTargetRecheckPath: postflight.liveTargetReference }
+      : null;
+  if (!recheckArgs) throw new Error("Publication-postflight target-aware live recheck mode is invalid.");
+  const live = await recheckPublicationTarget({
+    targetKind: readinessReview.readiness.targetKind,
+    targetIdentifier: readinessReview.readiness.targetIdentifier,
+    ...recheckArgs,
+    readLocal: bound,
+  });
+  if (live.sha256 !== postflight.liveTargetSha256 || live.byteLength !== postflight.liveTargetByteLength || live.sha256 !== readinessReview.publishedTarget.sha256 || live.byteLength !== readinessReview.publishedTarget.byteLength) throw new Error("Publication-postflight live-target binding no longer matches current published candidate bytes.");
+  if (live.mode !== postflight.liveTargetRecheckMode) throw new Error("Publication-postflight live-target recheck mode drifted.");
+  const liveReference = live.mode === "live-remote-cloudinary" ? live.url : live.path;
+  if (liveReference !== postflight.liveTargetReference) throw new Error("Publication-postflight live-target reference drifted.");
+  const finalUrl = live.mode === "live-remote-cloudinary" ? live.finalUrl : null;
+  if (finalUrl !== postflight.liveTargetFinalUrl) throw new Error("Publication-postflight live-target final URL drifted.");
   if (postflight.rollbackBackupPath !== readinessReview.backup.path || postflight.rollbackBackupSha256 !== readinessReview.backup.sha256 || postflight.rollbackBackupByteLength !== readinessReview.backup.byteLength) throw new Error("Publication-postflight rollback-backup binding drifted.");
-  return Object.freeze({ postflightFile, postflight });
+  return Object.freeze({ postflightFile, postflight, live });
 }
 
 async function authorize(args) {
@@ -155,11 +174,11 @@ async function verify(receiptPath) {
 }
 
 const tools = [
-  { name: "evavo_work_header_publication_rollback_authorization_capabilities", description: "Describe explicit, single-transaction rollback authorization gated by verified publication postflight. This tool cannot execute rollback or mutate website/Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_authorize_work_header_publication_rollback", description: "After exact explicit caller confirmation, reverify rollback readiness plus the publication postflight proving the live candidate and backup were healthy, then create one deterministic rollback-authorized-unexecuted receipt. No rollback is executed.", inputSchema: { type: "object", properties: { rollbackReadinessReceiptPath: { type: "string", minLength: 1 }, publicationPostflightReceiptPath: { type: "string", minLength: 1 }, confirmRollbackAuthorization: { type: "boolean" }, confirmationStatement: { type: "string", const: CONFIRMATION_STATEMENT }, confirmLocalWrite: { type: "boolean" } }, required: ["rollbackReadinessReceiptPath", "publicationPostflightReceiptPath", "confirmRollbackAuthorization", "confirmationStatement", "confirmLocalWrite"], additionalProperties: false } },
-  { name: "evavo_verify_work_header_publication_rollback_authorization", description: "Reverify rollback authorization against exact readiness, publication postflight, current published candidate and previous-target backup. Any drift invalidates authorization.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
+  { name: "evavo_work_header_publication_rollback_authorization_capabilities", description: "Describe explicit, single-transaction rollback authorization gated by target-aware verified publication postflight. This tool cannot execute rollback or mutate website/Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_authorize_work_header_publication_rollback", description: "After exact explicit caller confirmation, reverify rollback readiness plus the target-aware publication postflight proving the live candidate and backup are still healthy, then create one deterministic rollback-authorized-unexecuted receipt. Cloudinary live bytes are fetched again from the governed stable URL. No rollback is executed.", inputSchema: { type: "object", properties: { rollbackReadinessReceiptPath: { type: "string", minLength: 1 }, publicationPostflightReceiptPath: { type: "string", minLength: 1 }, confirmRollbackAuthorization: { type: "boolean" }, confirmationStatement: { type: "string", const: CONFIRMATION_STATEMENT }, confirmLocalWrite: { type: "boolean" } }, required: ["rollbackReadinessReceiptPath", "publicationPostflightReceiptPath", "confirmRollbackAuthorization", "confirmationStatement", "confirmLocalWrite"], additionalProperties: false } },
+  { name: "evavo_verify_work_header_publication_rollback_authorization", description: "Reverify rollback authorization against exact readiness, target-aware publication postflight, current published candidate and previous-target backup. Any drift invalidates authorization.", inputSchema: { type: "object", properties: { receiptPath: { type: "string", minLength: 1 } }, required: ["receiptPath"], additionalProperties: false } },
 ];
-function capabilities() { return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, explicitRollbackConfirmationRequired: true, exactConfirmationStatementRequired: true, rollbackReadinessReverificationRequired: true, publicationPostflightReverificationRequired: true, postflightLiveTargetMustMatchCandidate: true, postflightRollbackBackupMustRemainReady: true, currentPublishedTargetRecheckRequired: true, rollbackBackupReverificationRequired: true, singleRollbackTransactionAuthorizationOnly: true, authorizationExpiresOnAnyEvidenceDrift: true, deterministicCreateOnlyAuthorizationReceipt: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() }); }
+function capabilities() { return Object.freeze({ contract: CONTRACT, serverVersion: SERVER_VERSION, schemaSha256: SCHEMA_SHA256, explicitRollbackConfirmationRequired: true, exactConfirmationStatementRequired: true, rollbackReadinessReverificationRequired: true, publicationPostflightReverificationRequired: true, targetAwarePublicationPostflightRequired: true, cloudinaryPostflightLiveRemoteRecheckRequired: true, postflightLiveTargetMustMatchCandidate: true, postflightRollbackBackupMustRemainReady: true, currentPublishedTargetRecheckRequired: true, rollbackBackupReverificationRequired: true, singleRollbackTransactionAuthorizationOnly: true, authorizationExpiresOnAnyEvidenceDrift: true, deterministicCreateOnlyAuthorizationReceipt: true, rollbackExecutionAllowed: false, publicationAllowed: false, cloudOverwriteAllowed: false, websiteMutationAllowed: false, allowedRootCount: configuredLocalRootCount(ROOTS_ENV), writesEnabled: writesEnabled() }); }
 async function callTool(name, args) {
   if (name === "evavo_work_header_publication_rollback_authorization_capabilities") return capabilities();
   if (name === "evavo_authorize_work_header_publication_rollback") return authorize(args ?? {});
