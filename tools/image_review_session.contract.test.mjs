@@ -2,31 +2,44 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
+const read = (name) => readFile(new URL(name, import.meta.url), "utf8");
 
-test("durable image review session binds exact source and comparison bytes", async () => {
+test("durable image review receipts use canonical evidence integrity and deterministic recomputation", async () => {
   const source = await read("./image_review_session_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-review-session.v1"',
-    "sourceSha256AndLengthBound: true",
-    "comparisonSha256AndLengthBound: true",
-    "sourceBinding",
-    "comparisonBindings",
-    "sha256",
-    "byteLength",
-  ]) assert.ok(source.includes(token), `missing review-session binding token: ${token}`);
+    'SERVER_VERSION = "1.2.0"',
+    'RECEIPT_CONTRACT = "evavo.image-review-session.v1_2"',
+    'REVIEW_EVIDENCE_INTEGRITY_CONTRACT = "evavo.image-review-evidence-integrity.v1"',
+    "canonicalize",
+    "canonicalJson",
+    "digestReviewEvidence",
+    "reviewEvidenceSha256",
+    "reviewEvidenceCanonicalDigestRequired: true",
+    "reviewEvidenceRecomputedDuringVerification: true",
+    "reviewEvidenceTamperRejected: true",
+    "filenameInputPersistedForRecomputation: true",
+    "orchestrateImageReview",
+    "Image-review receipt review evidence was modified after review.",
+    "Image-review evidence no longer matches deterministic review-engine recomputation.",
+  ]) assert.ok(source.includes(token), `missing durable review integrity token: ${token}`);
 });
 
-test("review session can be reverified and carries no promotion authority", async () => {
+test("durable image review receipts stay exact-byte-bound and non-authoritative", async () => {
   const source = await read("./image_review_session_mcp.mjs");
   for (const token of [
-    "evavo_verify_image_review_session",
+    "sourceSha256AndLengthBound: true",
+    "comparisonSha256AndLengthBound: true",
     "staleEvidenceVerification: true",
-    'approvalState: "unapproved"',
+    "sourceBinding",
+    "comparisonBindings",
+    "finishingPlanNeverAuthorizesRepair: true",
+    "sourceMutationPerformed: false",
+    "visualReviewRequired: true",
+    "publicationAllowed: false",
     "cloudOverwriteAllowed: false",
     "websiteMutationAllowed: false",
-    "publicationAllowed: false",
-  ]) assert.ok(source.includes(token), `missing review-session safety token: ${token}`);
+    'approvalState: "unapproved"',
+  ]) assert.ok(source.includes(token), `missing durable review safety token: ${token}`);
 });
 
 test("review session receipt is create-only and leaves source immutable", async () => {
