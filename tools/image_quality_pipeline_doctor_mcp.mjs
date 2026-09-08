@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.33.0";
+const SERVER_VERSION = "1.34.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -39,7 +39,7 @@ const CHECKS = Object.freeze([
   { id: "work-publication-transaction-state-sidecar", file: ".mcp.work-header-publication-transaction-state-v1.json", tokens: ['"evavo-work-header-publication-transaction-state-v1"', '"tools/work_header_publication_transaction_state_mcp.mjs"', '"evavo.work-header-publication-transaction-state.v1"', '"0c88d1977075832287f9acf73500e7211687a594b0b0650f4dcadf367024583c"', '"publicationAllowed": false'] },
   { id: "durable-review", file: "tools/image_review_session_mcp.mjs", tokens: ["evavo.image-review-session.v1_1", "sourceSha256AndLengthBound: true", "staleEvidenceVerification: true"] },
   { id: "safe-bundle", file: "tools/lib/create_only_bundle.mjs", tokens: ["writeCreateOnlyBundle", "rollback", "preflight"] },
-  { id: "mcp-registration", file: ".mcp.json", tokens: ["evavo-image-review-session-v1", "evavo-image-quality-pipeline-doctor-v1", "evavo-work-header-preview-admission-v1", "evavo-work-header-page-render-review-v1", "evavo-work-header-approval-decision-v1", "evavo-work-header-publication-preparation-v1", "evavo-work-header-publication-transaction-plan-v1", "evavo-work-header-publication-execution-authorization-v1", "evavo-work-header-publication-execution-claim-v1", "evavo-work-header-publication-execution-result-v1", "evavo-work-header-publication-rollback-readiness-v1", "evavo-work-header-publication-rollback-authorization-v1", "evavo-work-header-publication-rollback-execution-claim-v1", "evavo-work-header-publication-rollback-execution-result-v1", "evavo-work-header-publication-rollback-postflight-v1"] },
+  { id: "mcp-registration", file: ".mcp.json", tokens: ["evavo-image-review-session-v1", "evavo-image-quality-pipeline-doctor-v1", "evavo-work-header-preview-admission-v1", "evavo-work-header-page-render-review-v1", "evavo-work-header-approval-decision-v1", "evavo-work-header-publication-preparation-v1", "evavo-work-header-publication-transaction-plan-v1", "evavo-work-header-publication-execution-authorization-v1", "evavo-work-header-publication-execution-claim-v1", "evavo-work-header-publication-execution-result-v1", "evavo-work-header-publication-rollback-readiness-v1", "evavo-work-header-publication-postflight-v1", "evavo-work-header-publication-rollback-authorization-v1", "evavo-work-header-publication-rollback-execution-claim-v1", "evavo-work-header-publication-rollback-execution-result-v1", "evavo-work-header-publication-rollback-postflight-v1", "evavo-work-header-publication-transaction-state-v1"] },
 ]);
 
 async function inspect() {
@@ -55,7 +55,7 @@ async function inspect() {
   }
   const blockers = checks.filter((check) => !check.ok).map((check) => check.id);
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_33",
+    contract: "evavo.image-quality-pipeline-doctor.v1_34",
     ready: blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
@@ -65,17 +65,17 @@ async function inspect() {
     publicationAllowed: false,
     nextAction: blockers.length
       ? "Repair failing image-quality contract surfaces before trusting publication or rollback evidence."
-      : "Static image-quality evidence now runs from preservation through exact browser review, deterministic page-review recomputation, explicit approval, target-aware publication/postflight verification, target-aware rollback authorization and claiming, rollback closure and target-aware published transaction-state verification.",
+      : "Static image-quality evidence now runs from preservation through exact browser review, deterministic page-review recomputation, explicit approval, target-aware publication/postflight verification, target-aware rollback authorization and claiming, rollback closure and a registered target-aware transaction-state ledger.",
   });
 }
 
 const tools = Object.freeze([
   { name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only EVAVO image quality pipeline doctor.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, deterministic reviewed-image evidence, target-aware publication/postflight protection, target-aware rollback evidence and durable transaction state without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, deterministic reviewed-image evidence, target-aware publication/postflight protection, target-aware rollback evidence and durable registered transaction state without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
 ]);
 function capabilities() {
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_33",
+    contract: "evavo.image-quality-pipeline-doctor.v1_34",
     serverVersion: SERVER_VERSION,
     readOnly: true,
     browserResponseBodyLineageChecked: true,
@@ -96,6 +96,7 @@ function capabilities() {
     publicationExecutionResultAttestationBoundaryChecked: true,
     publicationRollbackReadinessBoundaryChecked: true,
     publicationPostflightBoundaryChecked: true,
+    publicationPostflightMcpRegistered: true,
     publicationPostflightTargetAwareLiveRecheckChecked: true,
     rollbackAuthorizationPostflightGateChecked: true,
     rollbackAuthorizationTargetAwarePostflightRecheckChecked: true,
@@ -105,6 +106,7 @@ function capabilities() {
     rollbackPostflightTerminalClosureChecked: true,
     rollbackPostflightTargetAwarePublicationLineageChecked: true,
     publicationTransactionStateLedgerChecked: true,
+    publicationTransactionStateMcpRegistered: true,
     publicationTransactionStateTargetAwarePublishedRecheckChecked: true,
     publishedStateRemainsRollbackReadyNotTerminal: true,
     rolledBackStateIsTerminalClosed: true,
