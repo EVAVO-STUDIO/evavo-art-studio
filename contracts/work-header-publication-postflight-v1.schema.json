@@ -20,7 +20,9 @@
     "candidateByteLength",
     "targetKind",
     "targetIdentifier",
-    "liveTargetPath",
+    "liveTargetRecheckMode",
+    "liveTargetReference",
+    "liveTargetFinalUrl",
     "liveTargetSha256",
     "liveTargetByteLength",
     "rollbackBackupPath",
@@ -28,8 +30,9 @@
     "rollbackBackupByteLength",
     "executionResultReverified",
     "rollbackReadinessReverified",
-    "liveTargetReverified",
+    "targetAwareLiveRecheckVerified",
     "liveTargetMatchesReviewedCandidate",
+    "cloudinaryLiveRemoteRecheckRequiredWhenApplicable",
     "rollbackBackupStillReady",
     "postflightEvidenceOnly",
     "publicationAllowed",
@@ -37,36 +40,128 @@
     "websiteMutationAllowed"
   ],
   "properties": {
-    "contract": { "const": "evavo.work-header-publication-postflight.v1" },
-    "schemaSha256": { "$ref": "#/$defs/sha256" },
-    "postflightState": { "const": "published-verified-rollback-ready" },
-    "executionResultReceiptPath": { "type": "string", "minLength": 1 },
-    "executionResultReceiptSha256": { "$ref": "#/$defs/sha256" },
-    "executionResultReceiptByteLength": { "type": "integer", "minimum": 1 },
-    "rollbackReadinessReceiptPath": { "type": "string", "minLength": 1 },
-    "rollbackReadinessReceiptSha256": { "$ref": "#/$defs/sha256" },
-    "rollbackReadinessReceiptByteLength": { "type": "integer", "minimum": 1 },
-    "route": { "type": "string", "pattern": "^/work/[a-z0-9-]+$" },
-    "candidateId": { "type": "string", "minLength": 1, "maxLength": 160 },
-    "candidateSha256": { "$ref": "#/$defs/sha256" },
-    "candidateByteLength": { "type": "integer", "minimum": 1 },
-    "targetKind": { "enum": ["website-header-source-update", "cloudinary-stable-id-replacement"] },
-    "targetIdentifier": { "type": "string", "minLength": 1, "maxLength": 1024 },
-    "liveTargetPath": { "type": "string", "minLength": 1 },
-    "liveTargetSha256": { "$ref": "#/$defs/sha256" },
-    "liveTargetByteLength": { "type": "integer", "minimum": 1 },
-    "rollbackBackupPath": { "type": "string", "minLength": 1 },
-    "rollbackBackupSha256": { "$ref": "#/$defs/sha256" },
-    "rollbackBackupByteLength": { "type": "integer", "minimum": 1 },
-    "executionResultReverified": { "const": true },
-    "rollbackReadinessReverified": { "const": true },
-    "liveTargetReverified": { "const": true },
-    "liveTargetMatchesReviewedCandidate": { "const": true },
-    "rollbackBackupStillReady": { "const": true },
-    "postflightEvidenceOnly": { "const": true },
-    "publicationAllowed": { "const": false },
-    "cloudOverwriteAllowed": { "const": false },
-    "websiteMutationAllowed": { "const": false }
+    "contract": {
+      "const": "evavo.work-header-publication-postflight.v1"
+    },
+    "schemaSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "postflightState": {
+      "const": "published-verified-rollback-ready"
+    },
+    "executionResultReceiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "executionResultReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "executionResultReceiptByteLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rollbackReadinessReceiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rollbackReadinessReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackReadinessReceiptByteLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "route": {
+      "type": "string",
+      "pattern": "^/work/[a-z0-9-]+$"
+    },
+    "candidateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "candidateSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidateByteLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "targetKind": {
+      "enum": [
+        "website-header-source-update",
+        "cloudinary-stable-id-replacement"
+      ]
+    },
+    "targetIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "liveTargetRecheckMode": {
+      "enum": [
+        "governed-local-website-source",
+        "live-remote-cloudinary"
+      ]
+    },
+    "liveTargetReference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "liveTargetFinalUrl": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "liveTargetSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "liveTargetByteLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rollbackBackupPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rollbackBackupSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackBackupByteLength": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "executionResultReverified": {
+      "const": true
+    },
+    "rollbackReadinessReverified": {
+      "const": true
+    },
+    "targetAwareLiveRecheckVerified": {
+      "const": true
+    },
+    "liveTargetMatchesReviewedCandidate": {
+      "const": true
+    },
+    "cloudinaryLiveRemoteRecheckRequiredWhenApplicable": {
+      "const": true
+    },
+    "rollbackBackupStillReady": {
+      "const": true
+    },
+    "postflightEvidenceOnly": {
+      "const": true
+    },
+    "publicationAllowed": {
+      "const": false
+    },
+    "cloudOverwriteAllowed": {
+      "const": false
+    },
+    "websiteMutationAllowed": {
+      "const": false
+    }
   },
   "$defs": {
     "sha256": {
