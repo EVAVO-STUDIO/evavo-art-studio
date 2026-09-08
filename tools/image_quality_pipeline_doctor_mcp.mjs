@@ -6,7 +6,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const SERVER_NAME = "evavo-image-quality-pipeline-doctor";
-const SERVER_VERSION = "1.34.0";
+const SERVER_VERSION = "1.35.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -16,7 +16,7 @@ const CHECKS = Object.freeze([
   { id: "defect-regions", file: "packages/media/src/defect-region-components.ts", tokens: ["segmentDefectMaskRegions", "retainedComponentCount"] },
   { id: "finishing-plan", file: "packages/media/src/existing-image-finishing-plan.ts", tokens: ["planExistingImageFinishing", "automaticRepairAllowed: false", "localized-repair", "manual-review"] },
   { id: "artifact-signals", file: "packages/media/src/image-artifact-signals.ts", tokens: ["ringingRiskRatio", "posterizationRisk", "nearestNeighbourUpscaleRisk"] },
-  { id: "enhancement-session", file: "tools/enhancement_review_session_mcp.mjs", tokens: ["evavo.enhancement-art-review-session.v1_5", "evavo_verify_enhancement_review_session", "proofSha256AndLengthBound: true"] },
+  { id: "enhancement-session", file: "tools/enhancement_review_session_mcp.mjs", tokens: ['SERVER_VERSION = "1.8.0"', "evavo.enhancement-art-review-session.v1_5", "requiredImageReviewSessionContract: REQUIRED_IMAGE_REVIEW_SESSION_CONTRACT", "evavo.image-review-session.v1_2", "evavo.image-review-evidence-integrity.v1", "imageReviewEvidenceSha256Required: true", "imageReviewEvidenceCanonicalDigestRequired: true", "imageReviewEvidenceRecomputedDuringEnhancementVerification: true", "imageReviewEvidenceTamperRejected: true", "evavo_verify_enhancement_review_session", "proofSha256AndLengthBound: true"] },
   { id: "work-preview-core-v8", file: "packages/media/src/work-header-preview-admission.ts", tokens: ["evavo.work-header-candidate-preview-capture.v8", "browserResponseBodyIdentityVerified", "browserResponseMetadataBound", "exactTriggeredBrowserRequestBindingVerified", "browserResponseBindings", "exactTriggeredRequestsBoundAcrossProfiles", "browserCandidateRequestBindingRequired", "atomicEvidenceBundleVerified: true"] },
   { id: "work-preview-mcp-v180", file: "tools/work_header_preview_admission_mcp.mjs", tokens: ['SERVER_VERSION = "1.8.0"', 'acceptedPreviewContract: "evavo.work-header-candidate-preview-capture.v8"', "exactTriggeredBrowserRequestBindingRequired: true", 'exactTriggeredBrowserRequestMethod: "GET"', "browserResponseMetadataShaAndLengthBound: true", "browserResponseMetadataPersistedPerProfile: true", "exactTriggeredBrowserRequestBindingVerified: true", "evavo_verify_work_header_preview_admission"] },
   { id: "work-page-review-input-safety", file: "packages/media/src/work-header-page-render-review.ts", tokens: ["MAX_SCREENSHOT_BYTES", "MAX_NOTES = 24", "MAX_NOTE_CHARACTERS = 500", "MAX_NOTES_CHARACTERS = 4_000", "normalizedReviewInputsPersisted: true", "reviewInputs", "pageSlug must be a canonical Work detail route under /work/.", "must be boolean.", "notes exceed the"] },
@@ -37,7 +37,7 @@ const CHECKS = Object.freeze([
   { id: "work-publication-transaction-state-schema", file: "contracts/work-header-publication-transaction-state-v1.schema.json", tokens: ['"$id": "evavo.work-header-publication-transaction-state.v1"', '"published-verified-rollback-ready"', '"rolled-back-verified-closed"', '"transactionStateEvidenceOnly"', '"publicationAllowed": { "const": false }'] },
   { id: "work-publication-transaction-state", file: "tools/work_header_publication_transaction_state_mcp.mjs", tokens: ['SERVER_VERSION = "1.1.0"', 'CONTRACT = "evavo.work-header-publication-transaction-state.v1"', 'SCHEMA_SHA256 = "0c88d1977075832287f9acf73500e7211687a594b0b0650f4dcadf367024583c"', "acceptedSourcePostflightContracts", "targetAwarePublishedStateReverificationRequired: true", "cloudinaryPublishedStateUsesLiveRemoteRecheck: true", "publishedStateTerminal: false", "rolledBackStateTerminal: true", "currentLiveTargetReverificationRequired: true", "rollbackBackupReverificationRequired: true", "transactionStateEvidenceOnly: true", "executionAllowed: false", "rollbackExecutionAllowed: false", "publicationAllowed: false"] },
   { id: "work-publication-transaction-state-sidecar", file: ".mcp.work-header-publication-transaction-state-v1.json", tokens: ['"evavo-work-header-publication-transaction-state-v1"', '"tools/work_header_publication_transaction_state_mcp.mjs"', '"evavo.work-header-publication-transaction-state.v1"', '"0c88d1977075832287f9acf73500e7211687a594b0b0650f4dcadf367024583c"', '"publicationAllowed": false'] },
-  { id: "durable-review", file: "tools/image_review_session_mcp.mjs", tokens: ["evavo.image-review-session.v1_1", "sourceSha256AndLengthBound: true", "staleEvidenceVerification: true"] },
+  { id: "durable-review", file: "tools/image_review_session_mcp.mjs", tokens: ["evavo.image-review-session.v1_2", "evavo.image-review-evidence-integrity.v1", "reviewEvidenceSha256", "reviewEvidenceRecomputedDuringVerification: true", "reviewEvidenceTamperRejected: true", "sourceSha256AndLengthBound: true", "comparisonSha256AndLengthBound: true", "staleEvidenceVerification: true"] },
   { id: "safe-bundle", file: "tools/lib/create_only_bundle.mjs", tokens: ["writeCreateOnlyBundle", "rollback", "preflight"] },
   { id: "mcp-registration", file: ".mcp.json", tokens: ["evavo-image-review-session-v1", "evavo-image-quality-pipeline-doctor-v1", "evavo-work-header-preview-admission-v1", "evavo-work-header-page-render-review-v1", "evavo-work-header-approval-decision-v1", "evavo-work-header-publication-preparation-v1", "evavo-work-header-publication-transaction-plan-v1", "evavo-work-header-publication-execution-authorization-v1", "evavo-work-header-publication-execution-claim-v1", "evavo-work-header-publication-execution-result-v1", "evavo-work-header-publication-rollback-readiness-v1", "evavo-work-header-publication-postflight-v1", "evavo-work-header-publication-rollback-authorization-v1", "evavo-work-header-publication-rollback-execution-claim-v1", "evavo-work-header-publication-rollback-execution-result-v1", "evavo-work-header-publication-rollback-postflight-v1", "evavo-work-header-publication-transaction-state-v1"] },
 ]);
@@ -55,7 +55,7 @@ async function inspect() {
   }
   const blockers = checks.filter((check) => !check.ok).map((check) => check.id);
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_34",
+    contract: "evavo.image-quality-pipeline-doctor.v1_35",
     ready: blockers.length === 0,
     blockerCount: blockers.length,
     blockers,
@@ -65,19 +65,23 @@ async function inspect() {
     publicationAllowed: false,
     nextAction: blockers.length
       ? "Repair failing image-quality contract surfaces before trusting publication or rollback evidence."
-      : "Static image-quality evidence now runs from preservation through exact browser review, deterministic page-review recomputation, explicit approval, target-aware publication/postflight verification, target-aware rollback authorization and claiming, rollback closure and a registered target-aware transaction-state ledger.",
+      : "Static image-quality evidence now runs from self-verifying durable image review through enhancement review, exact browser/page evidence, explicit approval, target-aware publication/postflight verification, rollback closure and registered transaction state.",
   });
 }
 
 const tools = Object.freeze([
   { name: "evavo_image_quality_pipeline_doctor_capabilities", description: "Describe the read-only EVAVO image quality pipeline doctor.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
-  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect preservation, deterministic reviewed-image evidence, target-aware publication/postflight protection, target-aware rollback evidence and durable registered transaction state without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "evavo_run_image_quality_pipeline_doctor", description: "Inspect self-verifying durable image review, deterministic reviewed-image evidence, target-aware publication/postflight protection, target-aware rollback evidence and durable registered transaction state without mutating source, website or Cloudinary state.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
 ]);
 function capabilities() {
   return Object.freeze({
-    contract: "evavo.image-quality-pipeline-doctor.v1_34",
+    contract: "evavo.image-quality-pipeline-doctor.v1_35",
     serverVersion: SERVER_VERSION,
     readOnly: true,
+    durableReviewCanonicalEvidenceDigestChecked: true,
+    durableReviewDeterministicRecomputationChecked: true,
+    durableReviewTamperRejectionChecked: true,
+    enhancementReviewRequiresRecomputedDurableReviewEvidence: true,
     browserResponseBodyLineageChecked: true,
     exactTriggeredBrowserRequestBindingChecked: true,
     fullPageReviewReceiptLineageChecked: true,
