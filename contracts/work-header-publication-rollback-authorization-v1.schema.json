@@ -29,6 +29,9 @@
     "publicationPostflightReceiptPath",
     "publicationPostflightReceiptSha256",
     "publicationPostflightReceiptByteLength",
+    "recoverabilityReceiptPath",
+    "recoverabilityReceiptSha256",
+    "recoverabilityReceiptByteLength",
     "route",
     "candidateId",
     "candidateSha256",
@@ -45,6 +48,9 @@
     "explicitRollbackConfirmation",
     "rollbackReadinessReverified",
     "publicationPostflightReverified",
+    "recoverabilityReverified",
+    "recoverabilityLiveTargetMatchedCandidateAtVerification",
+    "recoverabilityRollbackBackupStillReady",
     "postflightLiveTargetMatchedCandidateAtVerification",
     "postflightRollbackBackupStillReady",
     "currentPublishedTargetStillMatchesCandidate",
@@ -69,19 +75,52 @@
     "rollbackReadinessReceiptPath": {
       "$ref": "#/$defs/path"
     },
+    "publicationPostflightReceiptPath": {
+      "$ref": "#/$defs/path"
+    },
+    "recoverabilityReceiptPath": {
+      "$ref": "#/$defs/path"
+    },
     "rollbackReadinessReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "publicationPostflightReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "recoverabilityReceiptSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidateSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "publishedTargetSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rollbackBackupSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "previousTargetSnapshotSha256": {
       "$ref": "#/$defs/sha256"
     },
     "rollbackReadinessReceiptByteLength": {
       "$ref": "#/$defs/positiveInt"
     },
-    "publicationPostflightReceiptPath": {
-      "$ref": "#/$defs/path"
-    },
-    "publicationPostflightReceiptSha256": {
-      "$ref": "#/$defs/sha256"
-    },
     "publicationPostflightReceiptByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "recoverabilityReceiptByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "candidateByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "publishedTargetByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "rollbackBackupByteLength": {
+      "$ref": "#/$defs/positiveInt"
+    },
+    "previousTargetSnapshotByteLength": {
       "$ref": "#/$defs/positiveInt"
     },
     "route": {
@@ -92,12 +131,6 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 160
-    },
-    "candidateSha256": {
-      "$ref": "#/$defs/sha256"
-    },
-    "candidateByteLength": {
-      "$ref": "#/$defs/positiveInt"
     },
     "targetKind": {
       "enum": [
@@ -110,24 +143,6 @@
       "minLength": 1,
       "maxLength": 4096
     },
-    "publishedTargetSha256": {
-      "$ref": "#/$defs/sha256"
-    },
-    "rollbackBackupSha256": {
-      "$ref": "#/$defs/sha256"
-    },
-    "previousTargetSnapshotSha256": {
-      "$ref": "#/$defs/sha256"
-    },
-    "publishedTargetByteLength": {
-      "$ref": "#/$defs/positiveInt"
-    },
-    "rollbackBackupByteLength": {
-      "$ref": "#/$defs/positiveInt"
-    },
-    "previousTargetSnapshotByteLength": {
-      "$ref": "#/$defs/positiveInt"
-    },
     "confirmationStatement": {
       "const": "I explicitly authorize rollback of this exact reviewed Work-header publication transaction."
     },
@@ -138,6 +153,15 @@
       "const": true
     },
     "publicationPostflightReverified": {
+      "const": true
+    },
+    "recoverabilityReverified": {
+      "const": true
+    },
+    "recoverabilityLiveTargetMatchedCandidateAtVerification": {
+      "const": true
+    },
+    "recoverabilityRollbackBackupStillReady": {
       "const": true
     },
     "postflightLiveTargetMatchedCandidateAtVerification": {
