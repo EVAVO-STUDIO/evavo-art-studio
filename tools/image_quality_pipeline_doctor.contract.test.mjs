@@ -4,11 +4,11 @@ import test from "node:test";
 
 const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
-test("image quality doctor covers review through target-aware publication and postflight-gated rollback result", async () => {
+test("image quality doctor covers review through target-aware publication and postflight-gated rollback", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
-    'contract: "evavo.image-quality-pipeline-doctor.v1_29"',
-    'SERVER_VERSION = "1.29.0"',
+    'contract: "evavo.image-quality-pipeline-doctor.v1_32"',
+    'SERVER_VERSION = "1.32.0"',
     'id: "alpha-aware-quality"',
     'id: "profile-aware-defects"',
     'id: "defect-regions"',
@@ -31,6 +31,8 @@ test("image quality doctor covers review through target-aware publication and po
     'id: "work-publication-rollback-authorization"',
     'id: "work-publication-rollback-execution-claim"',
     'id: "work-publication-rollback-execution-result"',
+    'id: "work-publication-rollback-postflight"',
+    'id: "work-publication-transaction-state"',
     'id: "mcp-registration"',
     "executionPerformed: false",
     "sourceMutationPerformed: false",
@@ -76,7 +78,6 @@ test("doctor requires live target-aware authorization and claim for Cloudinary s
     'CLOUDINARY_HOST = "res.cloudinary.com"',
     'CLOUDINARY_CLOUD = "dntogqtey"',
     "unversioned stable delivery URL",
-    'SERVER_VERSION = "1.1.0"',
     "targetAwareCurrentTargetRecheck: true",
     "cloudinaryUsesLiveRemoteRecheck: true",
     "cloudinaryUnversionedStableDeliveryUrlRequired: true",
@@ -103,34 +104,37 @@ test("doctor requires explicit approval, rollback planning, authorization and si
   ]) assert.ok(source.includes(token), `missing publication safety token: ${token}`);
 });
 
-test("doctor requires postflight before rollback authorization and single-use rollback evidence", async () => {
+test("doctor requires target-aware postflight before rollback authorization and claim", async () => {
   const source = await read("./image_quality_pipeline_doctor_mcp.mjs");
   for (const token of [
+    'SERVER_VERSION = "1.1.0"',
     'CONTRACT = "evavo.work-header-publication-postflight.v1"',
-    'SCHEMA_SHA256 = "5a1a2a9a329d3ce4eecd81981e3aa35cd2d6d2d3487f78b6b56672bacca99ae8"',
+    'SCHEMA_SHA256 = "69b9a40178e78892c330e6f2b5bca33b3be8413ef81ef404c1dd9edad9d24ff2"',
+    "targetAwareLiveRecheckRequired: true",
+    "websiteSourceUsesGovernedLocalRecheck: true",
+    "cloudinaryUsesLiveRemoteRecheck: true",
+    "cloudinaryCallerLocalRecheckRejected: true",
     "currentLiveTargetMustExactlyMatchReviewedCandidate: true",
     "rollbackBackupMustRemainReady: true",
     "postflightEvidenceOnly: true",
     'CONTRACT = "evavo.work-header-publication-rollback-authorization.v1"',
-    'SCHEMA_SHA256 = "3f23166dc2901ba09f222682b2d6e2be4ab84e4d0ad4d469ae9c041e3bac211b"',
-    "explicitRollbackConfirmationRequired: true",
-    "publicationPostflightReverificationRequired: true",
+    'POSTFLIGHT_SCHEMA_SHA256 = "69b9a40178e78892c330e6f2b5bca33b3be8413ef81ef404c1dd9edad9d24ff2"',
+    "targetAwarePublicationPostflightRequired: true",
+    "cloudinaryPostflightLiveRemoteRecheckRequired: true",
     "singleRollbackTransactionAuthorizationOnly: true",
     "authorizationExpiresOnAnyEvidenceDrift: true",
     'CONTRACT = "evavo.work-header-publication-rollback-execution-claim.v1"',
-    'SCHEMA_SHA256 = "2abc5c031803e2d29c40fe80dcc118ca4ee984e3f0a9a1fe7da17455acbf4e78"',
+    "targetAwarePublicationPostflightReverificationRequired: true",
+    "targetAwareCurrentPublishedTargetRecheckRequired: true",
+    "cloudinaryLiveRemoteRecheckRequired: true",
     "confirmSingleUseRollbackClaim=true is required",
     "claimInvalidOnAnyEvidenceDrift",
-    'CONTRACT = "evavo.work-header-publication-rollback-execution-result.v1"',
-    'SCHEMA_SHA256 = "2c963f8ba6adb05deb871e62c0803d78c55f68da551127c01b07c82df2480352"',
-    "publicationPostflightReceiptPath",
-    "rollback-claimed-unexecuted",
     "rollbackExecutionAllowed: false",
-    "rollbackAuthorizationPostflightGateChecked: true",
-    "rollbackSingleUseClaimBoundaryChecked: true",
-    "rollbackExecutionResultEvidenceBoundaryChecked: true",
+    "publicationPostflightTargetAwareLiveRecheckChecked: true",
+    "rollbackAuthorizationTargetAwarePostflightRecheckChecked: true",
+    "rollbackSingleUseClaimTargetAwareRecheckChecked: true",
     "rollbackMutationAuthorityAbsent: true",
-  ]) assert.ok(source.includes(token), `missing postflight/rollback doctor token: ${token}`);
+  ]) assert.ok(source.includes(token), `missing target-aware postflight/rollback doctor token: ${token}`);
 });
 
 test("MCP configuration exposes complete evidence chain but no mutation executor", async () => {
@@ -144,6 +148,7 @@ test("MCP configuration exposes complete evidence chain but no mutation executor
     '"evavo-work-header-publication-rollback-authorization-v1"',
     '"evavo-work-header-publication-rollback-execution-claim-v1"',
     '"evavo-work-header-publication-rollback-execution-result-v1"',
+    '"evavo-work-header-publication-rollback-postflight-v1"',
   ]) assert.ok(config.includes(token), `missing MCP registration token: ${token}`);
   assert.ok(!config.includes('"evavo-work-header-publication-executor-v1"'));
   assert.ok(!config.includes('"evavo-work-header-publication-rollback-executor-v1"'));
