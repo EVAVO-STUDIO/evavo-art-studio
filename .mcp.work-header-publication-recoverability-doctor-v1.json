@@ -1,0 +1,16 @@
+{
+  "name": "evavo-work-header-publication-recoverability-doctor-v1",
+  "command": "node",
+  "args": ["tools/work_header_publication_recoverability_doctor_mcp.mjs"],
+  "env": {},
+  "contract": "evavo.work-header-publication-recoverability-doctor.v1",
+  "readOnly": true,
+  "recoverabilitySchemaSha256": "c2fceba4d6d9bfa7ed4d1ec252c74d133a30b5e7f4a33847cc8fd354c275ae15",
+  "authority": {
+    "executionAllowed": false,
+    "rollbackExecutionAllowed": false,
+    "publicationAllowed": false,
+    "cloudOverwriteAllowed": false,
+    "websiteMutationAllowed": false
+  }
+}
