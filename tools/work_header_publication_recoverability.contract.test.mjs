@@ -5,10 +5,11 @@ import test from "node:test";
 
 const read = (name) => readFile(new URL(name, import.meta.url));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const SCHEMA_SHA256 = "c2fceba4d6d9bfa7ed4d1ec252c74d133a30b5e7f4a33847cc8fd354c275ae15";
 
 test("publication recoverability schema remains exact, fail-closed and evidence-only", async () => {
   const bytes = await read("../contracts/work-header-publication-recoverability-v1.schema.json");
-  assert.equal(sha256(bytes), "d382c2614e0315d6206bfa0ec0c3a5cc2f36600811031053eb0e4dc901d32370");
+  assert.equal(sha256(bytes), SCHEMA_SHA256);
   const schema = JSON.parse(bytes.toString("utf8"));
   assert.equal(schema.additionalProperties, false);
   assert.equal(schema.properties.contract.const, "evavo.work-header-publication-recoverability.v1");
@@ -24,7 +25,8 @@ test("publication recoverability schema remains exact, fail-closed and evidence-
 test("recoverability MCP rechecks live candidate and distinct rollback backup without execution authority", async () => {
   const source = (await read("./work_header_publication_recoverability_mcp.mjs")).toString("utf8");
   for (const token of [
-    'SERVER_VERSION = "1.0.0"',
+    'SERVER_VERSION = "1.0.1"',
+    `SCHEMA_SHA256 = "${SCHEMA_SHA256}"`,
     'CONTRACT = "evavo.work-header-publication-recoverability.v1"',
     'TRANSACTION_STATE_CONTRACT = "evavo.work-header-publication-transaction-state.v1"',
     'PUBLICATION_POSTFLIGHT_CONTRACT = "evavo.work-header-publication-postflight.v1"',
@@ -51,6 +53,6 @@ test("recoverability MCP rechecks live candidate and distinct rollback backup wi
 test("recoverability MCP profile pins schema and forbids mutation authority", async () => {
   const profile = JSON.parse((await read("../.mcp.work-header-publication-recoverability-v1.json")).toString("utf8"));
   assert.equal(profile.contract, "evavo.work-header-publication-recoverability.v1");
-  assert.equal(profile.schemaSha256, "d382c2614e0315d6206bfa0ec0c3a5cc2f36600811031053eb0e4dc901d32370");
+  assert.equal(profile.schemaSha256, SCHEMA_SHA256);
   for (const value of Object.values(profile.authority)) assert.equal(value, false);
 });
