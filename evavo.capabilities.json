@@ -48,35 +48,32 @@
     {
       "id": "art.animation.pipeline",
       "title": "Plan and govern canonical multi-studio animation production",
-      "description": "Compile camera-aware animation production profiles, determine dependency-safe drawing batches, run producer technical review, route independent Cel Animation Studio review, compile accepted runtime timing and coordinate target-specific next actions through the animation pipeline control plane v1.1.",
+      "description": "Compile camera-aware animation production profiles, determine dependency-safe drawing batches, run producer technical review, route independent Cel Animation Studio review, compile accepted runtime timing and coordinate target-specific next actions through the animation pipeline control plane v1.1. This surface cannot execute providers, auto-approve creative work, promote artifacts, mutate target repositories, activate runtimes or publish.",
       "interfaces": ["automation", "mcp", "library", "testing"],
       "effects": ["read", "compute", "execute"],
       "entrypoints": ["node tools/animation_pipeline_control_plane_v1_1_mcp.mjs", ".mcp.animation-pipeline-v1.json", "node tools/animation_production_profile_canonical_v1_mcp.mjs", ".mcp.animation-production-canonical-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
       "tags": ["animation", "cel", "production-profile", "timing", "camera", "review", "godot", "video"],
-      "requires": ["Approved camera/identity/style/performance direction", "Exact profile content identity", "Independent Cel Animation Studio review before acceptance", "Separate named creative approval before canonical delivery"],
-      "authority": {"providerExecution": false, "automaticCreativeApproval": false, "artifactPromotion": false, "targetRepositoryMutation": false, "runtimeActivation": false, "publication": false}
+      "requires": ["Approved camera/identity/style/performance direction", "Exact profile content identity", "Independent Cel Animation Studio review before acceptance", "Separate named creative approval before canonical delivery", "No automatic provider execution, promotion, target mutation or publication"]
     },
     {
       "id": "art.animation.frame-ledger",
       "title": "Track exact frame production with an event-sourced work ledger",
-      "description": "Create and verify animation frame ledgers bound to one approved profile, compile dependency-safe frame work orders, bind candidate receipts, atomically apply same-revision candidate batches and retain targeted-repair/independent-review evidence without treating generated images as accepted frames.",
+      "description": "Create and verify animation frame ledgers bound to one approved profile, compile dependency-safe frame work orders, bind candidate receipts, atomically apply same-revision candidate batches and retain targeted-repair/independent-review evidence without treating generated images as accepted frames. The ledger surface cannot execute providers or promote candidates.",
       "interfaces": ["automation", "mcp", "library", "testing"],
       "effects": ["read", "compute", "execute"],
       "entrypoints": ["node tools/animation_frame_work_ledger_v1_mcp.mjs", ".mcp.animation-frame-ledger-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
       "tags": ["animation", "frames", "ledger", "work-orders", "candidate-receipts", "repair", "cel-review"],
-      "requires": ["Exact approved production-profile digest", "Latest ledger revision", "Complete same-revision receipt batches", "Content-digested identity/direction/dependency references", "Independent review before frame acceptance"],
-      "authority": {"providerExecution": false, "automaticCreativeApproval": false, "artifactPromotion": false, "targetRepositoryMutation": false, "runtimeActivation": false, "publication": false}
+      "requires": ["Exact approved production-profile digest", "Latest ledger revision", "Complete same-revision receipt batches", "Content-digested identity/direction/dependency references", "Independent review before frame acceptance", "No automatic creative approval or runtime activation"]
     },
     {
       "id": "art.animation.delivery",
       "title": "Compile canonical path-free Godot, Cel and Video animation delivery",
-      "description": "Compile and verify accepted animation sequence delivery from an approved profile, canonical accepted review, exact PNG bindings and separate named creative approval; preserve integer exposure timing and prepare target-specific intake without resolving media paths or activating runtimes.",
+      "description": "Compile and verify accepted animation sequence delivery from an approved profile, canonical accepted review, exact PNG bindings and separate named creative approval; preserve integer exposure timing and prepare target-specific intake without resolving media paths, transcoding, interpolation, repository mutation or runtime activation.",
       "interfaces": ["automation", "mcp", "library", "testing"],
       "effects": ["read", "compute", "execute"],
       "entrypoints": ["node tools/animation_sequence_delivery_canonical_v1_mcp.mjs", ".mcp.animation-production-canonical-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
       "tags": ["animation", "delivery", "godot", "cel", "video", "timing", "artifact-lineage"],
-      "requires": ["Approved production profile", "Canonical accepted review", "Exact artifact hashes", "Separate named creative approval", "Downstream target-specific intake/runtime acceptance"],
-      "authority": {"mediaResolution": false, "transcoding": false, "interpolation": false, "runtimeActivation": false, "targetRepositoryMutation": false, "publication": false}
+      "requires": ["Approved production profile", "Canonical accepted review", "Exact artifact hashes", "Separate named creative approval", "Downstream target-specific intake/runtime acceptance", "No media resolution or runtime activation in this surface"]
     },
     {
       "id": "art.animation.character-family-preflight",
@@ -86,18 +83,17 @@
       "effects": ["read", "compute", "execute"],
       "entrypoints": ["node tools/animation_character_family_campaign_preflight_v1.mjs describe", "node tools/animation_character_family_campaign_preflight_v1.mjs inspect", "node tools/animation_character_family_campaign_preflight_v1.mjs verify", ".mcp.animation-character-family-campaign-preflight-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
       "tags": ["animation", "character-family", "campaign", "preflight", "adapters", "supply-chain", "ownership"],
-      "requires": ["Exact family-plan digest", "Declared Art/Cel repository roots", "Digest-bound adapter entrypoints", "No credential-bearing manifest fields"],
-      "authority": {"providerExecution": false, "localExecution": false, "automaticCreativeApproval": false, "artifactPromotion": false, "repositoryMutation": false, "runtimeActivation": false, "publication": false}
+      "requires": ["Exact family-plan digest", "Declared Art/Cel repository roots", "Digest-bound adapter entrypoints", "No credential-bearing manifest fields", "Preflight does not execute adapters or grant approval"]
     },
     {
       "id": "art.animation.execution-supervisor",
       "title": "Supervise explicitly enabled bounded animation execution",
-      "description": "Serve the animation execution supervisor with bounded local workspace/artifact roots, resolved Art/Cel repository identities and remote ComfyUI disabled by default. Execution and creative-approval writes are separate explicit opt-ins; publication and downstream runtime admission remain outside this authority.",
+      "description": "Serve the animation execution supervisor with bounded local workspace/artifact roots, resolved Art/Cel repository identities and remote ComfyUI disabled by default. Execution and creative-approval writes are separate explicit opt-ins; publication, Git publication and downstream runtime admission remain outside this authority.",
       "interfaces": ["automation", "mcp"],
       "effects": ["read", "compute", "write", "execute"],
       "entrypoints": ["node scripts/start-animation-execution-supervisor-mcp-v1.mjs", "node scripts/start-animation-execution-supervisor-mcp-v1.mjs --enable-execution", ".mcp.animation-execution-supervisor-v1.json", "docs/ANIMATION_CONTROL_PLANE.md"],
       "tags": ["animation", "execution", "supervisor", "comfyui", "workspace", "gated-effects"],
-      "requires": ["Explicit --enable-execution for animation execution", "Independent --enable-approval-write only when authorised", "Bounded local workspace/artifact roots", "Sibling Art/Cel repository identity", "No implicit publication or target-runtime authority"]
+      "requires": ["Explicit --enable-execution for animation execution", "Independent --enable-approval-write only when authorised", "Bounded local workspace/artifact roots", "Sibling Art/Cel repository identity", "No implicit Git publication, target mutation or runtime admission"]
     },
     {
       "id": "art.pixel-font.build",
