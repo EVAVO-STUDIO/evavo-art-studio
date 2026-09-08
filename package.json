@@ -62,7 +62,7 @@
     "project-art:workspace:persistent:check": "node scripts/check-persistent-artist-workspace.mjs && node scripts/test-persistent-artist-workspace.mjs",
     "project-art:mastering:check": "node scripts/check-project-art-mastering-and-motion.mjs && node scripts/test-project-art-mastering-and-motion.mjs && python -m unittest scripts/test_project_art_granular_edits.py",
     "project-art:granular-edits:check": "python -m unittest scripts/test_project_art_granular_edits.py",
-    "alpha-fallback:check": "python -m unittest scripts/test_recover_painted_checkerboard.py",
+    "alpha-fallback:check": "python -m unittest scripts/test_recover_painted_checkerboard.py scripts/test_transparency_guard.py",
     "raster-finishing:mcp:check": "node --check tools/raster_finishing_mcp.mjs && node --test tools/raster_finishing_mcp.test.mjs",
     "project-art:intake:check": "node scripts/check-project-art-intake.mjs && node scripts/test-project-art-intake.mjs",
     "project-art:review:compile": "node scripts/compile-project-art-review.mjs",

@@ -88,8 +88,97 @@ def _dominant_parity_colour(
     return colours[0], colours[1]
 
 
+def _band_luminance_correlation(rgba: Image.Image, lag_x: int, lag_y: int) -> float | None:
+    """Measure periodic luminance in the border band without assuming a rigid grid phase."""
+    width, height = rgba.size
+    band = max(8, int(min(width, height) * 0.16))
+    available = max(1, (width - lag_x) * (height - lag_y))
+    stride = max(1, math.ceil(math.sqrt(available / 12_000)))
+    pixels = rgba.load()
+    count = 0
+    left_sum = right_sum = left_sq_sum = right_sq_sum = product_sum = 0.0
+    for y in range(0, height - lag_y, stride):
+        for x in range(0, width - lag_x, stride):
+            other_x = x + lag_x
+            other_y = y + lag_y
+            if (
+                band <= x < width - band
+                and band <= y < height - band
+                and band <= other_x < width - band
+                and band <= other_y < height - band
+            ):
+                continue
+            left = pixels[x, y]
+            right = pixels[other_x, other_y]
+            if left[3] < 254 or right[3] < 254:
+                continue
+            if max(left[:3]) - min(left[:3]) > 40 or max(right[:3]) - min(right[:3]) > 40:
+                continue
+            left_luma = left[0] * 0.2126 + left[1] * 0.7152 + left[2] * 0.0722
+            right_luma = right[0] * 0.2126 + right[1] * 0.7152 + right[2] * 0.0722
+            count += 1
+            left_sum += left_luma
+            right_sum += right_luma
+            left_sq_sum += left_luma * left_luma
+            right_sq_sum += right_luma * right_luma
+            product_sum += left_luma * right_luma
+    if count < 64:
+        return None
+    covariance = product_sum - left_sum * right_sum / count
+    left_variance = left_sq_sum - left_sum * left_sum / count
+    right_variance = right_sq_sum - right_sum * right_sum / count
+    denominator = math.sqrt(max(0.0, left_variance) * max(0.0, right_variance))
+    return covariance / denominator if denominator > 1e-6 else None
+
+
+def _warped_checkerboard_evidence(rgba: Image.Image) -> dict[str, Any]:
+    """Find checker alternation that survived perspective warping or provider distortion."""
+    width, height = rgba.size
+    best: dict[str, Any] | None = None
+    for tile in CHECKER_TILE_SIZES:
+        if width / tile < 8 or height / tile < 8:
+            continue
+        horizontal_odd = _band_luminance_correlation(rgba, tile, 0)
+        vertical_odd = _band_luminance_correlation(rgba, 0, tile)
+        horizontal_even = _band_luminance_correlation(rgba, tile * 2, 0)
+        vertical_even = _band_luminance_correlation(rgba, 0, tile * 2)
+        if None in (horizontal_odd, vertical_odd, horizontal_even, vertical_even):
+            continue
+        odd = (horizontal_odd + vertical_odd) * 0.5
+        even = (horizontal_even + vertical_even) * 0.5
+        score = even - odd
+        candidate = {
+            "tileSize": tile,
+            "horizontalOddCorrelation": horizontal_odd,
+            "verticalOddCorrelation": vertical_odd,
+            "horizontalEvenCorrelation": horizontal_even,
+            "verticalEvenCorrelation": vertical_even,
+            "score": score,
+        }
+        if best is None or score > best["score"]:
+            best = candidate
+    detected = bool(
+        best
+        and best["horizontalOddCorrelation"] <= -0.05
+        and best["verticalOddCorrelation"] <= -0.05
+        and best["horizontalEvenCorrelation"] >= 0.45
+        and best["verticalEvenCorrelation"] >= 0.45
+        and best["score"] >= 0.55
+    )
+    return {
+        "detected": detected,
+        "confidence": round(min(1.0, 0.82 + max(0.0, best["score"] - 0.55) * 0.3), 6) if detected and best else 0.0,
+        "tileSize": best["tileSize"] if detected and best else None,
+        "horizontalOddCorrelation": round(best["horizontalOddCorrelation"], 6) if detected and best else None,
+        "verticalOddCorrelation": round(best["verticalOddCorrelation"], 6) if detected and best else None,
+        "horizontalEvenCorrelation": round(best["horizontalEvenCorrelation"], 6) if detected and best else None,
+        "verticalEvenCorrelation": round(best["verticalEvenCorrelation"], 6) if detected and best else None,
+    }
+
+
 def _checkerboard_evidence(rgba: Image.Image) -> dict[str, Any]:
     samples, sample_stats = _band_samples(rgba)
+    warped = _warped_checkerboard_evidence(rgba)
     best: dict[str, Any] | None = None
     width, height = rgba.size
     if len(samples) >= 32:
@@ -160,13 +249,18 @@ def _checkerboard_evidence(rgba: Image.Image) -> dict[str, Any]:
         and best["fitFraction"] >= 0.92
         and best["coverageFraction"] >= 0.3
     )
-    detected = bool(
+    rigid_detected = bool(
         best
         and (sample_stats["opaqueFraction"] >= 0.25 or sample_stats["visibleFraction"] >= 0.7)
         and (neutral or chromatic)
     )
+    detected = rigid_detected or bool(
+        warped["detected"]
+        and sample_stats["opaqueFraction"] >= 0.7
+        and sample_stats["lowChromaFraction"] >= 0.78
+    )
     confidence = 0.0
-    if detected and best:
+    if rigid_detected and best:
         confidence = max(
             0.86,
             min(
@@ -176,6 +270,8 @@ def _checkerboard_evidence(rgba: Image.Image) -> dict[str, Any]:
                 * (0.9 + 0.1 * math.sqrt(best["coverageFraction"])),
             ),
         )
+    elif detected:
+        confidence = float(warped["confidence"])
     return {
         "detected": detected,
         "confidence": round(confidence, 6),
@@ -191,6 +287,7 @@ def _checkerboard_evidence(rgba: Image.Image) -> dict[str, Any]:
         "fitFraction": round(best["fitFraction"], 6) if detected and best else None,
         "coverageFraction": round(best["coverageFraction"], 6) if detected and best else None,
         "rmse": round(best["rmse"], 4) if detected and best else None,
+        "warpedGrid": warped,
     }
 
 
