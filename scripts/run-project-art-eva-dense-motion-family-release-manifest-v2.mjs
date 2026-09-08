@@ -133,21 +133,23 @@ function fingerprint(values) {
 
 function manifest(values) {
   required(values, [
-    '--fingerprint-plan', '--owner-approval', '--creative-director-approval',
+    '--fingerprint-plan', '--family-evidence-root', '--owner-approval', '--creative-director-approval',
     '--technical-director-approval', '--manifested-at', '--output',
   ]);
   const plan = stableJson(values.get('--fingerprint-plan'), 'fingerprint plan');
   const manifestedAt = values.get('--manifested-at');
+  const familyEvidenceRoot = realDirectory(values.get('--family-evidence-root'), 'familyEvidenceRoot');
   const result = compileEvaDenseMotionFamilyReleaseManifestV2({
     fingerprintPlan: plan,
+    familyEvidenceRoot,
     ownerApproval: readEvaDenseMotionFamilyApprovalFileV2(
-      values.get('--owner-approval'), 'owner', plan.familyEvidenceFingerprint, manifestedAt,
+      values.get('--owner-approval'), 'owner', plan.familyEvidenceFingerprint, manifestedAt, familyEvidenceRoot,
     ),
     creativeDirectorApproval: readEvaDenseMotionFamilyApprovalFileV2(
-      values.get('--creative-director-approval'), 'creative-director', plan.familyEvidenceFingerprint, manifestedAt,
+      values.get('--creative-director-approval'), 'creative-director', plan.familyEvidenceFingerprint, manifestedAt, familyEvidenceRoot,
     ),
     technicalDirectorApproval: readEvaDenseMotionFamilyApprovalFileV2(
-      values.get('--technical-director-approval'), 'technical-director', plan.familyEvidenceFingerprint, manifestedAt,
+      values.get('--technical-director-approval'), 'technical-director', plan.familyEvidenceFingerprint, manifestedAt, familyEvidenceRoot,
     ),
     manifestedAt,
   });
@@ -157,6 +159,7 @@ function manifest(values) {
     familyEvidenceFingerprint: result.familyEvidenceFingerprint,
     manifestSha256: result.manifestSha256,
     automaticApprovalCreationAllowed: result.policy.automaticApprovalCreationAllowed,
+    fileBackedHumanApprovalEvidenceRequired: result.policy.fileBackedHumanApprovalEvidenceRequired,
     outputPath,
   }, null, 2)}\n`);
   return 0;
