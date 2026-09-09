@@ -29,7 +29,6 @@ const ROLE_VALUES = Object.freeze([
 
 const PROFILE_VALUES = Object.freeze([
   "web-hero",
-  "web-support",
   "logo-transparent",
   "product-cutout",
   "ui-screenshot",
