@@ -19,8 +19,9 @@ Art Studio owns reusable animation request/profile planning. It does not duplica
 - `createHumanCelQualityReceipt` for the exact candidate bytes after deterministic and manual craft review;
 - `reviewHumanCelArtefact` as the canonical positive review helper;
 - the Cel Animation Studio persistence-level strict receipt gate before any approved state becomes authoritative;
+- canonical persisted snapshot/render-job integrity at the public Cel Store boundary;
 - Cel Animation Studio `@evavo/cel-core` 0.37.0 or newer;
-- Cel Animation Studio `@evavo/cel-store` 0.26.0 or newer.
+- Cel Animation Studio `@evavo/cel-store` 0.27.0 or newer.
 
 It grants no provider execution, creative approval, repository mutation or publication authority.
 
@@ -54,7 +55,9 @@ The authority handoff requires these Cel Animation Studio core surfaces:
 - `assertHumanCelQualityReceiptBinding`
 - `reviewHumanCelArtefact`
 
-The authority also requires Store 0.26's `strict-human-cel-promotion-receipt-gate` behaviour. That gate is the final persisted-state authority: if a candidate cites a persisted strict envelope, a render-job revision cannot newly approve it or advance using it until a matching immutable zero-blocker receipt exists. The ordinary annotation-clearance and risk-acceptance gates still apply afterward.
+The authority also requires Store 0.27's `strict-human-cel-promotion-receipt-gate` and `canonical-snapshot-render-job-integrity` behaviours. The public Store recomputes canonical production-snapshot content, render recipe/request/job identity, task graph, artefact bindings and current render-job content before the strict receipt gate is trusted. A hand-edited job or snapshot therefore cannot become authority merely by carrying strings that look like SHA-256 digests.
+
+For strict candidates, the receipt gate remains the final craft-promotion boundary: if a candidate cites a persisted strict envelope, a render-job revision cannot newly approve it or advance using it until a matching immutable zero-blocker receipt exists. The ordinary annotation-clearance and risk-acceptance gates still apply afterward.
 
 The downstream Cel authority identifies one exact work order, craft-direction packet, render request, task and visual stage. Any change makes that authority stale. The strict compiler returns a digest-bound envelope containing both that authority and the exact governed render prompt, so a convenience/base compiler cannot silently satisfy a `human-cel-authored` claim.
 
@@ -64,7 +67,7 @@ The consolidated quality gate requires deterministic evidence for drawing contin
 
 The output-side quality receipt then binds those decisions to the exact candidate content digest plus the strict-envelope, authority, prompt, work-order and direction digests. A filename or visually similar replacement cannot reuse the receipt. Changing the candidate or any strict upstream identity requires a new receipt.
 
-`reviewHumanCelArtefact` is the canonical strict positive-review helper. The store is deliberately stronger than helper identity: even an older or generic caller cannot make a strict approved job revision authoritative unless the same exact persisted receipt evidence passes the global promotion gate.
+`reviewHumanCelArtefact` is the canonical strict positive-review helper. The store is deliberately stronger than helper identity: even an older or generic caller cannot make a strict approved job revision authoritative unless the same exact persisted receipt evidence passes the global promotion gate and the persisted snapshot/job state first recomputes correctly.
 
 Art Studio can continue to provide deterministic camera, perspective, identity, pose-beat, delivery and runtime planning. Cel Animation Studio remains responsible for the stricter craft grammar, exact downstream authority, immutable quality evidence and persisted promotion enforcement.
 
@@ -79,4 +82,4 @@ Both operations are side-effect free.
 
 ## Prohibited substitutions
 
-The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, random line boil, fake analogue degradation, constant idle body bob, timer-like blinking, generic mouth flapping, unmotivated rim/bloom/genre grading, generated pseudo-lettering, using a convenience/base prompt compiler to stand in for the required strict authority-bound path, and persisting a strict approved candidate without a current candidate-byte-bound zero-blocker quality receipt.
+The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, random line boil, fake analogue degradation, constant idle body bob, timer-like blinking, generic mouth flapping, unmotivated rim/bloom/genre grading, generated pseudo-lettering, using a convenience/base prompt compiler to stand in for the required strict authority-bound path, persisting a strict approved candidate without a current candidate-byte-bound zero-blocker quality receipt, and trusting hand-edited persisted job/snapshot state without canonical Store integrity verification.
