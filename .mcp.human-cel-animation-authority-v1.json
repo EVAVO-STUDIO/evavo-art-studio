@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "evavo-human-cel-animation-authority-v1": {
+      "command": "node",
+      "args": ["tools/human_cel_animation_authority_v1_mcp.mjs"],
+      "env": {
+        "EVAVO_HUMAN_CEL_PROVIDER_EXECUTION": "disabled",
+        "EVAVO_HUMAN_CEL_CREATIVE_APPROVAL": "disabled",
+        "EVAVO_HUMAN_CEL_REPOSITORY_MUTATION": "disabled",
+        "EVAVO_HUMAN_CEL_PUBLICATION": "disabled"
+      }
+    }
+  }
+}
