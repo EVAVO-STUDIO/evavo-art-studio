@@ -14,8 +14,8 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import {
-  compileEvaDenseMotionFamilyReleaseEvidenceV2,
-} from './project-art/eva-dense-motion-family-release-assembly-v2.mjs';
+  compileEvaDenseMotionFamilyReleaseEvidenceV2WithProvenance,
+} from './project-art/eva-dense-motion-family-release-assembly-v2-provenance.mjs';
 
 const MAXIMUM_JSON_BYTES = 32 * 1024 * 1024;
 const REQUIRED = Object.freeze([
@@ -104,7 +104,7 @@ function writeOutput(raw, value) {
 export function main(argv = process.argv.slice(2)) {
   try {
     const args = parseFlags(argv);
-    const result = compileEvaDenseMotionFamilyReleaseEvidenceV2({
+    const result = compileEvaDenseMotionFamilyReleaseEvidenceV2WithProvenance({
       tenMasterProgram: stableJson(args.get('--program'), 'ten-master program'),
       workOrder: stableJson(args.get('--work-order'), 'dense-motion work order'),
       workspaceRoot: realDirectory(args.get('--workspace-root'), 'workspaceRoot'),
@@ -120,6 +120,8 @@ export function main(argv = process.argv.slice(2)) {
       status: result.status,
       familyEvidenceFingerprint: result.familyEvidenceFingerprint,
       releaseEvidenceSha256: result.evidence.releaseEvidenceSha256,
+      approvalProvenanceStatus: result.approvalProvenance.status,
+      approvalProvenanceCount: result.approvalProvenance.approvalCount,
       runtimeReceiptAssemblyReady: result.evaluation.runtimeReceiptAssemblyReady,
       publicationAllowed: result.evaluation.publicationAllowed,
       deploymentAllowed: result.evaluation.deploymentAllowed,
