@@ -2,6 +2,8 @@
 
 Art Studio owns reusable animation request/profile planning. It does not duplicate Cel Animation Studio's craft engine. When an animation request must use strict hand-drawn cel production, compile a human-cel authority bridge and hand that authority to the Cel Animation Studio workflow.
 
+The current authority protocol is `2026-09-09.10`.
+
 ## Purpose
 
 `tools/human_cel_animation_authority_v1.mjs` converts a compatible animation request into a deterministic, digest-bound authority envelope that requires:
@@ -25,9 +27,10 @@ Art Studio owns reusable animation request/profile planning. It does not duplica
 - `reviewHumanCelArtefact` as the canonical positive review helper;
 - the Cel Animation Studio persistence-level strict receipt gate before any approved state becomes authoritative;
 - canonical persisted snapshot/render-job integrity at the public Cel Store boundary;
+- integrity-aware defaults for standalone strict-envelope and quality-receipt Stores, so those evidence paths cannot silently fall back to weaker base-state validation;
 - Cel Animation Studio `@evavo/cel-core` 0.39.0 or newer;
 - Cel Animation Studio `@evavo/cel-contracts` 0.15.0 or newer;
-- Cel Animation Studio `@evavo/cel-store` 0.27.0 or newer.
+- Cel Animation Studio `@evavo/cel-store` 0.28.0 or newer.
 
 It grants no provider execution, creative approval, repository mutation or publication authority.
 
@@ -68,7 +71,9 @@ The authority handoff requires these Cel Animation Studio core surfaces:
 
 Contracts 0.15 makes both the colour and composite observations mandatory fields in every strict quality-receipt request. A client or agent therefore cannot quietly submit the older review shape after Core has moved to the stricter craft contract.
 
-The authority also requires Store 0.27's `strict-human-cel-promotion-receipt-gate` and `canonical-snapshot-render-job-integrity` behaviours. The public Store recomputes canonical production-snapshot content, render recipe/request/job identity, task graph, artefact bindings and current render-job content before the strict receipt gate is trusted. A hand-edited job or snapshot therefore cannot become authority merely by carrying strings that look like SHA-256 digests.
+The authority also requires Store 0.28's `strict-human-cel-promotion-receipt-gate`, `canonical-snapshot-render-job-integrity` and `integrity-aware-strict-envelope-and-quality-receipt-defaults` behaviours. The public Store recomputes canonical production-snapshot content, render recipe/request/job identity, task graph, artefact bindings and current render-job content before the strict receipt gate is trusted. A hand-edited job or snapshot therefore cannot become authority merely by carrying strings that look like SHA-256 digests.
+
+Standalone strict-envelope and quality-receipt Stores must use the same canonical production-snapshot/render-job integrity by default. Callers may not construct those evidence Stores on top of weaker base validation and then present the result as equivalent strict evidence.
 
 For strict candidates, the receipt gate remains the final craft-promotion boundary: if a candidate cites a persisted strict envelope, a render-job revision cannot newly approve it or advance using it until a matching immutable zero-blocker receipt exists. The ordinary annotation-clearance and risk-acceptance gates still apply afterward.
 
@@ -99,7 +104,7 @@ The consolidated quality gate requires deterministic evidence for drawing contin
 
 A failed colour/composite assessment may still be persisted as an immutable quality receipt for audit and targeted repair. It is not approval authority. Positive review still requires a current zero-blocker receipt for the exact candidate bytes and strict authority chain.
 
-`reviewHumanCelArtefact` is the canonical strict positive-review helper. The store is deliberately stronger than helper identity: even an older or generic caller cannot make a strict approved job revision authoritative unless the same exact persisted receipt evidence passes the global promotion gate and the persisted snapshot/job state first recomputes correctly.
+`reviewHumanCelArtefact` is the canonical strict positive-review helper. The Store is deliberately stronger than helper identity: even an older or generic caller cannot make a strict approved job revision authoritative unless the same exact persisted receipt evidence passes the global promotion gate and the persisted snapshot/job state first recomputes correctly.
 
 Art Studio can continue to provide deterministic camera, perspective, identity, pose-beat, delivery and runtime planning. Cel Animation Studio remains responsible for the stricter craft grammar, exact downstream authority, immutable quality evidence and persisted promotion enforcement.
 
@@ -110,8 +115,8 @@ Use `.mcp.human-cel-animation-authority-v1.json` to expose:
 - `compile_human_cel_animation_authority_v1`
 - `verify_human_cel_animation_authority_v1`
 
-Both operations are side-effect free.
+Both operations are side-effect free. The verifier reports the protocol, Core/Contracts/Store minimums, public persisted-state integrity requirement and standalone evidence-store integrity requirement so clients can fail closed on an incomplete downstream installation.
 
 ## Prohibited substitutions
 
-The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, auto-traced/vector-uniform cleanup, random line wobble or line boil, blanket blue-night/multiply-shadow/generic LUT colour treatment, universal rim/gloss, skipping dedicated colour review, fake analogue degradation, constant idle body bob, timer-like blinking, generic mouth flapping, blanket bloom/full-frame weather/fake film damage, skipping dedicated composite review, generated pseudo-lettering, using a convenience/base prompt compiler to stand in for the required strict authority-bound path, persisting a strict approved candidate without a current candidate-byte-bound zero-blocker quality receipt, and trusting hand-edited persisted job/snapshot state without canonical Store integrity verification.
+The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, auto-traced/vector-uniform cleanup, random line wobble or line boil, blanket blue-night/multiply-shadow/generic LUT colour treatment, universal rim/gloss, skipping dedicated colour review, fake analogue degradation, constant idle body bob, timer-like blinking, generic mouth flapping, blanket bloom/full-frame weather/fake film damage, skipping dedicated composite review, generated pseudo-lettering, using a convenience/base prompt compiler to stand in for the required strict authority-bound path, persisting a strict approved candidate without a current candidate-byte-bound zero-blocker quality receipt, trusting hand-edited persisted job/snapshot state without canonical Store integrity verification, and constructing standalone strict-envelope or quality-receipt Stores with weaker default state validation.
