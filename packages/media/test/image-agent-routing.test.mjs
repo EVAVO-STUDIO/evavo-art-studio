@@ -35,20 +35,28 @@ test("learned enhancement explicitly checks micro detail and macro redraw risk",
   assert.match(route.evidenceExpected.join(" "), /macro structure risk/);
 });
 
-test("texture route spans map, material, UV, ORM, Godot planning and guarded materialization", () => {
+test("texture route spans review, preprocessing, materialization and native Godot validation", () => {
   const route = routeImageAgentTask("texture-review");
   assert.match(route.primarySurface, /evavo-texture-review/);
+  assert.match(route.primarySurface, /evavo-texture-preprocess/);
   assert.match(route.primarySurface, /evavo-godot-material-delivery/);
+  assert.match(route.primarySurface, /evavo-godot-material-validator/);
   assert.ok(route.orderedTools.includes("evavo_review_texture_set"));
   assert.ok(route.orderedTools.includes("evavo_review_obj_uv_layout"));
+  assert.ok(route.orderedTools.includes("evavo_convert_tangent_normal_y"));
+  assert.ok(route.orderedTools.includes("evavo_compose_opacity_into_albedo_alpha"));
   assert.ok(route.orderedTools.includes("evavo_pack_godot_orm_texture"));
   assert.ok(route.orderedTools.includes("evavo_plan_godot_material_delivery"));
   assert.ok(route.orderedTools.includes("evavo_write_godot_material_resource"));
+  assert.ok(route.orderedTools.includes("evavo_validate_godot_material_resource"));
   assert.equal(route.writeClass, "write-gated-create-only");
   assert.match(route.stopConditions.join(" "), /UV overlap/);
   assert.match(route.stopConditions.join(" "), /needs-preprocess/);
+  assert.match(route.stopConditions.join(" "), /native Godot load/);
   assert.match(route.evidenceExpected.join(" "), /StandardMaterial3D or ORMMaterial3D/);
   assert.match(route.evidenceExpected.join(" "), /\.tres/);
+  assert.match(route.evidenceExpected.join(" "), /native Godot load\/class evidence/);
+  assert.match(route.notes.join(" "), /separate execution privilege/);
   assert.match(route.notes.join(" "), /unapproved/);
 });
 
