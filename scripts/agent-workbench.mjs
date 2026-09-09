@@ -37,8 +37,14 @@ function parseArguments(argv) {
   return options;
 }
 
-function readJson(filePath) {
-  const bytes = fs.readFileSync(filePath);
+function readBytes(filePath, label = "JSON file") {
+  const metadata = fs.lstatSync(filePath);
+  if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error(`${label} must be a regular non-link file.`);
+  return fs.readFileSync(filePath);
+}
+
+function readJson(filePath, label = "JSON file") {
+  const bytes = readBytes(filePath, label);
   return { value: JSON.parse(bytes.toString("utf8")), evidence: Object.freeze({ path: filePath, sha256: digest(bytes), bytes: bytes.length }) };
 }
 
@@ -88,8 +94,64 @@ function toolsFrom(toolRegistry) {
   if (!record(toolRegistry) || !Array.isArray(toolRegistry.tools)) throw new Error("Tool registry must contain a tools array.");
   return toolRegistry.tools.map((item) => {
     if (!record(item) || !text(item.id)) throw new Error("Tool registry id is required.");
-    return Object.freeze({ id: text(item.id), repository: text(item.repository) || null, purpose: text(item.purpose), useWhen: strings(item.useWhen), entrypoints: strings(item.entrypoints), truthBoundary: text(item.truthBoundary) });
+    return Object.freeze({ id: text(item.id), repository: text(item.repository) || null, purpose: text(item.purpose), useWhen: strings(item.useWhen), entrypoints: strings(item.entrypoints), truthBoundary: text(item.truthBoundary), source: "development-tool-registry" });
   });
+}
+
+function mcpToolsFrom(document, repository) {
+  const servers = record(document)?.mcpServers;
+  if (!record(servers)) return [];
+  return Object.entries(servers).filter(([, value]) => record(value)).map(([name, value]) => {
+    const envKeys = Object.keys(record(value.env) ?? {}).sort();
+    const argumentCount = Array.isArray(value.args) ? value.args.length : 0;
+    const commandBaseName = text(value.command) ? path.basename(text(value.command)) : "";
+    return Object.freeze({
+      id: `mcp:${name}`,
+      repository,
+      purpose: `Registered MCP launch surface: ${name}`,
+      useWhen: [],
+      entrypoints: [name],
+      truthBoundary: "Repository launch registration only; runtime readiness and effect authority require separate live protocol evidence.",
+      source: "root-mcp-launch-manifest",
+      runtimeReadiness: "unknown",
+      commandBaseName,
+      argumentCount,
+      environmentKeys: envKeys,
+    });
+  }).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function readSanitizedMcp(filePath, repository) {
+  const bytes = readBytes(filePath, "MCP launch manifest");
+  const document = JSON.parse(bytes.toString("utf8"));
+  const tools = mcpToolsFrom(document, repository);
+  const sanitizedBytes = Buffer.from(JSON.stringify({ tools }, null, 2), "utf8");
+  return {
+    tools,
+    evidence: Object.freeze({
+      path: filePath,
+      sha256: digest(sanitizedBytes),
+      bytes: sanitizedBytes.length,
+      sanitized: true,
+      rawEnvironmentValuesRetained: false,
+      rawArgumentValuesRetained: false,
+    }),
+  };
+}
+
+function mergeTools(...groups) {
+  const byId = new Map();
+  for (const group of groups) for (const item of group) if (!byId.has(item.id)) byId.set(item.id, item);
+  return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function resolveToolRegistry({ repositoryRoot, config, explicitPath }) {
+  if (explicitPath) return { path: path.resolve(explicitPath), origin: "explicit" };
+  const configuredRegistry = text(config.defaultToolRegistry);
+  if (configuredRegistry) return { path: inside(repositoryRoot, configuredRegistry, "default tool registry"), origin: "repository-config" };
+  const sibling = path.resolve(repositoryRoot, "..", "evavo-development-studio", "config", "agent-tool-registry.json");
+  if (fs.existsSync(sibling)) return { path: sibling, origin: "sibling-development-studio" };
+  return { path: null, origin: "unavailable" };
 }
 
 function estateCapabilitiesFrom(snapshot) {
@@ -112,24 +174,28 @@ function estateSummary(snapshot) {
 
 export function compileAgentWorkbench({ root, objective = "", limit = 20, all = false, toolRegistryPath = null, estateSnapshotPath = null } = {}) {
   const repositoryRoot = path.resolve(root ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
-  const configRead = readJson(inside(repositoryRoot, ".evavo/agent-workbench.v1.json", "workbench config"));
+  const configRead = readJson(inside(repositoryRoot, ".evavo/agent-workbench.v1.json", "workbench config"), "workbench config");
   const config = record(configRead.value);
   if (!config || config.contractVersion !== CONFIG_CONTRACT || !text(config.repository) || !text(config.authority) || !Array.isArray(config.phases) || config.phases.length === 0) throw new Error(`Invalid ${CONFIG_CONTRACT}.`);
   const repository = text(config.repository);
 
-  const capabilityRead = readJson(inside(repositoryRoot, text(config.capabilityManifest) || "evavo.capabilities.json", "capability manifest"));
+  const capabilityRead = readJson(inside(repositoryRoot, text(config.capabilityManifest) || "evavo.capabilities.json", "capability manifest"), "capability manifest");
   if (text(capabilityRead.value.repository) !== repository) throw new Error("Capability manifest repository identity does not match workbench config.");
   const capabilities = capabilitiesFrom(capabilityRead.value);
 
-  const packageRead = readJson(inside(repositoryRoot, text(config.packageManifest) || "package.json", "package manifest"));
+  const packageRead = readJson(inside(repositoryRoot, text(config.packageManifest) || "package.json", "package manifest"), "package manifest");
   const scripts = scriptsFrom(packageRead.value);
 
-  const configuredRegistry = text(config.defaultToolRegistry);
-  const registryPath = toolRegistryPath ? path.resolve(toolRegistryPath) : configuredRegistry ? inside(repositoryRoot, configuredRegistry, "default tool registry") : null;
-  const registryRead = registryPath ? readJson(registryPath) : null;
-  const tools = toolsFrom(registryRead?.value ?? null);
+  const registryResolution = resolveToolRegistry({ repositoryRoot, config, explicitPath: toolRegistryPath });
+  const registryRead = registryResolution.path ? readJson(registryResolution.path, "tool registry") : null;
+  const registryTools = toolsFrom(registryRead?.value ?? null);
 
-  const estateRead = estateSnapshotPath ? readJson(path.resolve(estateSnapshotPath)) : null;
+  const mcpPath = path.join(repositoryRoot, ".mcp.json");
+  const mcpRead = fs.existsSync(mcpPath) ? readSanitizedMcp(mcpPath, repository) : null;
+  const mcpTools = mcpRead?.tools ?? [];
+  const tools = mergeTools(registryTools, mcpTools);
+
+  const estateRead = estateSnapshotPath ? readJson(path.resolve(estateSnapshotPath), "estate snapshot") : null;
   const estateDocument = estateRead?.value ?? null;
   const estateCapabilities = estateCapabilitiesFrom(estateDocument);
   const automation = record(config.automation) ?? {};
@@ -142,17 +208,18 @@ export function compileAgentWorkbench({ root, objective = "", limit = 20, all = 
     role: text(config.role),
     objective,
     mode: all ? "complete-local-inventory" : broadObjective(objective) ? "broad-orientation" : "objective-ranked-orientation",
-    sourceEvidence: Object.freeze({ workbenchConfig: configRead.evidence, capabilityManifest: capabilityRead.evidence, packageManifest: packageRead.evidence, ...(registryRead ? { toolRegistry: registryRead.evidence } : {}), ...(estateRead ? { estateSnapshot: estateRead.evidence } : {}) }),
-    inventory: Object.freeze({ capabilityCount: capabilities.length, packageScriptCount: scripts.length, toolCount: tools.length, estateCapabilityCount: estateCapabilities.length, estate: estateSummary(estateDocument) }),
+    sourceEvidence: Object.freeze({ workbenchConfig: configRead.evidence, capabilityManifest: capabilityRead.evidence, packageManifest: packageRead.evidence, ...(registryRead ? { toolRegistry: registryRead.evidence } : {}), ...(mcpRead ? { mcpLaunchManifest: mcpRead.evidence } : {}), ...(estateRead ? { estateSnapshot: estateRead.evidence } : {}) }),
+    inventory: Object.freeze({ capabilityCount: capabilities.length, packageScriptCount: scripts.length, toolCount: tools.length, registeredToolCount: registryTools.length, mcpServerCount: mcpTools.length, estateCapabilityCount: estateCapabilities.length, estate: estateSummary(estateDocument) }),
+    discovery: Object.freeze({ toolRegistryOrigin: registryResolution.origin, siblingDevelopmentStudioRegistryAutoDiscovered: registryResolution.origin === "sibling-development-studio", mcpLaunchManifestObserved: mcpRead !== null, mcpLaunchManifestSanitized: mcpRead !== null }),
     orientation: Object.freeze({ readFirst: strings(config.readFirst), phases: config.phases.filter(record).map((item) => Object.freeze({ id: text(item.id), purpose: text(item.purpose), evidence: strings(item.evidence) })), handoffs: Array.isArray(config.handoffs) ? config.handoffs.filter(record) : [] }),
     matches: Object.freeze({
       capabilities: rank(capabilities, objective, all, limit, (item) => [item.id, item.title, item.description, ...item.interfaces, ...item.effects, ...item.entrypoints, ...item.tags, ...item.requires].join(" ")),
       scripts: rank(scripts, objective, all, limit, (item) => `${item.name} ${item.command}`),
-      tools: rank(tools, objective, all, limit, (item) => [item.id, item.repository ?? "", item.purpose, ...item.useWhen, ...item.entrypoints, item.truthBoundary].join(" ")),
+      tools: rank(tools, objective, all, limit, (item) => [item.id, item.repository ?? "", item.purpose, ...item.useWhen, ...item.entrypoints, item.truthBoundary, item.commandBaseName ?? "", ...(item.environmentKeys ?? [])].join(" ")),
       estateCapabilities: rank(estateCapabilities, objective, all, limit, (item) => `${item.id} ${item.repository} ${item.authority ?? ""} ${item.manifestStatus}`),
     }),
     automation: Object.freeze({ safeWithoutApproval: strings(automation.safeWithoutApproval), gated: strings(automation.gated), neverImplied: strings(automation.neverImplied) }),
-    policy: Object.freeze({ readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, sourceCapabilityDoesNotImplyRuntimeReadiness: true, routeDoesNotAuthorizeEffects: true, planDoesNotProveExecution: true, incompleteEstateCannotProveAbsence: estateDocument ? estateDocument.evidenceComplete !== true : true, publicationRequiresSeparateAuthority: true }),
+    policy: Object.freeze({ readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, sourceCapabilityDoesNotImplyRuntimeReadiness: true, routeDoesNotAuthorizeEffects: true, planDoesNotProveExecution: true, incompleteEstateCannotProveAbsence: estateDocument ? estateDocument.evidenceComplete !== true : true, publicationRequiresSeparateAuthority: true, mcpRegistrationDoesNotImplyRuntimeReadiness: true, mcpEnvironmentValuesRetained: false, mcpArgumentValuesRetained: false }),
   });
 }
 
@@ -163,7 +230,12 @@ function selfTest() {
   if (estate[0]?.runtimeReadiness !== "unknown" || estate[0]?.evidenceState !== "validated-standard-manifest") throw new Error("estate self-test failed");
   if (!broadObjective("all tools") || broadObjective("repair alpha sprite")) throw new Error("objective self-test failed");
   if (strings(["a", "a", " b "]).join(",") !== "a,b") throw new Error("normalization self-test failed");
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_self_test_v1", status: "passed", assertions: 6 }, null, 2)}\n`);
+  const mcpTools = mcpToolsFrom({ mcpServers: { "secret-test": { command: "node", args: ["server.mjs", "--token", "secret-value"], env: { API_TOKEN: "secret", MODE: "read-only" } } } }, "EVAVO-STUDIO/test");
+  if (mcpTools[0]?.id !== "mcp:secret-test" || mcpTools[0]?.runtimeReadiness !== "unknown") throw new Error("MCP inventory self-test failed");
+  const mcpSerialized = JSON.stringify(mcpTools);
+  if (mcpSerialized.includes("secret-value") || mcpSerialized.includes('"secret"')) throw new Error("MCP redaction self-test failed");
+  if (!mcpTools[0]?.environmentKeys.includes("API_TOKEN") || mcpTools[0]?.argumentCount !== 3) throw new Error("MCP shape self-test failed");
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_self_test_v1", status: "passed", assertions: 9 }, null, 2)}\n`);
 }
 
 async function cli() {
