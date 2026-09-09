@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-texture-review-agent",
+  "purpose": "Map-aware technical review for texture and PBR data assets plus bounded 3x3 tile proofs.",
+  "entrypoint": "tools/texture_review_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "mapKinds": [
+    "base-color",
+    "normal-tangent",
+    "roughness",
+    "metallic",
+    "ambient-occlusion",
+    "height",
+    "specular",
+    "emissive",
+    "opacity",
+    "orm-packed"
+  ],
+  "tools": [
+    "evavo_texture_review_capabilities",
+    "evavo_review_texture_map",
+    "evavo_create_texture_tile_proof"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "proofOutputsCreateOnly": true,
+    "proofWritesRequireExplicitConfirmation": true,
+    "silentNormalChannelFlip": false,
+    "silentPackedMapRepacking": false,
+    "claimsAiOriginDetection": false
+  }
+}
