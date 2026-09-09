@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-sequence-finishing",
+  "purpose": "Read-only finishing review for ordered image/animation sequences, combining per-frame repair decisions, optional approved-reference consistency, technical continuity and neighbor similarity evidence.",
+  "entrypoint": "tools/image_sequence_finishing_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_IMAGE_SEQUENCE_ALLOWED_ROOTS": {
+      "requiredForImageReads": true,
+      "description": "Platform-delimited canonical roots containing ordered sequence frames and optional approved-reference images."
+    }
+  },
+  "tools": [
+    "evavo_image_sequence_finishing_capabilities",
+    "evavo_review_image_sequence_finishing"
+  ],
+  "limits": {
+    "frames": 128,
+    "approvedReferences": 32
+  },
+  "continuitySignals": [
+    "canvas-size",
+    "aspect-ratio",
+    "alpha-state",
+    "quality-score",
+    "luminance",
+    "contrast",
+    "sharpness",
+    "visible-mass",
+    "adjacent-perceptual-similarity",
+    "duplicate-or-held-frame-evidence"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "writesFiles": false,
+    "sharedApprovedReferenceModel": true,
+    "perFrameRepairRouting": true,
+    "duplicateFramesAutomaticallyRejected": false,
+    "semanticMotionQualityClaimed": false,
+    "automaticPromotionAllowed": false,
+    "claimsAiOriginDetection": false
+  }
+}
