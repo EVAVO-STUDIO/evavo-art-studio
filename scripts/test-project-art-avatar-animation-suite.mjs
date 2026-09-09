@@ -5,6 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import './test-project-art-eva-dense-motion-family-approval-provenance.mjs';
+import './test-project-art-eva-dense-motion-family-human-review-evidence-stage-v1.mjs';
+import './test-project-art-eva-dense-motion-family-release-assembly-v2.mjs';
+import './test-project-art-eva-dense-motion-family-release-manifest-v2.mjs';
 import {
   AVATAR_ANIMATION_SUITE_PLAN_SCHEMA,
   AVATAR_ANIMATION_SUITE_PLAN_SCHEMA_V1,
@@ -384,4 +388,3 @@ test('MCP exposes and executes the bounded create-only compiler tool', async () 
     await rm(root, { recursive: true, force: true });
   }
 });
-
