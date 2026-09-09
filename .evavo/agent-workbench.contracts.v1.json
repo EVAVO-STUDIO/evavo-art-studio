@@ -7,13 +7,17 @@
     "config": "schemas/evavo.agent-workbench-config.schema.json",
     "snapshot": "schemas/evavo.agent-workbench-snapshot.schema.json",
     "handoff": "schemas/evavo.agent-workbench-handoff.schema.json",
-    "guidance": "schemas/evavo.agent-workbench-guidance.schema.json"
+    "guidance": "schemas/evavo.agent-workbench-guidance.schema.json",
+    "fleet": "schemas/evavo.agent-workbench-fleet.schema.json"
   },
   "entrypoints": {
     "compileSnapshot": "scripts/agent-workbench.mjs",
     "awarenessTest": "scripts/test-agent-workbench-awareness.mjs",
     "verifyAwareness": "scripts/verify-agent-workbench-awareness.mjs",
     "awarenessVerifierTest": "scripts/test-agent-workbench-awareness-verifier.mjs",
+    "fleet": "scripts/agent-workbench-fleet.mjs",
+    "fleetTest": "scripts/test-agent-workbench-fleet.mjs",
+    "verifyFleet": "scripts/verify-agent-workbench-fleet.mjs",
     "verify": "scripts/verify-agent-workbench.mjs",
     "compileHandoff": "scripts/compile-agent-workbench-handoff.mjs",
     "guide": "scripts/agent-workbench-guide.mjs",
@@ -35,6 +39,9 @@
     "mcpLaunchEvidenceAuthorizesExecution": false,
     "mcpLaunchEvidenceRetainsEnvironmentValues": false,
     "mcpLaunchEvidenceRetainsArgumentValues": false,
+    "fleetAuthorizesExecution": false,
+    "fleetClaimsProviderCompleteness": false,
+    "fleetAllowsAbsenceClaims": false,
     "handoffAuthorizesExecution": false,
     "handoffAuthorizesMutation": false,
     "handoffAuthorizesPublication": false,
