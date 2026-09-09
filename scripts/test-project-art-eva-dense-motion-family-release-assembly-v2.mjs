@@ -12,6 +12,14 @@ import {
   EVA_DENSE_MOTION_FAMILY_RELEASE_PROVENANCE_GATE_VERSION,
   evaDenseMotionFamilyReleaseAssemblyV2ProvenanceCapabilities,
 } from './project-art/eva-dense-motion-family-release-assembly-v2-provenance.mjs';
+import {
+  compileEvaDenseMotionTenMasterProgram,
+  createEvaDenseMotionTenMasterRequest,
+} from './project-art/eva-dense-motion-ten-master-program.mjs';
+import {
+  compileEvaDenseMotionProductionStatusV1,
+  evaDenseMotionProductionStatusV1Capabilities,
+} from './project-art/eva-dense-motion-production-status-v1.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = readFileSync(
@@ -131,11 +139,44 @@ assert.equal(provenanceCapabilities.publication, false);
 assert.equal(provenanceCapabilities.deployment, false);
 assert.equal(provenanceCapabilities.runtimeActivation, false);
 
+const tenMasterProgram = compileEvaDenseMotionTenMasterProgram(
+  createEvaDenseMotionTenMasterRequest({
+    programId: 'eva-dense-motion-production-status-guard-v1',
+    actorId: 'eva-dense-motion-production-status-guard',
+    createdAt: '2026-09-09T00:00:00.000Z',
+  }),
+);
+const productionStatus = compileEvaDenseMotionProductionStatusV1(tenMasterProgram);
+assert.equal(productionStatus.summary, 'three-frame-fallback-live__ten-new-final-masters-not-produced');
+assert.equal(productionStatus.publicFallback.frameCount, 3);
+assert.deepEqual(productionStatus.publicFallback.ordinals, [4, 5, 6]);
+assert.equal(productionStatus.publicFallback.finalMasterEligibleCount, 0);
+assert.equal(productionStatus.finalMasterProduction.sourceContractsBound, 10);
+assert.equal(productionStatus.finalMasterProduction.requiredNewMasterCount, 10);
+assert.equal(productionStatus.finalMasterProduction.producedMasterCount, 0);
+assert.equal(productionStatus.finalMasterProduction.remainingMasterCount, 10);
+assert.equal(productionStatus.finalMasterProduction.sourcesBoundDoesNotMeanMastersProduced, true);
+assert.equal(productionStatus.continuity.requiredEdgeCount, 10);
+assert.equal(productionStatus.continuity.reviewedEdgeCount, 0);
+assert.equal(productionStatus.continuity.remainingEdgeCount, 10);
+assert.equal(productionStatus.release.releaseReady, false);
+assert.equal(productionStatus.release.runtimeActivationReady, false);
+assert.equal(productionStatus.evidenceBoundary.workstationSourceMediaPreflightClaimed, false);
+assert.equal(productionStatus.evidenceBoundary.candidateBytesClaimed, false);
+assert.equal(productionStatus.evidenceBoundary.reviewEvidenceClaimed, false);
+const productionStatusCapabilities = evaDenseMotionProductionStatusV1Capabilities();
+assert.equal(productionStatusCapabilities.separatesLiveFallbackFromFinalMasterSet, true);
+assert.equal(productionStatusCapabilities.separatesSourceContractsFromProducedMasters, true);
+assert.equal(productionStatusCapabilities.refusesUnobservedWorkstationEvidenceClaims, true);
+assert.equal(productionStatusCapabilities.partialPromotionAllowed, false);
+assert.equal(productionStatusCapabilities.runtimeActivation, false);
+
 console.log('EVA dense family release assembler v2 guard passed.');
 console.log('- family approvals sign non-circular evidence fingerprint');
 console.log('- owner, creative director and technical director must be distinct humans');
 console.log('- human approval provenance is file-backed, byte-hashed and semantically bound');
 console.log('- operational family runner cannot bypass the provenance gate');
+console.log('- public status distinguishes the live three-frame fallback from zero produced final masters');
 console.log('- exact ten-frame and ten-continuity-edge release semantics remain authoritative');
 console.log('- existing release evaluator remains authoritative');
 console.log('- publication, deployment and activation remain closed');
