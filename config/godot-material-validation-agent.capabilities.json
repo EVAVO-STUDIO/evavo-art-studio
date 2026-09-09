@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-godot-material-validation-agent",
+  "purpose": "Execution-gated native Godot 4.6 material resource loading and class validation after governed material creation.",
+  "entrypoint": "tools/godot_material_validation_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-godot build",
+  "environment": {
+    "EVAVO_GODOT_MATERIAL_VALIDATION_ALLOWED_ROOTS": {
+      "requiredForProjectAccess": true,
+      "description": "Platform-delimited canonical roots containing Godot projects that may be validated."
+    },
+    "EVAVO_GODOT_MATERIAL_ALLOW_EXECUTION": {
+      "requiredForNativeExecution": true,
+      "value": "true"
+    },
+    "EVAVO_GODOT_EXECUTABLE": {
+      "requiredForNativeExecution": true,
+      "description": "Trusted local Godot 4.6 executable configured by the operator. Agents cannot override this executable per call."
+    }
+  },
+  "tools": [
+    "evavo_godot_material_validation_capabilities",
+    "evavo_validate_godot_material_resource"
+  ],
+  "resourceClasses": ["StandardMaterial3D", "ORMMaterial3D"],
+  "execution": {
+    "headless": true,
+    "shell": false,
+    "timeoutProtected": true,
+    "temporaryValidatorOutsideProject": true,
+    "resourcePaths": "res://*.tres only",
+    "executableSource": "environment-only"
+  },
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "arbitraryExecutableInputAllowed": false,
+    "explicitExecutionConfirmation": true,
+    "executionDisabledByDefault": true,
+    "automaticApproval": false,
+    "projectCacheMayChange": true
+  }
+}
