@@ -7,11 +7,12 @@ import {
 } from "../packages/media/dist/index.js";
 
 const SERVER_NAME = "evavo-image-agent-router";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const GOALS = Object.freeze([
   "quality-review",
   "frame-consistency",
+  "reference-consistency",
   "fake-transparency",
   "natural-background-cutout",
   "local-technical-repair",
@@ -48,7 +49,7 @@ const tools = Object.freeze([
 async function callTool(name, args) {
   if (name === "evavo_image_agent_router_capabilities") {
     return Object.freeze({
-      contract: "evavo_image_agent_router_v1",
+      contract: "evavo_image_agent_router_v1_1",
       goals: listImageAgentGoals(),
       routes: Object.freeze(listImageAgentGoals().map((goal) => routeImageAgentTask(goal))),
       readsImageBytes: false,
@@ -110,7 +111,7 @@ input.on("line", (line) => {
     try {
       request = JSON.parse(line);
     } catch {
-      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })}\n`);
+      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })\n`);
       return;
     }
     const response = await dispatch(request);
