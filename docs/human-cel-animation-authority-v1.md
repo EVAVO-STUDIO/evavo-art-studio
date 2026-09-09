@@ -12,7 +12,7 @@ Art Studio owns reusable animation request/profile planning. It does not duplica
 - strict cel timing authenticity;
 - `createHumanCelRenderPrompt` as the preferred downstream compiler;
 - `evaluateHumanCelQualityGate` before promotion;
-- Cel Animation Studio `@evavo/cel-core` 0.32.0 or newer.
+- Cel Animation Studio `@evavo/cel-core` 0.33.0 or newer.
 
 It grants no provider execution, creative approval, repository mutation or publication authority.
 
@@ -33,7 +33,12 @@ The authority handoff requires these Cel Animation Studio core surfaces:
 - `createHumanCelEnvironmentStagingDirective`
 - `evaluateHumanCelDrawingContinuity`
 - `evaluateHumanCelAntiGenericReview`
+- `evaluateHumanCelFinishReview`
+- `evaluateHumanCelCinematographyReview`
+- `evaluateHumanCelEnvironmentReview`
 - `evaluateHumanCelQualityGate`
+
+The consolidated quality gate now requires deterministic evidence for drawing continuity, anti-generic artefacts, line/paint/light finish, cinematography and environment staging before the manual department approvals are even considered.
 
 Art Studio can continue to provide deterministic camera, perspective, identity, pose-beat, delivery and runtime planning. Cel Animation Studio remains responsible for the stricter craft grammar and promotion evidence.
 
