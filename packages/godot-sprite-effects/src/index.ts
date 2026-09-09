@@ -4,3 +4,4 @@ export * from "./shaders.js";
 export * from "./validation.js";
 export * from "./binder.js";
 export * from "./compiler.js";
+export * from "./agent-planner.js";
