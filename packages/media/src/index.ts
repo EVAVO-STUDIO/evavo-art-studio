@@ -33,6 +33,7 @@ export * from "./image-repair-routing.js";
 export * from "./texture-map-review.js";
 export * from "./enhancement-review-bridge.js";
 export * from "./enhancement-local-detail-risk.js";
+export * from "./enhancement-structure-risk.js";
 export * from "./enhancement-review-session.js";
 export * from "./localized-edit.js";
 export * from "./edit-mask.js";
