@@ -259,7 +259,9 @@ export class FixtureImageProviderAdapter implements ProviderAdapter {
     );
     return {
       adapterId: this.descriptor.id,
-      model: this.descriptor.models[0]!,
+      model:
+        resolved.request.selection.preferredModel ??
+        this.descriptor.models[0]!,
       externalId: `fixture:${resolved.request.requestId}`,
       outputs,
       usage: { fixtureCandidates: outputs.length },
