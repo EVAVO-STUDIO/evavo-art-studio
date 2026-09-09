@@ -26,6 +26,7 @@ export * from "./existing-image-defect-detection.js";
 export * from "./defect-region-components.js";
 export * from "./existing-image-finishing-plan.js";
 export * from "./image-artifact-signals.js";
+export * from "./image-generated-detail-risk.js";
 export * from "./image-review-profiles.js";
 export * from "./image-similarity.js";
 export * from "./image-reference-consistency.js";
