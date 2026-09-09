@@ -18,7 +18,7 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-texture-review";
-const SERVER_VERSION = "1.3.0";
+const SERVER_VERSION = "1.4.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS";
 const WRITE_ENV = "EVAVO_TEXTURE_REVIEW_ALLOW_WRITES";
@@ -40,6 +40,7 @@ const MAP_KINDS = Object.freeze([
 const PROOF_SAMPLING = Object.freeze(["continuous", "nearest"]);
 const SCALAR_CHANNELS = Object.freeze(["r", "g", "b", "a"]);
 const UV_POLICIES = Object.freeze(["ignore", "warn", "reject"]);
+const UV_ORIENTATIONS = Object.freeze(["majority", "positive", "negative"]);
 
 const assertAllowed = (filePath, { output = false } = {}) =>
   assertAllowedLocalPath(filePath, {
@@ -64,12 +65,14 @@ function uvReviewSpec(args) {
     ...(typeof args.allowTiledCoordinates === "boolean" ? { allowTiledCoordinates: args.allowTiledCoordinates } : {}),
     ...(UV_POLICIES.includes(args.overlapPolicy) ? { overlapPolicy: args.overlapPolicy } : {}),
     ...(UV_POLICIES.includes(args.mirroredPolicy) ? { mirroredPolicy: args.mirroredPolicy } : {}),
+    ...(UV_ORIENTATIONS.includes(args.orientationConvention) ? { orientationConvention: args.orientationConvention } : {}),
     ...(Number.isFinite(args.uvAreaEpsilon) ? { uvAreaEpsilon: args.uvAreaEpsilon } : {}),
     ...(Number.isFinite(args.uvEqualityTolerance) ? { uvEqualityTolerance: args.uvEqualityTolerance } : {}),
     ...(Number.isFinite(args.textureWidth) ? { textureWidth: args.textureWidth } : {}),
     ...(Number.isFinite(args.textureHeight) ? { textureHeight: args.textureHeight } : {}),
     ...(Number.isFinite(args.maximumTexelDensityRatio) ? { maximumTexelDensityRatio: args.maximumTexelDensityRatio } : {}),
     ...(Number.isFinite(args.minimumAtlasBoundaryPaddingTexels) ? { minimumAtlasBoundaryPaddingTexels: args.minimumAtlasBoundaryPaddingTexels } : {}),
+    ...(Number.isFinite(args.minimumIslandPaddingTexels) ? { minimumIslandPaddingTexels: args.minimumIslandPaddingTexels } : {}),
   };
 }
 
@@ -129,7 +132,7 @@ function reviewUvTriangles(args) {
   return Object.freeze({
     ok: true,
     evidence,
-    interpretation: "UV topology/coverage assurance only. A passing result does not prove the texture visually aligns with semantic mesh features.",
+    interpretation: "UV topology/coverage assurance only. Supply vertexKeys for mesh-aware island connectivity. A passing result does not prove semantic texture alignment.",
     sourceModified: false,
   });
 }
@@ -148,7 +151,7 @@ async function reviewObjUv(args) {
     inputPath,
     extraction,
     evidence: result.review,
-    interpretation: "OBJ faces are triangulated for read-only UV assurance. Faces missing UVs are counted rather than assigned invented coordinates.",
+    interpretation: "OBJ faces are triangulated for read-only topology-aware UV assurance. Faces missing UVs are counted rather than assigned invented coordinates.",
     bytesReturned: false,
     sourceModified: false,
   });
@@ -208,7 +211,7 @@ async function createTileProof(args) {
   );
   await assertCreateOnlyTargets([outputPath, receiptPath]);
   const receipt = Object.freeze({
-    schemaVersion: "1.3",
+    schemaVersion: "1.4",
     operation: "evavo-texture-tile-proof",
     approvalState: "diagnostic-only",
     inputPath,
@@ -259,7 +262,7 @@ async function packGodotOrm(args) {
   const postReview = await reviewTextureMap(packed.png, { kind: "orm-packed", ...(args.expectSeamless === true ? { expectSeamless: true } : {}) });
   if (postReview.grade === "fail") throw new Error(`Packed ORM failed post-pack review: ${postReview.blockers.join(", ") || "texture-review-failed"}`);
   const receipt = Object.freeze({
-    schemaVersion: "1.3",
+    schemaVersion: "1.4",
     operation: "evavo-pack-godot-orm-texture",
     approvalState: "unapproved",
     sourcePaths,
@@ -287,12 +290,14 @@ const uvProperties = Object.freeze({
   allowTiledCoordinates: { type: "boolean" },
   overlapPolicy: { type: "string", enum: UV_POLICIES },
   mirroredPolicy: { type: "string", enum: UV_POLICIES },
+  orientationConvention: { type: "string", enum: UV_ORIENTATIONS },
   uvAreaEpsilon: { type: "number", exclusiveMinimum: 0 },
   uvEqualityTolerance: { type: "number", exclusiveMinimum: 0 },
   textureWidth: { type: "number", exclusiveMinimum: 0 },
   textureHeight: { type: "number", exclusiveMinimum: 0 },
   maximumTexelDensityRatio: { type: "number", minimum: 1 },
   minimumAtlasBoundaryPaddingTexels: { type: "number", minimum: 0 },
+  minimumIslandPaddingTexels: { type: "number", minimum: 0 },
 });
 const uvPointSchema = Object.freeze({
   type: "object",
@@ -316,7 +321,7 @@ const scalarSourceSchema = Object.freeze({
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_texture_review_capabilities",
-    description: "Describe map-aware texture review, coherent material-set validation, UV/OBJ assurance, diagnostic tile proofs and explicit Godot ORM packing.",
+    description: "Describe map-aware texture review, coherent material-set validation, topology-aware UV/OBJ assurance, diagnostic tile proofs and explicit Godot ORM packing.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
@@ -358,7 +363,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_uv_layout",
-    description: "Read-only UV layout assurance from already-extracted triangle UV/world-position data. Detects degenerates, accidental overlap, mirrored winding, out-of-range UVs, texel-density outliers and atlas boundary padding.",
+    description: "Read-only UV assurance from triangle UV/world-position data. Supports mesh vertex keys for topology-aware island detection and checks degenerates, overlap, mirrored winding, range, density, atlas boundary padding and inter-island padding.",
     inputSchema: {
       type: "object",
       properties: {
@@ -372,6 +377,7 @@ const tools = Object.freeze([
               id: { type: "string", minLength: 1 },
               uv: { type: "array", minItems: 3, maxItems: 3, items: uvPointSchema },
               position: { type: "array", minItems: 3, maxItems: 3, items: positionSchema },
+              vertexKeys: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", minLength: 1 } },
               overlapGroup: { type: "string", minLength: 1 },
             },
             required: ["id", "uv"],
@@ -386,7 +392,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_obj_uv_layout",
-    description: "Read a local Wavefront OBJ, triangulate polygon faces, preserve authored UVs and review the resulting layout without modifying the mesh. Faces with missing UVs are counted, not fabricated.",
+    description: "Read a local Wavefront OBJ, triangulate polygon faces, preserve authored UVs and mesh vertex topology, and review the resulting layout without modifying the mesh. Faces with missing UVs are counted, not fabricated.",
     inputSchema: {
       type: "object",
       properties: { inputPath: { type: "string", minLength: 1 }, flipVForReview: { type: "boolean" }, ...uvProperties },
@@ -439,7 +445,7 @@ const tools = Object.freeze([
 async function callTool(name, args) {
   if (name === "evavo_texture_review_capabilities") {
     return Object.freeze({
-      contract: "evavo_texture_review_agent_v1_3",
+      contract: "evavo_texture_review_agent_v1_4",
       mapKinds: MAP_KINDS,
       tools: tools.map((tool) => tool.name),
       proofSampling: {
@@ -454,9 +460,11 @@ async function callTool(name, args) {
         "material-set-dimension-and-role-consistency",
         "power-of-two-policy",
         "godot-colour-vs-linear-data-intent",
+        "topology-aware-uv-island-connectivity",
         "uv-degenerate-overlap-mirror-range-and-padding",
+        "inter-island-padding-in-output-texels",
         "world-space-texel-density-consistency",
-        "wavefront-obj-uv-extraction",
+        "wavefront-obj-uv-and-topology-extraction",
         "sampling-aware-bounded-3x3-tile-proof",
       ],
       godot: {
@@ -464,7 +472,7 @@ async function callTool(name, args) {
         ormChannels: "R=ambient-occlusion,G=roughness,B=metallic",
         materials: ["StandardMaterial3D", "ORMMaterial3D"],
       },
-      engineNote: "Normal channel conversion and ORM packing are explicit. UV review is separate from semantic mesh/material visual review.",
+      engineNote: "Normal channel conversion and ORM packing are explicit. UV review is topology-aware when vertex identities are available and remains separate from semantic mesh/material visual review.",
       aiOriginDetection: "not claimed",
       writesEnabled: process.env[WRITE_ENV] === "true",
       allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
