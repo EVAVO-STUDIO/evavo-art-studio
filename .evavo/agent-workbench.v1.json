@@ -6,6 +6,7 @@
   "capabilityManifest": "evavo.capabilities.json",
   "packageManifest": "package.json",
   "readFirst": [
+    "WORKBENCH_FIRST.md",
     "AGENTS.md",
     "docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md",
     "docs/IMAGE_WORKFLOW_ROUTER_V2.md",
@@ -20,8 +21,8 @@
     },
     {
       "id": "route",
-      "purpose": "Choose the narrowest specialist image/art/animation route from declared capabilities instead of memorising individual commands.",
-      "evidence": ["Image Workflow Router v2 or domain route", "matched capability effects and requirements"]
+      "purpose": "Choose the narrowest semantic art/specialist route from declared capabilities and local workbench-fleet evidence before considering raw MCP/package launch inventory.",
+      "evidence": ["Image Workflow Router v2 or domain route", "local workbench fleet snapshot when sibling ownership matters", "Development Studio tool registry when available", "matched capability effects and requirements", "sanitized MCP launch inventory"]
     },
     {
       "id": "plan",
@@ -52,7 +53,8 @@
   "automation": {
     "safeWithoutApproval": [
       "immutable source inventory and technical inspection",
-      "capability and package-script discovery",
+      "capability, semantic tool, local-fleet and package-script discovery",
+      "sanitized MCP launch inventory",
       "deterministic planning, hashing and evidence compilation",
       "read-only visual review preparation",
       "technical QA that does not mutate source assets"
@@ -67,6 +69,8 @@
     "neverImplied": [
       "creative approval from technical checks",
       "native transparency from a provider declaration alone",
+      "runtime readiness from MCP launch registration",
+      "provider-estate completeness or absence from a local fleet scan",
       "runtime suitability from a mastered file alone",
       "target repository mutation, commit, push or publication authority"
     ]
