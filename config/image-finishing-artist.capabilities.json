@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-finishing-artist",
+  "purpose": "Read-only image and image-set review before governed finishing or provider edits.",
+  "entrypoint": "tools/image_finishing_artist_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm run build:domain",
+  "environment": {
+    "EVAVO_IMAGE_REVIEW_ALLOWED_ROOTS": {
+      "requiredForImageReads": true,
+      "description": "Platform-delimited canonical roots that the review server may read."
+    }
+  },
+  "tools": [
+    "evavo_image_finishing_artist_capabilities",
+    "evavo_review_image_for_finishing",
+    "evavo_review_image_set_consistency"
+  ],
+  "guarantees": {
+    "readOnly": true,
+    "returnsImageBytes": false,
+    "modifiesSources": false,
+    "claimsAiOriginDetection": false,
+    "requiresVisualReviewForSemanticQuality": true
+  },
+  "downstream": [
+    "evavo-raster-finishing",
+    "persistent Project Art workspace",
+    "governed provider edit/inpaint",
+    "existing promotion and quality gates"
+  ]
+}
