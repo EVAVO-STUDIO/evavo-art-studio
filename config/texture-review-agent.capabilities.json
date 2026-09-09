@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "1.4",
+  "schemaVersion": "1.5",
   "id": "evavo-texture-review-agent",
-  "purpose": "Map-aware texture/PBR review, coherent material-set validation, topology-aware UV/OBJ assurance, sampling-aware tile proofs and guarded Godot ORM packing.",
+  "purpose": "Map-aware texture/PBR review, coherent material-set validation, topology-aware UV/OBJ assurance, explicit texture preprocessing, sampling-aware tile proofs and guarded Godot ORM packing.",
   "entrypoint": "tools/texture_review_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
@@ -60,6 +60,24 @@
     "sourceMutationAllowed": false,
     "missingObjUvsInvented": false
   },
+  "preprocessing": {
+    "normalYConvention": {
+      "tool": "evavo_convert_tangent_normal_y_convention",
+      "transformation": "G=255-G",
+      "preservedChannels": ["r", "b", "a"],
+      "silentConversionAllowed": false
+    },
+    "opacityToAlbedoAlpha": {
+      "tool": "evavo_compose_opacity_into_albedo_alpha",
+      "albedoRgbPreservedExactly": true,
+      "resizeAllowed": false,
+      "silentCompositionAllowed": false
+    },
+    "specular": {
+      "automaticConversionAllowed": false,
+      "route": "Re-author for metallic/roughness or deliberately use a reviewed custom shader."
+    }
+  },
   "godot": {
     "normalConvention": "OpenGL X+ Y+ Z+",
     "ormChannelContract": "R=ambient-occlusion,G=roughness,B=metallic",
@@ -76,6 +94,8 @@
     "evavo_review_texture_set",
     "evavo_review_uv_layout",
     "evavo_review_obj_uv_layout",
+    "evavo_convert_tangent_normal_y_convention",
+    "evavo_compose_opacity_into_albedo_alpha",
     "evavo_create_texture_tile_proof",
     "evavo_pack_godot_orm_texture"
   ],
@@ -86,6 +106,7 @@
     "continuousTextureProofsAvoidForcedNearestResampling": true,
     "strictScalarValidationByDefault": true,
     "silentNormalChannelFlip": false,
+    "silentOpacityComposition": false,
     "silentPackedMapRepacking": false,
     "explicitOrmPackingOnly": true,
     "uvReviewReadOnly": true,
