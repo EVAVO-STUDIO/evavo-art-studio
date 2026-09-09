@@ -41,7 +41,7 @@ async function patterned(filePath, offset = 0) {
   await writeFile(filePath, await sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer());
 }
 
-test("capabilities expose one read-only combined finishing decision surface", async () => {
+test("capabilities expose single and batch read-only finishing decisions", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-finishing-packet-capabilities-"));
   const response = await call(root, "evavo_image_finishing_packet_capabilities");
   assert.equal(response.isError, false);
@@ -49,6 +49,10 @@ test("capabilities expose one read-only combined finishing decision surface", as
   assert.equal(response.structuredContent.guarantees.writesFiles, false);
   assert.equal(response.structuredContent.guarantees.automaticPromotionAllowed, false);
   assert.equal(response.structuredContent.guarantees.claimsAiOriginDetection, false);
+  assert.equal(response.structuredContent.maximumBatchSize, 128);
+  assert.equal(response.structuredContent.batchReferenceModelShared, true);
+  assert.equal(response.structuredContent.batchResponsesCompactByDefault, true);
+  assert.ok(response.structuredContent.tools.includes("evavo_review_image_finishing_batch"));
   assert.ok(response.structuredContent.combines.includes("generated-detail repetition and detail-density triage"));
 });
 
@@ -88,6 +92,52 @@ test("semantic findings become a semantic repair packet rather than a filter sug
   assert.equal(response.structuredContent.packet.repairDecision.requiresMask, true);
   assert.equal(response.structuredContent.packet.repairDecision.requiresReference, true);
   assert.ok(response.structuredContent.packet.recommendedNextTools.includes("governed-provider-edit-or-inpaint"));
+});
+
+test("batch review returns compact prioritized per-image packets with shared reference evidence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-finishing-batch-"));
+  const referencePath = path.join(root, "approved.png");
+  const firstPath = path.join(root, "first.png");
+  const secondPath = path.join(root, "second.png");
+  await patterned(referencePath, 0);
+  await patterned(firstPath, 2);
+  await patterned(secondPath, 80);
+
+  const response = await call(root, "evavo_review_image_finishing_batch", {
+    profile: "illustration",
+    candidates: [
+      { id: "first", path: firstPath },
+      { id: "second", path: secondPath, visualFindings: ["malformed-text"] },
+    ],
+    approvedReferences: [{ id: "approved", path: referencePath }],
+  });
+  assert.equal(response.isError, false);
+  assert.equal(response.structuredContent.itemCount, 2);
+  assert.equal(response.structuredContent.referenceCount, 1);
+  assert.equal(response.structuredContent.referenceCoherence.state, "coherent");
+  assert.equal(response.structuredContent.items.length, 2);
+  assert.equal(response.structuredContent.reviewPriority.length, 2);
+  assert.equal(response.structuredContent.automaticPromotionAllowed, false);
+  assert.equal(response.structuredContent.sourcesModified, false);
+  assert.equal(response.structuredContent.bytesReturned, false);
+  const semantic = response.structuredContent.items.find((item) => item.id === "second");
+  assert.equal(semantic.packet.disposition, "semantic-repair");
+  assert.equal("defectReview" in semantic.packet.technicalReview, false);
+  assert.ok(semantic.packet.technicalReview.quality.score >= 0);
+});
+
+test("batch review rejects duplicate candidate ids before returning ambiguous decisions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-finishing-batch-duplicate-"));
+  const imagePath = path.join(root, "image.png");
+  await patterned(imagePath, 0);
+  const response = await call(root, "evavo_review_image_finishing_batch", {
+    candidates: [
+      { id: "same", path: imagePath },
+      { id: "same", path: imagePath },
+    ],
+  });
+  assert.equal(response.isError, true);
+  assert.match(response.structuredContent.message, /Duplicate candidate id/);
 });
 
 test("packet reference paths remain confined to configured roots", async () => {
