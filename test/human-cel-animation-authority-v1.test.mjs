@@ -43,9 +43,13 @@ function request(overrides = {}) {
 test("compiles strict human cel authority for cel animation requests", () => {
   const authority = compileHumanCelAnimationAuthority(request());
   assert.equal(authority.authority.mode, "human-cel-authored");
-  assert.equal(authority.authority.preferredPromptCompiler, "createHumanCelRenderPrompt");
+  assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
   assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
-  assert.equal(authority.handoff.minimumPackageVersion, "0.33.0");
+  assert.equal(authority.authority.requiresExactProductionAuthority, true);
+  assert.equal(authority.handoff.minimumPackageVersion, "0.34.0");
+  assert.equal(authority.handoff.requiredExports.includes("createHumanCelProductionAuthority"), true);
+  assert.equal(authority.handoff.requiredExports.includes("assertHumanCelProductionAuthorityBinding"), true);
+  assert.equal(authority.handoff.requiredExports.includes("createStrictHumanCelRenderPrompt"), true);
   assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelFinishReview"), true);
   assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelCinematographyReview"), true);
   assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelEnvironmentReview"), true);
