@@ -4,14 +4,17 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
 
-import { createTextureTileProof, reviewTextureMap } from "../packages/media/dist/index.js";
+import {
+  createTextureTileProofWithSampling,
+  reviewTextureMap,
+} from "../packages/media/dist/index.js";
 import {
   assertAllowedLocalPath,
   configuredLocalRootCount,
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-texture-review";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS";
 const WRITE_ENV = "EVAVO_TEXTURE_REVIEW_ALLOW_WRITES";
@@ -28,6 +31,7 @@ const MAP_KINDS = Object.freeze([
   "opacity",
   "orm-packed",
 ]);
+const PROOF_SAMPLING = Object.freeze(["continuous", "nearest"]);
 
 const assertAllowed = (filePath, { output = false } = {}) =>
   assertAllowedLocalPath(filePath, {
@@ -109,14 +113,16 @@ async function createTileProof(args) {
 
   const source = await readFile(inputPath);
   const review = await reviewTextureMap(source, reviewSpec(args));
-  const proof = await createTextureTileProof(
+  const sampling = typeof args.sampling === "string" ? args.sampling : "continuous";
+  const proof = await createTextureTileProofWithSampling(
     source,
     Number.isInteger(args.maximumTileDimension) ? args.maximumTileDimension : 512,
+    sampling,
   );
   await assertCreateOnlyTargets([outputPath, receiptPath]);
 
   const receipt = Object.freeze({
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     operation: "evavo-texture-tile-proof",
     approvalState: "diagnostic-only",
     inputPath,
@@ -169,7 +175,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_create_texture_tile_proof",
-    description: "Create a diagnostic 3x3 repeated tile proof plus JSON receipt using create-only paths. Useful for visually confirming seamlessness and repeated motifs.",
+    description: "Create a diagnostic 3x3 repeated tile proof plus JSON receipt using create-only paths. Continuous textures default to Lanczos3 proof resizing; nearest-neighbour is explicit for pixel/texel inspection.",
     inputSchema: {
       type: "object",
       properties: {
@@ -177,6 +183,7 @@ const tools = Object.freeze([
         outputPath: { type: "string", minLength: 1 },
         receiptPath: { type: "string", minLength: 1 },
         maximumTileDimension: { type: "integer", minimum: 64, maximum: 2048 },
+        sampling: { type: "string", enum: PROOF_SAMPLING },
         confirmLocalWrite: { type: "boolean", const: true },
       },
       required: ["inputPath", "kind", "outputPath", "confirmLocalWrite"],
@@ -188,8 +195,13 @@ const tools = Object.freeze([
 async function callTool(name, args) {
   if (name === "evavo_texture_review_capabilities") {
     return Object.freeze({
-      contract: "evavo_texture_review_agent_v1",
+      contract: "evavo_texture_review_agent_v1_1",
       mapKinds: MAP_KINDS,
+      proofSampling: {
+        default: "continuous",
+        continuous: "Lanczos3 only when the proof tile must be downsized; best default for continuous albedo/PBR previews.",
+        nearest: "Opt-in for pixel art or exact texel/block inspection.",
+      },
       checks: [
         "opposite-edge-seam-error",
         "scalar-rgb-contamination",
@@ -198,7 +210,7 @@ async function callTool(name, args) {
         "normal-vector-length-error",
         "packed-map-alpha-warning",
         "map-specific-visual-checklist",
-        "bounded-3x3-tile-proof",
+        "sampling-aware-bounded-3x3-tile-proof",
       ],
       engineNote: "Normal green-channel convention and packed-channel assignment must be verified against the target Godot/material shader; the reviewer will not silently flip or repack channels.",
       aiOriginDetection: "not claimed",
