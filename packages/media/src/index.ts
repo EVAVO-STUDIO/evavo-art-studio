@@ -33,6 +33,8 @@ export * from "./image-repair-routing.js";
 export * from "./image-agent-routing.js";
 export * from "./texture-map-review.js";
 export * from "./texture-tile-proof.js";
+export * from "./texture-set-review.js";
+export * from "./texture-channel-pack.js";
 export * from "./enhancement-review-bridge.js";
 export * from "./enhancement-local-detail-risk.js";
 export * from "./enhancement-structure-risk.js";
