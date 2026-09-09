@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-reference-consistency",
+  "purpose": "Read-only approved-reference consistency analysis for images, animation frames and generated-art batches.",
+  "entrypoint": "tools/image_reference_consistency_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_IMAGE_CONSISTENCY_ALLOWED_ROOTS": {
+      "requiredForImageReads": true,
+      "description": "Platform-delimited canonical roots containing candidate and approved-reference images."
+    }
+  },
+  "tools": [
+    "evavo_image_reference_consistency_capabilities",
+    "evavo_review_image_against_references",
+    "evavo_review_image_batch_against_references"
+  ],
+  "limits": {
+    "references": 32,
+    "batchCandidates": 128
+  },
+  "signals": [
+    "palette-distribution",
+    "luminance-and-contrast",
+    "saturation",
+    "edge-detail-density",
+    "edge-orientation-distribution",
+    "alpha-silhouette-and-occupancy",
+    "aspect-and-canvas-drift",
+    "reference-set-coherence"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "writesFiles": false,
+    "referenceSetCheckedBeforeCandidateRejection": true,
+    "semanticIdentityRecognitionClaimed": false,
+    "artisticCorrectnessClaimed": false,
+    "claimsAiOriginDetection": false
+  }
+}
