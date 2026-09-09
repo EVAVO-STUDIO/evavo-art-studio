@@ -1,24 +1,31 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "evavo-image-reference-consistency",
-  "purpose": "Read-only approved-reference consistency analysis for images, animation frames and generated-art batches.",
+  "purpose": "Approved-reference consistency analysis for images, animation frames and generated-art batches, with optional create-only visual diagnostic proofs.",
   "entrypoint": "tools/image_reference_consistency_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
   "environment": {
     "EVAVO_IMAGE_CONSISTENCY_ALLOWED_ROOTS": {
-      "requiredForImageReads": true,
-      "description": "Platform-delimited canonical roots containing candidate and approved-reference images."
+      "requiredForImageReadsAndProofWrites": true,
+      "description": "Platform-delimited canonical roots containing candidate/reference images and optional proof output destinations."
+    },
+    "EVAVO_IMAGE_CONSISTENCY_ALLOW_WRITES": {
+      "requiredForDiagnosticProofWrites": true,
+      "value": "true"
     }
   },
   "tools": [
     "evavo_image_reference_consistency_capabilities",
     "evavo_review_image_against_references",
-    "evavo_review_image_batch_against_references"
+    "evavo_review_image_batch_against_references",
+    "evavo_create_image_reference_consistency_proof"
   ],
   "limits": {
     "references": 32,
-    "batchCandidates": 128
+    "batchCandidates": 128,
+    "proofReferenceCards": 16,
+    "proofCandidateCards": 48
   },
   "signals": [
     "palette-distribution",
@@ -30,9 +37,18 @@
     "aspect-and-canvas-drift",
     "reference-set-coherence"
   ],
+  "proof": {
+    "format": "png",
+    "strongestOutliersFirst": true,
+    "transparentAssetsShownOnDiagnosticChecker": true,
+    "receipt": true,
+    "approvalState": "diagnostic-only"
+  },
   "guarantees": {
     "sourceMutationAllowed": false,
-    "writesFiles": false,
+    "reviewsReadOnlyByDefault": true,
+    "proofOutputsCreateOnly": true,
+    "proofWritesRequireExplicitConfirmation": true,
     "referenceSetCheckedBeforeCandidateRejection": true,
     "semanticIdentityRecognitionClaimed": false,
     "artisticCorrectnessClaimed": false,
