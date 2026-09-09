@@ -10,7 +10,7 @@ import {
 const TOOL_DEFINITIONS = [
   {
     name: "compile_human_cel_animation_authority_v1",
-    description: "Compile an Art Studio animation request into a strict human-cel craft authority handoff requiring authored acting/performance, candidate-envelope provenance, candidate-byte quality receipts and integrity-aware Cel Studio Store promotion enforcement.",
+    description: "Compile an Art Studio animation request into a strict human-cel handoff requiring authored cleanup/ink, colour/paint, acting/performance, optical compositing, candidate-envelope provenance, quality receipts and integrity-aware Store promotion enforcement.",
     inputSchema: {
       type: "object",
       required: ["request"],
@@ -20,7 +20,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "verify_human_cel_animation_authority_v1",
-    description: "Verify the digest, Core 0.37 performance requirements, Store 0.27 promotion/integrity gates and mandatory strict human-cel authority bindings without side effects.",
+    description: "Verify protocol .8, Core 0.38 authored departments, Store 0.27 promotion/integrity gates and mandatory strict human-cel bindings without side effects.",
     inputSchema: {
       type: "object",
       required: ["authority"],
@@ -49,7 +49,10 @@ function callTool(name, args) {
       authorityId: args.authority.authorityId,
       contentDigest: args.authority.contentDigest,
       mode: args.authority.authority.mode,
+      cleanupInk: args.authority.authority.cleanupInk,
+      colourPaint: args.authority.authority.colourPaint,
       performanceActing: args.authority.authority.performanceActing,
+      opticalCompositing: args.authority.authority.opticalCompositing,
       candidateEnvelopeProvenanceRequired:
         args.authority.authority.requiresCandidateEnvelopeProvenance,
       persistencePromotionGateRequired:
@@ -71,8 +74,8 @@ async function dispatch(message) {
     return {
       protocolVersion: message.params?.protocolVersion ?? "2025-06-18",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "evavo-human-cel-animation-authority-v1", version: "1.2.0" },
-      instructions: "Use this bridge when Art Studio animation must be handed to cel-animation-studio under strict human-authored cel draftsmanship, authored acting/performance, timing, cinematography and anti-generic review. A valid handoff requires Cel Core 0.37+, Cel Store 0.27+, canonical persisted snapshot/render-job integrity, candidate provenance containing the persisted strict-envelope digest, an immutable candidate-byte-bound zero-blocker quality receipt and the Store strict-human-cel-promotion-receipt-gate before approved state is authoritative. This bridge grants no provider execution, creative approval, repository mutation or publication authority.",
+      serverInfo: { name: "evavo-human-cel-animation-authority-v1", version: "1.3.0" },
+      instructions: "Use this bridge when Art Studio animation must be handed to cel-animation-studio under strict human-authored cel production. A valid handoff requires Cel Core 0.38+ with strict cleanup/ink, colour/paint, acting/performance and optical/compositing grammar, Cel Store 0.27+ with canonical persisted-state integrity, candidate provenance containing the persisted strict-envelope digest, an immutable candidate-byte-bound zero-blocker quality receipt and the Store strict-human-cel-promotion-receipt-gate before approved state is authoritative. Auto-trace wobble, generic blue/night or LUT grading, blanket bloom, optical-flow smoothing and fake analogue degradation are not valid substitutes. This bridge grants no provider execution, creative approval, repository mutation or publication authority.",
     };
   }
   if (message.method === "notifications/initialized") return null;
