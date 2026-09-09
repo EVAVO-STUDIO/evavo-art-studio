@@ -11,6 +11,9 @@
   },
   "entrypoints": {
     "compileSnapshot": "scripts/agent-workbench.mjs",
+    "awarenessTest": "scripts/test-agent-workbench-awareness.mjs",
+    "verifyAwareness": "scripts/verify-agent-workbench-awareness.mjs",
+    "awarenessVerifierTest": "scripts/test-agent-workbench-awareness-verifier.mjs",
     "verify": "scripts/verify-agent-workbench.mjs",
     "compileHandoff": "scripts/compile-agent-workbench-handoff.mjs",
     "guide": "scripts/agent-workbench-guide.mjs",
@@ -29,6 +32,9 @@
   },
   "truthBoundary": {
     "discoveryAuthorizesExecution": false,
+    "mcpLaunchEvidenceAuthorizesExecution": false,
+    "mcpLaunchEvidenceRetainsEnvironmentValues": false,
+    "mcpLaunchEvidenceRetainsArgumentValues": false,
     "handoffAuthorizesExecution": false,
     "handoffAuthorizesMutation": false,
     "handoffAuthorizesPublication": false,
