@@ -55,7 +55,7 @@ test("canonical provider compile contract is deterministic and immutable", () =>
   assert.ok(Object.isFrozen(left.requiredAdapterCapabilities));
 });
 
-test("canonical runtime contract binds the exact compiled request and adapter profile", () => {
+test("canonical runtime contract binds the exact compiled request, adapter profile and provenance requirement", () => {
   const compiled = compileProviderCandidateContract(request);
   const runtime = compileProviderCandidateRuntimeContract(request);
   assert.deepEqual(runtime.request, compiled.request);
@@ -82,6 +82,7 @@ test("canonical runtime contract binds the exact compiled request and adapter pr
     "provider.reference-lock",
     "provider.candidate-store",
     "evidence.bundle",
+    "evidence.provenance",
   ]);
   assert.equal(runtime.runtimeJob.maximumAttempts, 3);
   assert.equal(runtime.runtimeJob.leaseDurationMs, 300_000);
