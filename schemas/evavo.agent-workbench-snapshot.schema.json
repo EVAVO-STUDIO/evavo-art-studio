@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.com/schemas/evavo.agent-workbench-snapshot.schema.json",
+  "title": "EVAVO Agent Workbench Snapshot v1",
+  "type": "object",
+  "required": ["contract", "generatedAt", "repository", "authority", "role", "objective", "mode", "sourceEvidence", "inventory", "orientation", "matches", "automation", "policy"],
+  "properties": {
+    "contract": {"const": "evavo_agent_workbench_snapshot_v1"},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "authority": {"type": "string", "minLength": 1},
+    "role": {"type": "string"},
+    "objective": {"type": "string"},
+    "mode": {"enum": ["complete-local-inventory", "broad-orientation", "objective-ranked-orientation"]},
+    "sourceEvidence": {
+      "type": "object",
+      "required": ["workbenchConfig", "capabilityManifest", "packageManifest"],
+      "additionalProperties": {"$ref": "#/$defs/fileEvidence"}
+    },
+    "inventory": {
+      "type": "object",
+      "required": ["capabilityCount", "packageScriptCount", "toolCount", "estateCapabilityCount", "estate"],
+      "properties": {
+        "capabilityCount": {"type": "integer", "minimum": 0},
+        "packageScriptCount": {"type": "integer", "minimum": 0},
+        "toolCount": {"type": "integer", "minimum": 0},
+        "estateCapabilityCount": {"type": "integer", "minimum": 0},
+        "estate": {"type": ["object", "null"]}
+      }
+    },
+    "orientation": {
+      "type": "object",
+      "required": ["readFirst", "phases", "handoffs"],
+      "properties": {
+        "readFirst": {"type": "array"},
+        "phases": {"type": "array", "minItems": 1},
+        "handoffs": {"type": "array"}
+      }
+    },
+    "matches": {
+      "type": "object",
+      "required": ["capabilities", "scripts", "tools", "estateCapabilities"],
+      "properties": {
+        "capabilities": {"type": "array"},
+        "scripts": {"type": "array"},
+        "tools": {"type": "array"},
+        "estateCapabilities": {"type": "array"}
+      }
+    },
+    "automation": {
+      "type": "object",
+      "required": ["safeWithoutApproval", "gated", "neverImplied"]
+    },
+    "policy": {
+      "type": "object",
+      "required": ["readOnlyCompiler", "commandExecutionPerformed", "mutationPerformed", "sourceCapabilityDoesNotImplyRuntimeReadiness", "routeDoesNotAuthorizeEffects", "planDoesNotProveExecution", "incompleteEstateCannotProveAbsence", "publicationRequiresSeparateAuthority"],
+      "properties": {
+        "readOnlyCompiler": {"const": true},
+        "commandExecutionPerformed": {"const": false},
+        "mutationPerformed": {"const": false},
+        "sourceCapabilityDoesNotImplyRuntimeReadiness": {"const": true},
+        "routeDoesNotAuthorizeEffects": {"const": true},
+        "planDoesNotProveExecution": {"const": true},
+        "incompleteEstateCannotProveAbsence": {"type": "boolean"},
+        "publicationRequiresSeparateAuthority": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "fileEvidence": {
+      "type": "object",
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "bytes": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
