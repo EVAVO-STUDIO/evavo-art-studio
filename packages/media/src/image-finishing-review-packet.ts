@@ -239,9 +239,8 @@ export async function createImageFinishingReviewBatch(
   }));
 
   const [referenceBatch, technicalItems] = await Promise.all([referencePromise, technicalItemsPromise]);
-  const referenceById = new Map<string, ImageReferenceConsistencyResult>(
-    referenceBatch?.results.map((item) => [item.id, item.review]) ?? [],
-  );
+  const referenceById = new Map<string, ImageReferenceConsistencyResult>();
+  for (const item of referenceBatch?.results ?? []) referenceById.set(item.id, item.review);
   const items = technicalItems.map((item) => Object.freeze({
     id: item.id,
     packet: assemblePacket(item.technicalReview, item.repairDecision, referenceById.get(item.id) ?? null),
