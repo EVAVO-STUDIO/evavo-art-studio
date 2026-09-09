@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.7";
+export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.8";
 export const HUMAN_CEL_AUTHORITY_KIND = "evavo.human-cel-animation-authority.v1";
 export const HUMAN_CEL_CRAFT_AUTHORITY_ID = "evavo-human-cel-craft-v1";
 export const HUMAN_CEL_ALLOWED_MOTION_STYLES = Object.freeze([
@@ -127,9 +127,12 @@ export function compileHumanCelAnimationAuthority(request) {
       craftAuthority: HUMAN_CEL_CRAFT_AUTHORITY_ID,
       mode: "human-cel-authored",
       draftsmanshipPriority: "strict",
+      cleanupInk: "strict",
+      colourPaint: "strict",
       antiGenericEnforcement: "strict",
       timingAuthenticity: "strict-cel",
       performanceActing: "strict",
+      opticalCompositing: "strict",
       preferredPromptCompiler: "createStrictHumanCelRenderPrompt",
       requiredQualityGate: "evaluateHumanCelQualityGate",
       requiredQualityReceipt: "createHumanCelQualityReceipt",
@@ -145,10 +148,13 @@ export function compileHumanCelAnimationAuthority(request) {
       "lock identity to approved model-sheet anchors before generating or drawing motion",
       "author keys and complex-motion breakdowns before in-betweens",
       "preserve identical drawings across held exposures",
+      "clean line from construction with intentional contour hierarchy, closed paint regions and stable held ink rather than auto-tracing generated noise",
+      "author local colour, palette roles, cel-shadow families and material-specific highlights before grading or optical treatment",
       "separate line, flat colour, shade, highlight, effects and composite evidence",
       "derive camera and composition from shot purpose, geography and continuity rather than poster staging",
       "derive shadows, highlights and reflections from named light sources and material response",
       "author gaze, thought, blink, mouth, facial construction and held-body acting as deliberate substitutions rather than continuous idle motion",
+      "composite registered production layers and allow glow diffusion reflection weather and analogue treatment only when source, depth and authored duration justify them",
       "review adjacent drawings for anatomy, contact, prop scale, perspective, light and detail topology continuity",
       "reject duplicates, pseudo-text, repeated stamped patterns, temporal detail crawl and fake analogue degradation",
       "require deterministic finish, cinematography, performance and environment review evidence before manual department approval",
@@ -164,8 +170,11 @@ export function compileHumanCelAnimationAuthority(request) {
       "independent per-frame regeneration",
       "generic optical-flow or frame interpolation over authored timing",
       "morphing between key drawings",
+      "auto-traced vector-uniform cleanup or random line wobble used to fake hand drawing",
+      "blanket blue-night wash black-multiply-everything shadow generic teal-orange grading universal rim light or universal gloss substituted for colour scripting",
       "random line jitter or global line boil",
       "constant idle body bob, timer-like blinking or mouth flapping used as generic life motion",
+      "blanket bloom full-frame weather overlays motion blur interpolation or fake film VHS damage substituted for registered optical compositing",
       "random film grain or damage used to fake handmade provenance",
       "unmotivated rim light, blanket bloom or generic cyan-magenta grading",
       "generated pseudo-lettering",
@@ -180,10 +189,13 @@ export function compileHumanCelAnimationAuthority(request) {
       "canonical persisted production-snapshot integrity",
       "canonical persisted render-job integrity and revision-one lifecycle admission",
       "human cel craft prompt inspection",
+      "construction-first cleanup and stable ink inspection",
+      "palette-role local-colour cel-shadow and material-highlight inspection",
       "shot-language and composition inspection",
       "source-based lighting and cel-shadow inspection",
       "X-sheet exposure and hold inspection",
       "authored acting gaze blink facial construction and mouth-substitution inspection",
+      "registered optical compositing and source-motivated effects inspection",
       "frame-pair drawing continuity inspection",
       "anti-generic artifact inspection",
       "line paint lighting and matte finish inspection",
@@ -197,7 +209,7 @@ export function compileHumanCelAnimationAuthority(request) {
     handoff: {
       targetRepository: "EVAVO-STUDIO/cel-animation-studio",
       package: "@evavo/cel-core",
-      minimumPackageVersion: "0.37.0",
+      minimumPackageVersion: "0.38.0",
       storePackage: "@evavo/cel-store",
       minimumStorePackageVersion: "0.27.0",
       requiredStoreBehavior: "strict-human-cel-promotion-receipt-gate",
@@ -209,9 +221,12 @@ export function compileHumanCelAnimationAuthority(request) {
         "assertStrictHumanCelRenderPromptIntegrity",
         "createHumanCelShotLanguageDirective",
         "createHumanCelLightingDirective",
+        "createHumanCelColourPaintDirective",
+        "createHumanCelCleanupInkDirective",
         "createHumanCelTimingDirective",
         "createHumanCelPerformanceDirective",
         "createHumanCelEnvironmentStagingDirective",
+        "createHumanCelCompositingDirective",
         "evaluateHumanCelDrawingContinuity",
         "evaluateHumanCelAntiGenericReview",
         "evaluateHumanCelFinishReview",
@@ -252,7 +267,10 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
   if (
     authority.authority?.craftAuthority !== HUMAN_CEL_CRAFT_AUTHORITY_ID ||
     authority.authority?.mode !== "human-cel-authored" ||
+    authority.authority?.cleanupInk !== "strict" ||
+    authority.authority?.colourPaint !== "strict" ||
     authority.authority?.performanceActing !== "strict" ||
+    authority.authority?.opticalCompositing !== "strict" ||
     authority.authority?.preferredPromptCompiler !== "createStrictHumanCelRenderPrompt" ||
     authority.authority?.requiredQualityGate !== "evaluateHumanCelQualityGate" ||
     authority.authority?.requiredQualityReceipt !== "createHumanCelQualityReceipt" ||
@@ -269,7 +287,7 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
   if (authority.handoff?.targetRepository !== "EVAVO-STUDIO/cel-animation-studio") {
     fail("HUMAN_CEL_AUTHORITY_HANDOFF_INVALID");
   }
-  if (authority.handoff?.minimumPackageVersion !== "0.37.0") {
+  if (authority.handoff?.minimumPackageVersion !== "0.38.0") {
     fail("HUMAN_CEL_AUTHORITY_CORE_VERSION_INVALID");
   }
   if (
@@ -281,7 +299,10 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
     fail("HUMAN_CEL_AUTHORITY_STORE_GATE_INVALID");
   }
   for (const required of [
+    "createHumanCelColourPaintDirective",
+    "createHumanCelCleanupInkDirective",
     "createHumanCelPerformanceDirective",
+    "createHumanCelCompositingDirective",
     "evaluateHumanCelPerformanceReview",
     "createHumanCelQualityReceipt",
     "assertHumanCelQualityReceiptBinding",
