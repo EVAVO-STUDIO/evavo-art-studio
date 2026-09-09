@@ -36,6 +36,8 @@ def test_antialiased_divider_fringe_does_not_expand_subject_bbox():
 def test_sparse_neutral_divider_fringe_is_removed_with_source_pixels():
     image = Image.new("RGB", (16, 16), (2, 248, 4))
     pixels = image.load()
+    for x in range(16):
+        pixels[x, 12] = (255, 255, 255)
     pixels[0, 11] = (213, 254, 222)
     pixels[8, 6] = (130, 50, 20)
     mask, _ = remove_edge_dividers(foreground_mask(image, matte_colour(image), 30), 6, image)

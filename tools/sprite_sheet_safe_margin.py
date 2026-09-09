@@ -98,13 +98,19 @@ def remove_edge_dividers(mask: Image.Image, maximum_width: int, cell: Image.Imag
                         pixels[x, neighbour] = 0
     if cell is not None:
         source = cell.convert("RGB").load()
-        for y in range(cleaned.height):
-            for x in range(cleaned.width):
-                if x >= maximum_width and y >= maximum_width and x < cleaned.width - maximum_width and y < cleaned.height - maximum_width:
-                    continue
-                r, g, b = source[x, y]
-                if min(r, g, b) >= 180 and max(r, g, b) - min(r, g, b) <= 60:
-                    pixels[x, y] = 0
+        for edge, coordinates in removed_coordinates.items():
+            for coordinate in coordinates:
+                for fringe in range(coordinate - 2, coordinate + 3):
+                    if edge in ("left", "right") and 0 <= fringe < cleaned.width:
+                        for y in range(cleaned.height):
+                            r, g, b = source[fringe, y]
+                            if min(r, g, b) >= 180 and max(r, g, b) - min(r, g, b) <= 60:
+                                pixels[fringe, y] = 0
+                    elif edge in ("top", "bottom") and 0 <= fringe < cleaned.height:
+                        for x in range(cleaned.width):
+                            r, g, b = source[x, fringe]
+                            if min(r, g, b) >= 180 and max(r, g, b) - min(r, g, b) <= 60:
+                                pixels[x, fringe] = 0
     return cleaned, removed
 
 
