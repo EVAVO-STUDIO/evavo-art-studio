@@ -1,7 +1,8 @@
-export const UV_LAYOUT_REVIEW_CONTRACT = "evavo.uv-layout-review.v1" as const;
+export const UV_LAYOUT_REVIEW_CONTRACT = "evavo.uv-layout-review.v2" as const;
 
 export type UvLayoutGrade = "pass" | "warn" | "fail";
 export type UvPolicy = "ignore" | "warn" | "reject";
+export type UvOrientationConvention = "majority" | "positive" | "negative";
 
 export interface UvPoint {
   readonly u: number;
@@ -26,12 +27,15 @@ export interface UvLayoutReviewSpec {
   readonly allowTiledCoordinates?: boolean;
   readonly overlapPolicy?: UvPolicy;
   readonly mirroredPolicy?: UvPolicy;
+  /** Majority avoids treating a globally flipped UV convention as accidental mirroring. */
+  readonly orientationConvention?: UvOrientationConvention;
   readonly uvAreaEpsilon?: number;
   readonly uvEqualityTolerance?: number;
   readonly textureWidth?: number;
   readonly textureHeight?: number;
   readonly maximumTexelDensityRatio?: number;
   readonly minimumAtlasBoundaryPaddingTexels?: number;
+  readonly minimumIslandPaddingTexels?: number;
 }
 
 export interface UvOverlapPair {
@@ -43,8 +47,16 @@ export interface UvOverlapPair {
 export interface UvIslandEvidence {
   readonly id: string;
   readonly triangleIds: readonly string[];
+  readonly overlapGroup: string | null;
   readonly bounds: Readonly<{ minU: number; minV: number; maxU: number; maxV: number }>;
   readonly boundaryPaddingTexels: number | null;
+}
+
+export interface UvIslandSpacingEvidence {
+  readonly eligiblePairCount: number;
+  readonly minimumPaddingTexels: number | null;
+  readonly closestPair: Readonly<{ a: string; b: string; paddingTexels: number }> | null;
+  readonly requiredMinimumPaddingTexels: number;
 }
 
 export interface UvTexelDensityEvidence {
@@ -61,12 +73,20 @@ export interface UvLayoutReviewEvidence {
   readonly grade: UvLayoutGrade;
   readonly triangleCount: number;
   readonly islandCount: number;
+  readonly orientation: Readonly<{
+    convention: UvOrientationConvention;
+    referenceSign: "positive" | "negative";
+    positiveTriangleCount: number;
+    negativeTriangleCount: number;
+    minorityRatio: number;
+  }>;
   readonly degenerateUvTriangleIds: readonly string[];
   readonly degenerateWorldTriangleIds: readonly string[];
   readonly outsideUnitSquareTriangleIds: readonly string[];
   readonly mirroredTriangleIds: readonly string[];
   readonly overlapPairs: readonly UvOverlapPair[];
   readonly islands: readonly UvIslandEvidence[];
+  readonly islandSpacing: UvIslandSpacingEvidence | null;
   readonly texelDensity: UvTexelDensityEvidence | null;
   readonly blockers: readonly string[];
   readonly warnings: readonly string[];
@@ -74,6 +94,7 @@ export interface UvLayoutReviewEvidence {
 }
 
 type Bounds = { minU: number; minV: number; maxU: number; maxV: number };
+type OrientationSign = 1 | -1;
 
 function finite(value: number, label: string): number {
   if (!Number.isFinite(value)) throw new Error(`${label} must be finite.`);
@@ -94,8 +115,14 @@ function nonNegative(value: number | undefined, fallback: number, label: string)
 
 function policy(value: UvPolicy | undefined, fallback: UvPolicy, label: string): UvPolicy {
   const resolved = value ?? fallback;
-  if (resolved !== "ignore" && resolved !== "warn" && resolved !== "reject") {
-    throw new Error(`${label} must be ignore, warn or reject.`);
+  if (resolved !== "ignore" && resolved !== "warn" && resolved !== "reject") throw new Error(`${label} must be ignore, warn or reject.`);
+  return resolved;
+}
+
+function orientationConvention(value: UvOrientationConvention | undefined): UvOrientationConvention {
+  const resolved = value ?? "majority";
+  if (resolved !== "majority" && resolved !== "positive" && resolved !== "negative") {
+    throw new Error("orientationConvention must be majority, positive or negative.");
   }
   return resolved;
 }
@@ -129,12 +156,13 @@ function boundsOf(uv: readonly [UvPoint, UvPoint, UvPoint]): Bounds {
 }
 
 function boundsOverlap(a: Bounds, b: Bounds, tolerance: number): boolean {
-  return !(
-    a.maxU < b.minU - tolerance ||
-    b.maxU < a.minU - tolerance ||
-    a.maxV < b.minV - tolerance ||
-    b.maxV < a.minV - tolerance
-  );
+  return !(a.maxU < b.minU - tolerance || b.maxU < a.minU - tolerance || a.maxV < b.minV - tolerance || b.maxV < a.minV - tolerance);
+}
+
+function boundsDistancePixels(a: Bounds, b: Bounds, width: number, height: number): number {
+  const du = Math.max(0, b.minU - a.maxU, a.minU - b.maxU) * width;
+  const dv = Math.max(0, b.minV - a.maxV, a.minV - b.maxV) * height;
+  return Math.sqrt(du * du + dv * dv);
 }
 
 function orient(a: UvPoint, b: UvPoint, c: UvPoint): number {
@@ -149,15 +177,11 @@ function pointInTriangleStrict(point: UvPoint, uv: readonly [UvPoint, UvPoint, U
   const s1 = orient(uv[0], uv[1], point);
   const s2 = orient(uv[1], uv[2], point);
   const s3 = orient(uv[2], uv[0], point);
-  const positive = s1 > tolerance && s2 > tolerance && s3 > tolerance;
-  const negative = s1 < -tolerance && s2 < -tolerance && s3 < -tolerance;
-  return positive || negative;
+  return (s1 > tolerance && s2 > tolerance && s3 > tolerance) || (s1 < -tolerance && s2 < -tolerance && s3 < -tolerance);
 }
 
 function properSegmentIntersection(a: UvPoint, b: UvPoint, c: UvPoint, d: UvPoint, tolerance: number): boolean {
-  if (samePoint(a, c, tolerance) || samePoint(a, d, tolerance) || samePoint(b, c, tolerance) || samePoint(b, d, tolerance)) {
-    return false;
-  }
+  if (samePoint(a, c, tolerance) || samePoint(a, d, tolerance) || samePoint(b, c, tolerance) || samePoint(b, d, tolerance)) return false;
   const o1 = orient(a, b, c);
   const o2 = orient(a, b, d);
   const o3 = orient(c, d, a);
@@ -170,17 +194,11 @@ function centroid(uv: readonly [UvPoint, UvPoint, UvPoint]): UvPoint {
   return { u: (uv[0].u + uv[1].u + uv[2].u) / 3, v: (uv[0].v + uv[1].v + uv[2].v) / 3 };
 }
 
-function trianglesOverlap(
-  a: readonly [UvPoint, UvPoint, UvPoint],
-  b: readonly [UvPoint, UvPoint, UvPoint],
-  tolerance: number,
-): boolean {
+function trianglesOverlap(a: readonly [UvPoint, UvPoint, UvPoint], b: readonly [UvPoint, UvPoint, UvPoint], tolerance: number): boolean {
   if (pointInTriangleStrict(centroid(a), b, tolerance) || pointInTriangleStrict(centroid(b), a, tolerance)) return true;
   for (let ai = 0; ai < 3; ai += 1) {
-    const an = (ai + 1) % 3;
     for (let bi = 0; bi < 3; bi += 1) {
-      const bn = (bi + 1) % 3;
-      if (properSegmentIntersection(a[ai]!, a[an]!, b[bi]!, b[bn]!, tolerance)) return true;
+      if (properSegmentIntersection(a[ai]!, a[(ai + 1) % 3]!, b[bi]!, b[(bi + 1) % 3]!, tolerance)) return true;
     }
   }
   return false;
@@ -195,6 +213,48 @@ function edgeKey(a: UvPoint, b: UvPoint, tolerance: number): string {
   const left = pointKey(a, tolerance);
   const right = pointKey(b, tolerance);
   return left < right ? `${left}|${right}` : `${right}|${left}`;
+}
+
+function pixelPoint(point: UvPoint, width: number, height: number): UvPoint {
+  return { u: point.u * width, v: point.v * height };
+}
+
+function pointSegmentDistance(point: UvPoint, a: UvPoint, b: UvPoint): number {
+  const dx = b.u - a.u;
+  const dy = b.v - a.v;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) return Math.hypot(point.u - a.u, point.v - a.v);
+  const t = Math.max(0, Math.min(1, ((point.u - a.u) * dx + (point.v - a.v) * dy) / lengthSq));
+  return Math.hypot(point.u - (a.u + t * dx), point.v - (a.v + t * dy));
+}
+
+function segmentDistance(a: UvPoint, b: UvPoint, c: UvPoint, d: UvPoint): number {
+  if (properSegmentIntersection(a, b, c, d, 1e-9)) return 0;
+  return Math.min(
+    pointSegmentDistance(a, c, d),
+    pointSegmentDistance(b, c, d),
+    pointSegmentDistance(c, a, b),
+    pointSegmentDistance(d, a, b),
+  );
+}
+
+function triangleDistancePixels(
+  a: readonly [UvPoint, UvPoint, UvPoint],
+  b: readonly [UvPoint, UvPoint, UvPoint],
+  width: number,
+  height: number,
+  tolerance: number,
+): number {
+  if (trianglesOverlap(a, b, tolerance)) return 0;
+  const pa = a.map((point) => pixelPoint(point, width, height)) as [UvPoint, UvPoint, UvPoint];
+  const pb = b.map((point) => pixelPoint(point, width, height)) as [UvPoint, UvPoint, UvPoint];
+  let minimum = Number.POSITIVE_INFINITY;
+  for (let ai = 0; ai < 3; ai += 1) {
+    for (let bi = 0; bi < 3; bi += 1) {
+      minimum = Math.min(minimum, segmentDistance(pa[ai]!, pa[(ai + 1) % 3]!, pb[bi]!, pb[(bi + 1) % 3]!));
+    }
+  }
+  return minimum;
 }
 
 class UnionFind {
@@ -229,34 +289,29 @@ function median(values: readonly number[]): number {
   return ordered.length % 2 === 1 ? ordered[middle]! : (ordered[middle - 1]! + ordered[middle]!) / 2;
 }
 
-function addPolicyFinding(targetBlockers: string[], targetWarnings: string[], selected: UvPolicy, message: string): void {
-  if (selected === "reject") targetBlockers.push(message);
-  else if (selected === "warn") targetWarnings.push(message);
+function addPolicyFinding(blockers: string[], warnings: string[], selected: UvPolicy, message: string): void {
+  if (selected === "reject") blockers.push(message);
+  else if (selected === "warn") warnings.push(message);
 }
 
-/**
- * Deterministic UV topology/coverage review from already-extracted mesh triangles.
- * The function does not parse or rewrite mesh files; importers can adapt OBJ/glTF/Godot
- * data into this small contract while keeping geometry I/O out of the reviewer.
- */
-export function reviewUvLayout(
-  triangles: readonly UvTriangle[],
-  spec: UvLayoutReviewSpec = {},
-): UvLayoutReviewEvidence {
-  if (triangles.length < 1 || triangles.length > 5000) {
-    throw new Error("UV layout review requires 1 through 5000 triangles.");
-  }
+function commonOverlapGroup(members: readonly number[], triangles: readonly UvTriangle[]): string | null {
+  const first = triangles[members[0]!]!.overlapGroup;
+  if (!first) return null;
+  return members.every((member) => triangles[member]!.overlapGroup === first) ? first : null;
+}
+
+/** Deterministic UV topology, spacing and density review from extracted mesh triangles. */
+export function reviewUvLayout(triangles: readonly UvTriangle[], spec: UvLayoutReviewSpec = {}): UvLayoutReviewEvidence {
+  if (!Array.isArray(triangles) || triangles.length < 1 || triangles.length > 5000) throw new Error("UV layout review requires 1 through 5000 triangles.");
   const uvAreaEpsilon = positive(spec.uvAreaEpsilon, 1e-10, "uvAreaEpsilon");
   const uvEqualityTolerance = positive(spec.uvEqualityTolerance, 1e-7, "uvEqualityTolerance");
   const overlapPolicy = policy(spec.overlapPolicy, "reject", "overlapPolicy");
   const mirroredPolicy = policy(spec.mirroredPolicy, "warn", "mirroredPolicy");
+  const convention = orientationConvention(spec.orientationConvention);
   const maximumTexelDensityRatio = positive(spec.maximumTexelDensityRatio, 2, "maximumTexelDensityRatio");
   if (maximumTexelDensityRatio < 1) throw new Error("maximumTexelDensityRatio must be at least 1.");
-  const minimumAtlasBoundaryPaddingTexels = nonNegative(
-    spec.minimumAtlasBoundaryPaddingTexels,
-    0,
-    "minimumAtlasBoundaryPaddingTexels",
-  );
+  const minimumAtlasBoundaryPaddingTexels = nonNegative(spec.minimumAtlasBoundaryPaddingTexels, 0, "minimumAtlasBoundaryPaddingTexels");
+  const minimumIslandPaddingTexels = nonNegative(spec.minimumIslandPaddingTexels, 0, "minimumIslandPaddingTexels");
 
   const hasTextureWidth = spec.textureWidth !== undefined;
   const hasTextureHeight = spec.textureHeight !== undefined;
@@ -265,15 +320,16 @@ export function reviewUvLayout(
   const textureHeight = spec.textureHeight === undefined ? null : positive(spec.textureHeight, 1, "textureHeight");
 
   const ids = new Set<string>();
+  const signedAreas: number[] = [];
   const absoluteAreas: number[] = [];
   const bounds: Bounds[] = [];
   const degenerateUvTriangleIds: string[] = [];
   const degenerateWorldTriangleIds: string[] = [];
   const outsideUnitSquareTriangleIds: string[] = [];
-  const mirroredTriangleIds: string[] = [];
 
   for (const [index, triangle] of triangles.entries()) {
     if (!triangle || typeof triangle.id !== "string" || !triangle.id.trim()) throw new Error(`triangles[${index}].id must be a non-empty string.`);
+    if (!Array.isArray(triangle.uv) || triangle.uv.length !== 3) throw new Error(`triangles[${index}].uv must contain exactly three points.`);
     if (ids.has(triangle.id)) throw new Error(`Duplicate UV triangle id ${JSON.stringify(triangle.id)}.`);
     ids.add(triangle.id);
     for (const [vertexIndex, point] of triangle.uv.entries()) {
@@ -281,53 +337,58 @@ export function reviewUvLayout(
       finite(point.v, `triangles[${index}].uv[${vertexIndex}].v`);
     }
     if (triangle.position) {
+      if (!Array.isArray(triangle.position) || triangle.position.length !== 3) throw new Error(`triangles[${index}].position must contain exactly three points.`);
       for (const [vertexIndex, point] of triangle.position.entries()) {
         finite(point.x, `triangles[${index}].position[${vertexIndex}].x`);
         finite(point.y, `triangles[${index}].position[${vertexIndex}].y`);
         finite(point.z, `triangles[${index}].position[${vertexIndex}].z`);
       }
     }
-
     const signedArea = signedUvArea(triangle.uv);
     const absoluteArea = Math.abs(signedArea);
+    signedAreas.push(signedArea);
     absoluteAreas.push(absoluteArea);
     bounds.push(boundsOf(triangle.uv));
     if (absoluteArea <= uvAreaEpsilon) degenerateUvTriangleIds.push(triangle.id);
-    else if (signedArea < 0) mirroredTriangleIds.push(triangle.id);
     if (!spec.allowTiledCoordinates && triangle.uv.some((point) => point.u < -uvEqualityTolerance || point.v < -uvEqualityTolerance || point.u > 1 + uvEqualityTolerance || point.v > 1 + uvEqualityTolerance)) {
       outsideUnitSquareTriangleIds.push(triangle.id);
     }
     if (triangle.position && worldArea(triangle.position) <= 1e-12) degenerateWorldTriangleIds.push(triangle.id);
   }
 
+  const positiveTriangleCount = signedAreas.filter((area, index) => absoluteAreas[index]! > uvAreaEpsilon && area > 0).length;
+  const negativeTriangleCount = signedAreas.filter((area, index) => absoluteAreas[index]! > uvAreaEpsilon && area < 0).length;
+  const referenceSign: OrientationSign = convention === "positive" ? 1 : convention === "negative" ? -1 : negativeTriangleCount > positiveTriangleCount ? -1 : 1;
+  const orientedCount = positiveTriangleCount + negativeTriangleCount;
+  const minorityCount = referenceSign === 1 ? negativeTriangleCount : positiveTriangleCount;
+  const mirroredTriangleIds = triangles
+    .filter((_triangle, index) => absoluteAreas[index]! > uvAreaEpsilon && Math.sign(signedAreas[index]!) !== referenceSign)
+    .map((triangle) => triangle.id);
+
   const edgeOwners = new Map<string, number[]>();
-  const islands = new UnionFind(triangles.length);
+  const islandUnion = new UnionFind(triangles.length);
   for (let index = 0; index < triangles.length; index += 1) {
     const uv = triangles[index]!.uv;
     for (let edge = 0; edge < 3; edge += 1) {
       const key = edgeKey(uv[edge]!, uv[(edge + 1) % 3]!, uvEqualityTolerance);
       const owners = edgeOwners.get(key);
       if (owners) {
-        for (const owner of owners) islands.union(index, owner);
+        for (const owner of owners) islandUnion.union(index, owner);
         owners.push(index);
-      } else {
-        edgeOwners.set(key, [index]);
-      }
+      } else edgeOwners.set(key, [index]);
     }
   }
 
   const islandMembers = new Map<number, number[]>();
   for (let index = 0; index < triangles.length; index += 1) {
-    const root = islands.find(index);
+    const root = islandUnion.find(index);
     const members = islandMembers.get(root);
     if (members) members.push(index);
     else islandMembers.set(root, [index]);
   }
 
-  const islandEvidence: UvIslandEvidence[] = [];
-  let islandOrdinal = 0;
-  for (const members of islandMembers.values()) {
-    islandOrdinal += 1;
+  const islandMemberList = [...islandMembers.values()];
+  const islandEvidence: UvIslandEvidence[] = islandMemberList.map((members, islandIndex) => {
     const islandBounds = members.reduce<Bounds>((accumulator, member) => {
       const current = bounds[member]!;
       return {
@@ -338,20 +399,16 @@ export function reviewUvLayout(
       };
     }, { minU: Number.POSITIVE_INFINITY, minV: Number.POSITIVE_INFINITY, maxU: Number.NEGATIVE_INFINITY, maxV: Number.NEGATIVE_INFINITY });
     const boundaryPaddingTexels = textureWidth !== null && textureHeight !== null
-      ? Math.min(
-        islandBounds.minU * textureWidth,
-        (1 - islandBounds.maxU) * textureWidth,
-        islandBounds.minV * textureHeight,
-        (1 - islandBounds.maxV) * textureHeight,
-      )
+      ? Math.min(islandBounds.minU * textureWidth, (1 - islandBounds.maxU) * textureWidth, islandBounds.minV * textureHeight, (1 - islandBounds.maxV) * textureHeight)
       : null;
-    islandEvidence.push(Object.freeze({
-      id: `island-${String(islandOrdinal).padStart(3, "0")}`,
+    return Object.freeze({
+      id: `island-${String(islandIndex + 1).padStart(3, "0")}`,
       triangleIds: Object.freeze(members.map((member) => triangles[member]!.id)),
+      overlapGroup: commonOverlapGroup(members, triangles),
       bounds: Object.freeze(islandBounds),
       boundaryPaddingTexels,
-    }));
-  }
+    });
+  });
 
   const overlapPairs: UvOverlapPair[] = [];
   for (let left = 0; left < triangles.length; left += 1) {
@@ -361,9 +418,47 @@ export function reviewUvLayout(
       const a = triangles[left]!;
       const b = triangles[right]!;
       if (!trianglesOverlap(a.uv, b.uv, uvEqualityTolerance)) continue;
-      const allowedByGroup = Boolean(a.overlapGroup && b.overlapGroup && a.overlapGroup === b.overlapGroup);
-      overlapPairs.push(Object.freeze({ a: a.id, b: b.id, allowedByGroup }));
+      overlapPairs.push(Object.freeze({
+        a: a.id,
+        b: b.id,
+        allowedByGroup: Boolean(a.overlapGroup && b.overlapGroup && a.overlapGroup === b.overlapGroup),
+      }));
     }
+  }
+
+  let islandSpacing: UvIslandSpacingEvidence | null = null;
+  if (textureWidth !== null && textureHeight !== null && islandMemberList.length > 1) {
+    let eligiblePairCount = 0;
+    let minimumPaddingTexels = Number.POSITIVE_INFINITY;
+    let closestPair: { a: string; b: string; paddingTexels: number } | null = null;
+    for (let left = 0; left < islandMemberList.length; left += 1) {
+      for (let right = left + 1; right < islandMemberList.length; right += 1) {
+        const leftEvidence = islandEvidence[left]!;
+        const rightEvidence = islandEvidence[right]!;
+        if (leftEvidence.overlapGroup && leftEvidence.overlapGroup === rightEvidence.overlapGroup) continue;
+        eligiblePairCount += 1;
+        const lowerBound = boundsDistancePixels(leftEvidence.bounds, rightEvidence.bounds, textureWidth, textureHeight);
+        if (lowerBound >= minimumPaddingTexels) continue;
+        let pairMinimum = Number.POSITIVE_INFINITY;
+        for (const aIndex of islandMemberList[left]!) {
+          for (const bIndex of islandMemberList[right]!) {
+            const triangleLowerBound = boundsDistancePixels(bounds[aIndex]!, bounds[bIndex]!, textureWidth, textureHeight);
+            if (triangleLowerBound >= pairMinimum) continue;
+            pairMinimum = Math.min(pairMinimum, triangleDistancePixels(triangles[aIndex]!.uv, triangles[bIndex]!.uv, textureWidth, textureHeight, uvEqualityTolerance));
+          }
+        }
+        if (pairMinimum < minimumPaddingTexels) {
+          minimumPaddingTexels = pairMinimum;
+          closestPair = { a: leftEvidence.id, b: rightEvidence.id, paddingTexels: pairMinimum };
+        }
+      }
+    }
+    islandSpacing = Object.freeze({
+      eligiblePairCount,
+      minimumPaddingTexels: Number.isFinite(minimumPaddingTexels) ? minimumPaddingTexels : null,
+      closestPair: closestPair ? Object.freeze(closestPair) : null,
+      requiredMinimumPaddingTexels: minimumIslandPaddingTexels,
+    });
   }
 
   let texelDensity: UvTexelDensityEvidence | null = null;
@@ -374,21 +469,19 @@ export function reviewUvLayout(
       if (!triangle.position || absoluteAreas[index]! <= uvAreaEpsilon) continue;
       const area3d = worldArea(triangle.position);
       if (area3d <= 1e-12) continue;
-      const pixelArea = absoluteAreas[index]! * textureWidth * textureHeight;
-      samples.push({ id: triangle.id, value: Math.sqrt(pixelArea / area3d) });
+      samples.push({ id: triangle.id, value: Math.sqrt((absoluteAreas[index]! * textureWidth * textureHeight) / area3d) });
     }
     if (samples.length) {
       const densityMedian = median(samples.map((sample) => sample.value));
       const lower = densityMedian / maximumTexelDensityRatio;
       const upper = densityMedian * maximumTexelDensityRatio;
-      const outlierTriangleIds = samples.filter((sample) => sample.value < lower || sample.value > upper).map((sample) => sample.id);
       texelDensity = Object.freeze({
         sampleCount: samples.length,
         medianTexelsPerWorldUnit: densityMedian,
         minimumTexelsPerWorldUnit: Math.min(...samples.map((sample) => sample.value)),
         maximumTexelsPerWorldUnit: Math.max(...samples.map((sample) => sample.value)),
         maximumAllowedRatio: maximumTexelDensityRatio,
-        outlierTriangleIds: Object.freeze(outlierTriangleIds),
+        outlierTriangleIds: Object.freeze(samples.filter((sample) => sample.value < lower || sample.value > upper).map((sample) => sample.id)),
       });
     }
   }
@@ -406,6 +499,10 @@ export function reviewUvLayout(
     const tooClose = islandEvidence.filter((island) => island.boundaryPaddingTexels !== null && island.boundaryPaddingTexels < minimumAtlasBoundaryPaddingTexels);
     if (tooClose.length) blockers.push(`atlas-boundary-padding-below-${minimumAtlasBoundaryPaddingTexels}px:${tooClose.length}`);
   }
+  if (minimumIslandPaddingTexels > 0 && islandSpacing?.minimumPaddingTexels !== null && islandSpacing.minimumPaddingTexels < minimumIslandPaddingTexels) {
+    const pair = islandSpacing.closestPair;
+    blockers.push(`inter-island-padding-below-${minimumIslandPaddingTexels}px:${pair?.a ?? "unknown"}:${pair?.b ?? "unknown"}:${islandSpacing.minimumPaddingTexels.toFixed(3)}px`);
+  }
 
   const grade: UvLayoutGrade = blockers.length ? "fail" : warnings.length ? "warn" : "pass";
   return Object.freeze({
@@ -413,12 +510,20 @@ export function reviewUvLayout(
     grade,
     triangleCount: triangles.length,
     islandCount: islandEvidence.length,
+    orientation: Object.freeze({
+      convention,
+      referenceSign: referenceSign === 1 ? "positive" as const : "negative" as const,
+      positiveTriangleCount,
+      negativeTriangleCount,
+      minorityRatio: orientedCount ? minorityCount / orientedCount : 0,
+    }),
     degenerateUvTriangleIds: Object.freeze(degenerateUvTriangleIds),
     degenerateWorldTriangleIds: Object.freeze(degenerateWorldTriangleIds),
     outsideUnitSquareTriangleIds: Object.freeze(outsideUnitSquareTriangleIds),
     mirroredTriangleIds: Object.freeze(mirroredTriangleIds),
     overlapPairs: Object.freeze(overlapPairs),
     islands: Object.freeze(islandEvidence),
+    islandSpacing,
     texelDensity,
     blockers: Object.freeze(blockers),
     warnings: Object.freeze(warnings),
@@ -426,7 +531,7 @@ export function reviewUvLayout(
       "Inspect UV seams on the final mesh under representative lighting, especially where tangent-space normals cross island boundaries.",
       "Check texel density on representative geometry; equal numeric density can still look inconsistent across materials with different authored detail scale.",
       "Verify deliberate mirrored/stacked islands use an explicit overlapGroup so accidental overlaps remain visible.",
-      "For atlases and mipmapped assets, inspect real inter-island bleed/padding in the exported texture in addition to boundary padding metrics.",
+      "For atlases and mipmapped assets, verify both measured inter-island spacing and real exported bleed/padding at lower mip levels.",
     ]),
   });
 }
