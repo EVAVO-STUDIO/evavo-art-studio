@@ -45,7 +45,10 @@ test("compiles strict human cel authority for cel animation requests", () => {
   assert.equal(authority.authority.mode, "human-cel-authored");
   assert.equal(authority.authority.preferredPromptCompiler, "createHumanCelRenderPrompt");
   assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
-  assert.equal(authority.handoff.minimumPackageVersion, "0.32.0");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.33.0");
+  assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelFinishReview"), true);
+  assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelCinematographyReview"), true);
+  assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelEnvironmentReview"), true);
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
 });
 
