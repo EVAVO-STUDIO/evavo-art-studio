@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "evavo-texture-review-agent",
-  "purpose": "Map-aware technical review for texture and PBR data assets plus bounded 3x3 tile proofs.",
+  "purpose": "Map-aware technical review for texture and PBR data assets plus sampling-aware bounded 3x3 tile proofs.",
   "entrypoint": "tools/texture_review_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
@@ -17,6 +17,11 @@
     "opacity",
     "orm-packed"
   ],
+  "proofSampling": {
+    "default": "continuous",
+    "continuous": "Lanczos3 is used only when the diagnostic tile must be reduced; this avoids artificial blockiness on continuous-tone textures.",
+    "nearest": "Explicit opt-in for pixel art or exact texel/block inspection."
+  },
   "tools": [
     "evavo_texture_review_capabilities",
     "evavo_review_texture_map",
@@ -26,6 +31,7 @@
     "sourceMutationAllowed": false,
     "proofOutputsCreateOnly": true,
     "proofWritesRequireExplicitConfirmation": true,
+    "continuousTextureProofsAvoidForcedNearestResampling": true,
     "silentNormalChannelFlip": false,
     "silentPackedMapRepacking": false,
     "claimsAiOriginDetection": false
