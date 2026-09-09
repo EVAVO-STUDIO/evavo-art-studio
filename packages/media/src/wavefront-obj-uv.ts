@@ -1,6 +1,6 @@
 import { reviewUvLayout, type UvLayoutReviewEvidence, type UvLayoutReviewSpec, type UvPoint, type Position3, type UvTriangle } from "./uv-layout-review.js";
 
-export const WAVEFRONT_OBJ_UV_CONTRACT = "evavo.wavefront-obj-uv.v1" as const;
+export const WAVEFRONT_OBJ_UV_CONTRACT = "evavo.wavefront-obj-uv.v2" as const;
 
 export interface WavefrontObjUvExtraction {
   readonly contract: typeof WAVEFRONT_OBJ_UV_CONTRACT;
@@ -17,7 +17,7 @@ export interface WavefrontObjUvExtraction {
 }
 
 export interface WavefrontObjUvReviewSpec extends UvLayoutReviewSpec {
-  /** Apply v := 1-v before review without changing the source text. */
+  /** Apply v := 1-v before review without changing authored source UVs. */
   readonly flipVForReview?: boolean;
 }
 
@@ -136,15 +136,19 @@ export function extractWavefrontObjUv(source: string): WavefrontObjUvExtraction 
       const triRefs = [refs[0]!, refs[fan]!, refs[fan + 1]!] as const;
       const uv = triRefs.map((ref) => textureCoordinates[ref.uvIndex!]!) as unknown as [UvPoint, UvPoint, UvPoint];
       const position = triRefs.map((ref) => vertices[ref.vertexIndex]!) as unknown as [Position3, Position3, Position3];
+      const vertexKeys = triRefs.map((ref) => `v:${ref.vertexIndex + 1}`) as unknown as [string, string, string];
       triangles.push(Object.freeze({
         id: `${currentObject}/${currentGroup}/${currentMaterial}/face-${faceCount}/tri-${fan}`,
         uv: Object.freeze(uv) as readonly [UvPoint, UvPoint, UvPoint],
         position: Object.freeze(position) as readonly [Position3, Position3, Position3],
+        vertexKeys: Object.freeze(vertexKeys) as readonly [string, string, string],
       }));
     }
   }
 
-  if (!triangles.length) throw new Error(`Wavefront OBJ produced no UV triangles; faces=${faceCount}, skippedWithoutUv=${skippedFacesWithoutUv}.`);
+  if (!triangles.length) {
+    throw new Error(`Wavefront OBJ produced no UV triangles; faces=${faceCount}, skippedWithoutUv=${skippedFacesWithoutUv}.`);
+  }
   return Object.freeze({
     contract: WAVEFRONT_OBJ_UV_CONTRACT,
     vertexCount: vertices.length,
@@ -161,12 +165,17 @@ export function extractWavefrontObjUv(source: string): WavefrontObjUvExtraction 
 }
 
 /** Extract and immediately review OBJ UVs without mutating the source. */
-export function reviewWavefrontObjUv(source: string, spec: WavefrontObjUvReviewSpec = {}): WavefrontObjUvReviewResult {
+export function reviewWavefrontObjUv(
+  source: string,
+  spec: WavefrontObjUvReviewSpec = {},
+): WavefrontObjUvReviewResult {
   const extraction = extractWavefrontObjUv(source);
   const triangles = spec.flipVForReview
     ? extraction.triangles.map((triangle) => Object.freeze({
       ...triangle,
-      uv: Object.freeze(triangle.uv.map((point) => Object.freeze({ u: point.u, v: 1 - point.v }))) as unknown as readonly [UvPoint, UvPoint, UvPoint],
+      uv: Object.freeze(
+        triangle.uv.map((point) => Object.freeze({ u: point.u, v: 1 - point.v })),
+      ) as unknown as readonly [UvPoint, UvPoint, UvPoint],
     }))
     : extraction.triangles;
   const review = reviewUvLayout(triangles, {
