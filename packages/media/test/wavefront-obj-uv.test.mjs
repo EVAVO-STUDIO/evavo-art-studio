@@ -84,7 +84,7 @@ f 4 5 6
   assert.equal(result.triangleCount, 1);
 });
 
-test("can explicitly flip V for review without changing extracted authored UVs", () => {
+test("majority orientation accepts a globally V-flipped OBJ review domain", () => {
   const source = `
 v 0 0 0
 v 1 0 0
@@ -97,8 +97,29 @@ f 1/1 2/2 3/3
   const normal = reviewWavefrontObjUv(source, { mirroredPolicy: "reject" });
   const flipped = reviewWavefrontObjUv(source, { mirroredPolicy: "reject", flipVForReview: true });
   assert.equal(normal.review.grade, "pass");
-  assert.equal(flipped.review.grade, "fail");
+  assert.equal(flipped.review.grade, "pass");
+  assert.equal(normal.review.orientation.referenceSign, "positive");
+  assert.equal(flipped.review.orientation.referenceSign, "negative");
   assert.deepEqual(flipped.extraction.triangles[0].uv, normal.extraction.triangles[0].uv);
+});
+
+test("an explicit positive convention can still detect a V-flipped review as mirrored", () => {
+  const source = `
+v 0 0 0
+v 1 0 0
+v 0 1 0
+vt 0 0
+vt 1 0
+vt 0 1
+f 1/1 2/2 3/3
+`;
+  const result = reviewWavefrontObjUv(source, {
+    flipVForReview: true,
+    orientationConvention: "positive",
+    mirroredPolicy: "reject",
+  });
+  assert.equal(result.review.grade, "fail");
+  assert.equal(result.review.mirroredTriangleIds.length, 1);
 });
 
 test("fails closed when an OBJ has no UV-reviewable faces", () => {
