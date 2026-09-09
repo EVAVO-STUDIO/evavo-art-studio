@@ -9,7 +9,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifestPath = path.join(root, "config/image-delivery-integrity.capabilities.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
-if (manifest.schemaVersion !== "1.0") throw new Error("Delivery integrity capability schema must be 1.0.");
+if (typeof manifest.schemaVersion !== "string" || !/^1\.\d+$/u.test(manifest.schemaVersion)) {
+  throw new Error("Delivery integrity capability schema must be a supported 1.x revision.");
+}
 if (manifest.entrypoint !== "tools/image_delivery_integrity_mcp.mjs") throw new Error("Delivery integrity entrypoint is not canonical.");
 if (!Array.isArray(manifest.tools) || manifest.tools.length !== 3) throw new Error("Delivery integrity manifest must advertise exactly three tools.");
 
@@ -28,6 +30,7 @@ for (const requiredGuard of [
   "sourceModified: false",
   "bytesReturned: false",
   "MAX_BATCH = 128",
+  "maximumBytes",
 ]) {
   if (!source.includes(requiredGuard)) throw new Error(`Delivery integrity MCP is missing ${requiredGuard}.`);
 }
@@ -39,7 +42,9 @@ if (!mediaIndex.includes('export * from "./image-delivery-integrity.js";')) {
 const core = await readFile(path.join(root, "packages/media/src/image-delivery-integrity.ts"), "utf8");
 for (const requiredCoreFeature of [
   "reviewImageDeliveryIntegrity",
-  "jpeg-delivery-cannot-preserve-alpha",
+  "forbidden-alpha-channel-present",
+  "encoded-format-does-not-match-intent",
+  "encoded-byte-budget-exceeded",
   "print-effective-dpi-below-minimum",
   "game-data-map",
   "sourceMutationAllowed: false",
@@ -55,11 +60,13 @@ for (const requiredTest of [
 process.stdout.write(`${JSON.stringify({
   contract: "evavo.image-delivery-integrity-agent.check.v1",
   ok: true,
+  schemaVersion: manifest.schemaVersion,
   entrypoint: manifest.entrypoint,
   tools: manifest.tools,
   targets: manifest.targets,
   maximumBatchSize: manifest.limits?.batchImages ?? null,
   guarantees: manifest.guarantees,
+  checks: manifest.checks,
   tests: [
     "packages/media/test/image-delivery-integrity.test.mjs",
     "tools/image_delivery_integrity_mcp.test.mjs",
