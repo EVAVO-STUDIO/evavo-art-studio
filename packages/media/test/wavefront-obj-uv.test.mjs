@@ -18,7 +18,7 @@ g front
 f 1/1 2/2 3/3 4/4
 `;
 
-test("extracts and triangulates an OBJ quad while preserving scope metadata", () => {
+test("extracts and triangulates an OBJ quad while preserving scope and topology metadata", () => {
   const result = extractWavefrontObjUv(CLEAN_QUAD);
   assert.equal(result.vertexCount, 4);
   assert.equal(result.textureCoordinateCount, 4);
@@ -30,9 +30,10 @@ test("extracts and triangulates an OBJ quad while preserving scope metadata", ()
   assert.deepEqual(result.groupNames, ["front"]);
   assert.deepEqual(result.materialNames, ["brick"]);
   assert.match(result.triangles[0].id, /^wall\/front\/brick\/face-1\/tri-1$/);
+  assert.deepEqual(result.triangles[0].vertexKeys, ["v:1", "v:2", "v:3"]);
 });
 
-test("feeds OBJ UV and world-space triangles directly into UV assurance", () => {
+test("feeds OBJ UV and world-space triangles directly into topology-aware UV assurance", () => {
   const result = reviewWavefrontObjUv(CLEAN_QUAD, {
     textureWidth: 1024,
     textureHeight: 1024,
@@ -42,7 +43,28 @@ test("feeds OBJ UV and world-space triangles directly into UV assurance", () => 
   assert.equal(result.review.grade, "pass");
   assert.equal(result.review.islandCount, 1);
   assert.equal(result.review.triangleCount, 2);
+  assert.equal(result.review.connectivity.mode, "mesh-aware");
   assert.ok(result.review.texelDensity);
+});
+
+test("does not merge unrelated mesh parts merely because their UVs are identical", () => {
+  const source = `
+v 0 0 0
+v 1 0 0
+v 0 1 0
+v 2 0 0
+v 3 0 0
+v 2 1 0
+vt 0.1 0.1
+vt 0.4 0.1
+vt 0.1 0.4
+f 1/1 2/2 3/3
+f 4/1 5/2 6/3
+`;
+  const result = reviewWavefrontObjUv(source, { textureWidth: 1024, textureHeight: 1024 });
+  assert.equal(result.review.islandCount, 2);
+  assert.equal(result.review.grade, "fail");
+  assert.ok(result.review.blockers.includes("unapproved-uv-overlaps:1"));
 });
 
 test("supports negative OBJ vertex and texture-coordinate indices", () => {
@@ -62,6 +84,7 @@ f -3/-3 -2/-2 -1/-1
     { u: 1, v: 0 },
     { u: 0, v: 1 },
   ]);
+  assert.deepEqual(result.triangles[0].vertexKeys, ["v:1", "v:2", "v:3"]);
 });
 
 test("counts faces that cannot be UV-reviewed instead of inventing coordinates", () => {
@@ -120,6 +143,32 @@ f 1/1 2/2 3/3
   });
   assert.equal(result.review.grade, "fail");
   assert.equal(result.review.mirroredTriangleIds.length, 1);
+});
+
+test("forwards inter-island padding review options", () => {
+  const source = `
+v 0 0 0
+v 1 0 0
+v 0 1 0
+v 2 0 0
+v 3 0 0
+v 2 1 0
+vt 0.1 0.1
+vt 0.4 0.1
+vt 0.1 0.4
+vt 0.405 0.1
+vt 0.7 0.1
+vt 0.7 0.4
+f 1/1 2/2 3/3
+f 4/4 5/5 6/6
+`;
+  const result = reviewWavefrontObjUv(source, {
+    textureWidth: 1000,
+    textureHeight: 1000,
+    minimumIslandPaddingTexels: 8,
+  });
+  assert.equal(result.review.grade, "fail");
+  assert.ok(result.review.blockers.some((item) => item.startsWith("inter-island-padding-below-8px:")));
 });
 
 test("fails closed when an OBJ has no UV-reviewable faces", () => {
