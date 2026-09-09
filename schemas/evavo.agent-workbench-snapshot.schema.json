@@ -24,8 +24,19 @@
         "capabilityCount": {"type": "integer", "minimum": 0},
         "packageScriptCount": {"type": "integer", "minimum": 0},
         "toolCount": {"type": "integer", "minimum": 0},
+        "registeredToolCount": {"type": "integer", "minimum": 0},
+        "mcpServerCount": {"type": "integer", "minimum": 0},
         "estateCapabilityCount": {"type": "integer", "minimum": 0},
         "estate": {"type": ["object", "null"]}
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "properties": {
+        "toolRegistryOrigin": {"enum": ["explicit", "repository-config", "sibling-development-studio", "unavailable"]},
+        "siblingDevelopmentStudioRegistryAutoDiscovered": {"type": "boolean"},
+        "mcpLaunchManifestObserved": {"type": "boolean"},
+        "mcpLaunchManifestSanitized": {"type": "boolean"}
       }
     },
     "orientation": {
@@ -62,7 +73,10 @@
         "routeDoesNotAuthorizeEffects": {"const": true},
         "planDoesNotProveExecution": {"const": true},
         "incompleteEstateCannotProveAbsence": {"type": "boolean"},
-        "publicationRequiresSeparateAuthority": {"const": true}
+        "publicationRequiresSeparateAuthority": {"const": true},
+        "mcpRegistrationDoesNotImplyRuntimeReadiness": {"const": true},
+        "mcpEnvironmentValuesRetained": {"const": false},
+        "mcpArgumentValuesRetained": {"const": false}
       }
     }
   },
@@ -73,7 +87,10 @@
       "properties": {
         "path": {"type": "string", "minLength": 1},
         "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-        "bytes": {"type": "integer", "minimum": 0}
+        "bytes": {"type": "integer", "minimum": 0},
+        "sanitized": {"type": "boolean"},
+        "rawEnvironmentValuesRetained": {"type": "boolean"},
+        "rawArgumentValuesRetained": {"type": "boolean"}
       }
     }
   }
