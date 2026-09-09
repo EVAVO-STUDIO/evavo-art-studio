@@ -41,8 +41,10 @@ test("approved-reference consistency is separate from frame continuity and never
   assert.equal(route.writeClass, "read-only");
   assert.ok(route.orderedTools.includes("evavo_review_image_against_references"));
   assert.ok(route.orderedTools.includes("evavo_review_image_batch_against_references"));
+  assert.ok(route.orderedTools.includes("evavo_create_image_reference_consistency_proof"));
   assert.match(route.stopConditions.join(" "), /reference set is unstable/);
   assert.match(route.evidenceExpected.join(" "), /palette\/tone\/detail\/silhouette\/framing/);
+  assert.match(route.evidenceExpected.join(" "), /visual proof/);
   assert.match(route.notes.join(" "), /not character\/object identity recognition/);
   assert.match(route.notes.join(" "), /does not detect or prove AI authorship/);
 });
@@ -72,8 +74,15 @@ test("texture route spans review, preprocessing, materialization and native Godo
   assert.match(route.notes.join(" "), /unapproved/);
 });
 
-test("AI artifact assessment never claims pixel-origin detection", () => {
+test("artifact assessment uses dedicated triage while refusing pixel-origin conclusions", () => {
   const route = routeImageAgentTask("ai-artifact-assessment");
+  assert.match(route.primarySurface, /evavo-image-artifact-triage/);
+  assert.match(route.primarySurface, /evavo-image-reference-consistency/);
+  assert.ok(route.orderedTools.includes("evavo_review_image_artifact_risk"));
+  assert.ok(route.orderedTools.includes("evavo_review_image_against_references"));
   assert.match(route.stopConditions.join(" "), /do not infer authorship/);
-  assert.match(route.notes.join(" "), /must not claim pixels alone prove AI authorship/);
+  assert.match(route.evidenceExpected.join(" "), /repeated nontrivial detail/);
+  assert.match(route.evidenceExpected.join(" "), /provenance status/);
+  assert.match(route.notes.join(" "), /not image authorship/);
+  assert.match(route.notes.join(" "), /provenance records/);
 });
