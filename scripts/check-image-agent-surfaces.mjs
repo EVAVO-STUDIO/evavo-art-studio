@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifests = [
   "config/image-finishing-artist.capabilities.json",
+  "config/image-finishing-packet.capabilities.json",
   "config/image-repair-agent.capabilities.json",
   "config/image-reference-consistency.capabilities.json",
   "config/image-artifact-triage.capabilities.json",
@@ -45,6 +46,7 @@ for (const relative of manifests) {
 const mediaIndex = await readFile(path.join(root, "packages/media/src/index.ts"), "utf8");
 const mediaExports = [
   "image-repair-routing",
+  "image-finishing-review-packet",
   "image-agent-routing",
   "image-reference-consistency",
   "image-reference-consistency-proof",
@@ -62,6 +64,10 @@ for (const requiredExport of mediaExports) {
   if (!mediaIndex.includes(`export * from "./${requiredExport}.js";`)) {
     throw new Error(`packages/media/src/index.ts does not export ${requiredExport}.`);
   }
+}
+const finishingPacket = await readFile(path.join(root, "packages/media/src/image-finishing-review-packet.ts"), "utf8");
+for (const requiredPacketFeature of ["createImageFinishingReviewPacket", "automaticPromotionAllowed", "approved-reference-set-is-not-stable-enough", "generated-detail-risk:"]) {
+  if (!finishingPacket.includes(requiredPacketFeature)) throw new Error(`Unified finishing packet is missing ${requiredPacketFeature}.`);
 }
 const generatedDetailRisk = await readFile(path.join(root, "packages/media/src/image-generated-detail-risk.ts"), "utf8");
 for (const requiredSignal of ["repeated-nontrivial-local-pattern-risk", "local-detail-density-imbalance", "advisoryOnly", "aiOriginDetection"]) {
@@ -108,6 +114,7 @@ if (!spriteEffectsIndex.includes('export * from "./agent-planner.js";')) throw n
 
 for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
+  "packages/media/test/image-finishing-review-packet.test.mjs",
   "packages/media/test/image-agent-routing.test.mjs",
   "packages/media/test/image-reference-consistency.test.mjs",
   "packages/media/test/image-reference-consistency-proof.test.mjs",
@@ -126,6 +133,7 @@ for (const requiredTest of [
   "packages/godot/test/material-validation-native.test.mjs",
   "packages/godot/test/material-delivery-mcp.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
+  "tools/image_finishing_packet_mcp.test.mjs",
   "tools/image_reference_consistency_mcp.test.mjs",
   "tools/image_artifact_triage_mcp.test.mjs",
   "tools/texture_review_mcp.test.mjs",
@@ -139,6 +147,7 @@ process.stdout.write(`${JSON.stringify({
   ok: true,
   surfaces: parsed,
   mediaExports,
+  finishingPacket: ["technical-review", "artifact-triage", "repair-routing", "approved-reference-consistency", "semantic-findings", "no-auto-promotion"],
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   artifactTriage: ["ringing", "posterization", "resampling", "repeated-detail", "detail-density-imbalance", "advisory-only", "no-ai-origin-claim"],
   referenceConsistency: ["approved-reference-baseline", "reference-set-coherence", "palette-tone-detail-silhouette-framing", "batch-outlier-ranking", "guarded-visual-proof", "no-ai-origin-claim"],
