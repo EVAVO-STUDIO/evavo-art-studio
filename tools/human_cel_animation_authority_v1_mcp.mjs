@@ -10,7 +10,7 @@ import {
 const TOOL_DEFINITIONS = [
   {
     name: "compile_human_cel_animation_authority_v1",
-    description: "Compile an Art Studio animation request into a strict human-cel craft authority handoff for cel-animation-studio.",
+    description: "Compile an Art Studio animation request into a strict human-cel craft authority handoff requiring authored acting/performance, candidate-envelope provenance, candidate-byte quality receipts and Cel Studio Store-level promotion enforcement.",
     inputSchema: {
       type: "object",
       required: ["request"],
@@ -20,7 +20,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "verify_human_cel_animation_authority_v1",
-    description: "Verify the digest and mandatory strict human-cel authority bindings without side effects.",
+    description: "Verify the digest, Core 0.37 performance requirements, Store 0.26 promotion gate and mandatory strict human-cel authority bindings without side effects.",
     inputSchema: {
       type: "object",
       required: ["authority"],
@@ -45,10 +45,19 @@ function callTool(name, args) {
     assertHumanCelAnimationAuthorityIntegrity(args.authority);
     return {
       status: "verified",
+      protocolVersion: args.authority.protocolVersion,
       authorityId: args.authority.authorityId,
       contentDigest: args.authority.contentDigest,
       mode: args.authority.authority.mode,
+      performanceActing: args.authority.authority.performanceActing,
+      candidateEnvelopeProvenanceRequired:
+        args.authority.authority.requiresCandidateEnvelopeProvenance,
+      persistencePromotionGateRequired:
+        args.authority.authority.requiresPersistencePromotionGate,
       targetRepository: args.authority.handoff.targetRepository,
+      coreMinimumVersion: args.authority.handoff.minimumPackageVersion,
+      storeMinimumVersion: args.authority.handoff.minimumStorePackageVersion,
+      requiredStoreBehavior: args.authority.handoff.requiredStoreBehavior,
     };
   }
   throw new Error(`HUMAN_CEL_AUTHORITY_MCP_TOOL_UNKNOWN:${name}`);
@@ -59,8 +68,8 @@ async function dispatch(message) {
     return {
       protocolVersion: message.params?.protocolVersion ?? "2025-06-18",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "evavo-human-cel-animation-authority-v1", version: "1.0.0" },
-      instructions: "Use this bridge when Art Studio animation must be handed to cel-animation-studio under strict human-authored cel craft, timing, cinematography and anti-generic review. This bridge grants no rendering, approval, repository mutation or publication authority.",
+      serverInfo: { name: "evavo-human-cel-animation-authority-v1", version: "1.1.0" },
+      instructions: "Use this bridge when Art Studio animation must be handed to cel-animation-studio under strict human-authored cel draftsmanship, authored acting/performance, timing, cinematography and anti-generic review. A valid handoff requires Cel Core 0.37+, Cel Store 0.26+, candidate provenance containing the persisted strict-envelope digest, an immutable candidate-byte-bound zero-blocker quality receipt and the Store strict-human-cel-promotion-receipt-gate before approved state is authoritative. This bridge grants no provider execution, creative approval, repository mutation or publication authority.",
     };
   }
   if (message.method === "notifications/initialized") return null;
