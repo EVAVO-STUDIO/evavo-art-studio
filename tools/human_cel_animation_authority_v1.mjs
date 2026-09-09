@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.6";
+export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.7";
 export const HUMAN_CEL_AUTHORITY_KIND = "evavo.human-cel-animation-authority.v1";
 export const HUMAN_CEL_CRAFT_AUTHORITY_ID = "evavo-human-cel-craft-v1";
 export const HUMAN_CEL_ALLOWED_MOTION_STYLES = Object.freeze([
@@ -135,9 +135,11 @@ export function compileHumanCelAnimationAuthority(request) {
       requiredQualityReceipt: "createHumanCelQualityReceipt",
       canonicalApprovalHelper: "reviewHumanCelArtefact",
       requiredPersistenceGate: "strict-human-cel-promotion-receipt-gate",
+      requiredPersistedStateIntegrity: "canonical-snapshot-render-job-integrity",
       requiresExactProductionAuthority: true,
       requiresCandidateEnvelopeProvenance: true,
       requiresPersistencePromotionGate: true,
+      requiresPersistedStateIntegrity: true,
     },
     requiredPractices: [
       "lock identity to approved model-sheet anchors before generating or drawing motion",
@@ -154,6 +156,7 @@ export function compileHumanCelAnimationAuthority(request) {
       "invalidate strict prompt authority whenever work order, direction, request, task or stage identity changes",
       "require every strict candidate to cite the exact strict-envelope digest in source provenance",
       "create one quality receipt bound to the exact candidate bytes and strict envelope after every complete craft review",
+      "require the public Cel Store to recompute canonical snapshot and render-job state before trusting strict promotion evidence",
       "use reviewHumanCelArtefact as the canonical strict review helper and require the Studio Store persistence gate to independently recheck strict receipt evidence before any approved state becomes authoritative",
     ],
     prohibitedSubstitutions: [
@@ -168,11 +171,14 @@ export function compileHumanCelAnimationAuthority(request) {
       "generated pseudo-lettering",
       "using the convenience or base render compiler to satisfy a strict human-cel-authored production claim",
       "persisting a strict approved candidate without a current zero-blocker candidate-byte quality receipt",
+      "trusting a hand-edited or forged render job or snapshot because its digest string merely has the right shape",
     ],
     qualityGates: [
       "exact human-cel production authority binding",
       "strict human-cel render prompt envelope integrity",
       "candidate provenance contains the exact strict-envelope digest",
+      "canonical persisted production-snapshot integrity",
+      "canonical persisted render-job integrity and revision-one lifecycle admission",
       "human cel craft prompt inspection",
       "shot-language and composition inspection",
       "source-based lighting and cel-shadow inspection",
@@ -193,8 +199,9 @@ export function compileHumanCelAnimationAuthority(request) {
       package: "@evavo/cel-core",
       minimumPackageVersion: "0.37.0",
       storePackage: "@evavo/cel-store",
-      minimumStorePackageVersion: "0.26.0",
+      minimumStorePackageVersion: "0.27.0",
       requiredStoreBehavior: "strict-human-cel-promotion-receipt-gate",
+      requiredStoreIntegrity: "canonical-snapshot-render-job-integrity",
       requiredExports: [
         "createHumanCelProductionAuthority",
         "assertHumanCelProductionAuthorityBinding",
@@ -251,9 +258,11 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
     authority.authority?.requiredQualityReceipt !== "createHumanCelQualityReceipt" ||
     authority.authority?.canonicalApprovalHelper !== "reviewHumanCelArtefact" ||
     authority.authority?.requiredPersistenceGate !== "strict-human-cel-promotion-receipt-gate" ||
+    authority.authority?.requiredPersistedStateIntegrity !== "canonical-snapshot-render-job-integrity" ||
     authority.authority?.requiresExactProductionAuthority !== true ||
     authority.authority?.requiresCandidateEnvelopeProvenance !== true ||
-    authority.authority?.requiresPersistencePromotionGate !== true
+    authority.authority?.requiresPersistencePromotionGate !== true ||
+    authority.authority?.requiresPersistedStateIntegrity !== true
   ) {
     fail("HUMAN_CEL_AUTHORITY_CRAFT_BINDING_INVALID");
   }
@@ -265,9 +274,9 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
   }
   if (
     authority.handoff?.storePackage !== "@evavo/cel-store" ||
-    authority.handoff?.minimumStorePackageVersion !== "0.26.0" ||
-    authority.handoff?.requiredStoreBehavior !==
-      "strict-human-cel-promotion-receipt-gate"
+    authority.handoff?.minimumStorePackageVersion !== "0.27.0" ||
+    authority.handoff?.requiredStoreBehavior !== "strict-human-cel-promotion-receipt-gate" ||
+    authority.handoff?.requiredStoreIntegrity !== "canonical-snapshot-render-job-integrity"
   ) {
     fail("HUMAN_CEL_AUTHORITY_STORE_GATE_INVALID");
   }
