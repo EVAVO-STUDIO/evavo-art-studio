@@ -22,7 +22,7 @@ class GranularEditTests(unittest.TestCase):
         image = Image.new("RGBA", (3, 1))
         image.putdata([(10, 20, 30, 0), (40, 50, 60, 95), (70, 80, 90, 96)])
         result = SANDBOX.apply_operation(image, {"op": "alpha-clean", "threshold": 96})
-        self.assertEqual(list(result.get_flattened_data()), [(0, 0, 0, 0), (0, 0, 0, 0), (70, 80, 90, 255)])
+        self.assertEqual(list(result.getdata()), [(0, 0, 0, 0), (0, 0, 0, 0), (70, 80, 90, 255)])
 
     def test_chroma_to_alpha_preserves_cyan_effects_and_opaque_shadows(self) -> None:
         image = Image.new("RGBA", (3, 1))

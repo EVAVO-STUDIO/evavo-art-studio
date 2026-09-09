@@ -19,11 +19,12 @@ test("builds deterministic wheel, contact-patch and occlusion layers on the sour
   const second = await buildVehicleMotionLayerPacket(input, spec);
   assert.equal(first.width, 32);
   assert.equal(first.height, 24);
-  assert.equal(first.layers.length, 3);
-  assert.deepEqual(first.layers.map((layer) => layer.role), ["wheel", "tyre_contact_patch_mask", "wheel_occlusion_mask"]);
+  assert.equal(first.layers.length, 5);
+  assert.deepEqual(first.layers.map((layer) => layer.role), ["body_plate", "wheel", "tyre_contact_patch_mask", "wheel_occlusion_mask", "wheel_occlusion_layer"]);
   assert.deepEqual(first.layers.map((layer) => layer.sha256), second.layers.map((layer) => layer.sha256));
   assert.ok(first.layers.every((layer) => layer.nonTransparentPixels > 0));
   assert.equal(first.evidence.publicationAuthority, false);
+  assert.deepEqual(first.evidence.compositionOrder, ["body_plate", "wheel", "wheel_occlusion_layer", "tyre_contact_patch_mask"]);
 });
 
 test("rejects unreviewed anchors and opaque sources", async () => {

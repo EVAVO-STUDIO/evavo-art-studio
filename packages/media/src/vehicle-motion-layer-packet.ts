@@ -22,7 +22,7 @@ export type VehicleMotionLayerPacketSpec = {
 
 export type VehicleMotionLayer = {
   id: string;
-  role: "wheel" | "tyre_contact_patch_mask" | "wheel_occlusion_mask";
+  role: "body_plate" | "wheel" | "tyre_contact_patch_mask" | "wheel_occlusion_mask" | "wheel_occlusion_layer";
   buffer: Buffer;
   sha256: string;
   nonTransparentPixels: number;
@@ -72,10 +72,12 @@ export async function buildVehicleMotionLayerPacket(input: Buffer, spec: Vehicle
   }
 
   const layers: VehicleMotionLayer[] = [];
+  const bodyPlate = Buffer.from(decoded.data);
   for (const anchor of spec.anchors) {
     const wheel = Buffer.alloc(width * height * 4);
     const contact = Buffer.alloc(width * height * 4);
     const occlusion = Buffer.alloc(width * height * 4);
+    const occlusionLayer = Buffer.alloc(width * height * 4);
     let wheelPixels = 0;
     let contactPixels = 0;
     let occlusionPixels = 0;
@@ -87,6 +89,11 @@ export async function buildVehicleMotionLayerPacket(input: Buffer, spec: Vehicle
         const offset = (y * width + x) * 4;
         const alpha = decoded.data[offset + 3]!;
         if (alpha === 0) continue;
+        // The body plate owns no pixels inside the reviewed wheel aperture. The
+        // original-colour upper aperture is restored later as an occlusion layer,
+        // allowing the wheel to rotate between the two without cutting through
+        // the arch/fender artwork.
+        bodyPlate[offset] = 0; bodyPlate[offset + 1] = 0; bodyPlate[offset + 2] = 0; bodyPlate[offset + 3] = 0;
         decoded.data.copy(wheel, offset, offset, offset + 4);
         wheelPixels += 1;
         if (ny >= 0.42) {
@@ -95,6 +102,7 @@ export async function buildVehicleMotionLayerPacket(input: Buffer, spec: Vehicle
         }
         if (ny <= 0.18) {
           occlusion[offset] = 255; occlusion[offset + 1] = 255; occlusion[offset + 2] = 255; occlusion[offset + 3] = alpha;
+          decoded.data.copy(occlusionLayer, offset, offset, offset + 4);
           occlusionPixels += 1;
         }
       }
@@ -104,24 +112,30 @@ export async function buildVehicleMotionLayerPacket(input: Buffer, spec: Vehicle
       ["wheel", wheel, wheelPixels],
       ["tyre_contact_patch_mask", contact, contactPixels],
       ["wheel_occlusion_mask", occlusion, occlusionPixels],
+      ["wheel_occlusion_layer", occlusionLayer, occlusionPixels],
     ] as const) {
       const buffer = await encodeRgba(data, width, height);
       layers.push({ id: `${role}_${anchor.id}`, role, buffer, sha256: sha256(buffer), nonTransparentPixels: count });
     }
   }
+  const bodyPlateBuffer = await encodeRgba(bodyPlate, width, height);
+  let bodyPlatePixels = 0;
+  for (let offset = 3; offset < bodyPlate.length; offset += 4) if (bodyPlate[offset]! > 0) bodyPlatePixels += 1;
+  layers.unshift({ id: "body_plate", role: "body_plate", buffer: bodyPlateBuffer, sha256: sha256(bodyPlateBuffer), nonTransparentPixels: bodyPlatePixels });
   return {
     width,
     height,
     inputSha256: sha256(input),
     layers,
     evidence: {
-      schema: "evavo.vehicle-motion-layer-packet.v1",
+      schema: "evavo.vehicle-motion-layer-packet.v2",
       view: spec.view,
       drivetrain: spec.drivetrain,
       reviewer: spec.reviewer,
       reviewedAnchors: true,
       sourceAlphaPixels,
       layerCount: layers.length,
+      compositionOrder: ["body_plate", "wheel", "wheel_occlusion_layer", "tyre_contact_patch_mask"],
       publicationAuthority: false,
       semanticOcclusionApprovalRequired: true,
     },
