@@ -42,39 +42,31 @@ function request(overrides = {}) {
 
 test("compiles strict human cel authority for cel animation requests", () => {
   const authority = compileHumanCelAnimationAuthority(request());
-  assert.equal(authority.protocolVersion, "2026-09-09.8");
+  assert.equal(authority.protocolVersion, "2026-09-09.9");
   assert.equal(authority.authority.mode, "human-cel-authored");
   assert.equal(authority.authority.cleanupInk, "strict");
   assert.equal(authority.authority.colourPaint, "strict");
+  assert.equal(authority.authority.colourReview, "strict");
   assert.equal(authority.authority.performanceActing, "strict");
   assert.equal(authority.authority.opticalCompositing, "strict");
+  assert.equal(authority.authority.compositeReview, "strict");
   assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
   assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
   assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
   assert.equal(authority.authority.canonicalApprovalHelper, "reviewHumanCelArtefact");
-  assert.equal(
-    authority.authority.requiredPersistenceGate,
-    "strict-human-cel-promotion-receipt-gate",
-  );
-  assert.equal(
-    authority.authority.requiredPersistedStateIntegrity,
-    "canonical-snapshot-render-job-integrity",
-  );
+  assert.equal(authority.authority.requiredPersistenceGate, "strict-human-cel-promotion-receipt-gate");
+  assert.equal(authority.authority.requiredPersistedStateIntegrity, "canonical-snapshot-render-job-integrity");
   assert.equal(authority.authority.requiresExactProductionAuthority, true);
   assert.equal(authority.authority.requiresCandidateEnvelopeProvenance, true);
   assert.equal(authority.authority.requiresPersistencePromotionGate, true);
   assert.equal(authority.authority.requiresPersistedStateIntegrity, true);
-  assert.equal(authority.handoff.minimumPackageVersion, "0.38.0");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.39.0");
+  assert.equal(authority.handoff.contractsPackage, "@evavo/cel-contracts");
+  assert.equal(authority.handoff.minimumContractsPackageVersion, "0.15.0");
   assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
   assert.equal(authority.handoff.minimumStorePackageVersion, "0.27.0");
-  assert.equal(
-    authority.handoff.requiredStoreBehavior,
-    "strict-human-cel-promotion-receipt-gate",
-  );
-  assert.equal(
-    authority.handoff.requiredStoreIntegrity,
-    "canonical-snapshot-render-job-integrity",
-  );
+  assert.equal(authority.handoff.requiredStoreBehavior, "strict-human-cel-promotion-receipt-gate");
+  assert.equal(authority.handoff.requiredStoreIntegrity, "canonical-snapshot-render-job-integrity");
   for (const required of [
     "createHumanCelProductionAuthority",
     "assertHumanCelProductionAuthorityBinding",
@@ -83,6 +75,8 @@ test("compiles strict human cel authority for cel animation requests", () => {
     "createHumanCelCleanupInkDirective",
     "createHumanCelPerformanceDirective",
     "createHumanCelCompositingDirective",
+    "evaluateHumanCelColourReview",
+    "evaluateHumanCelCompositeReview",
     "evaluateHumanCelPerformanceReview",
     "createHumanCelQualityReceipt",
     "assertHumanCelQualityReceiptBinding",
@@ -100,6 +94,14 @@ test("compiles strict human cel authority for cel animation requests", () => {
   );
   assert.equal(
     authority.prohibitedSubstitutions.some((value) => value.includes("blanket bloom")),
+    true,
+  );
+  assert.equal(
+    authority.prohibitedSubstitutions.some((value) => value.includes("skipping dedicated colour-script review")),
+    true,
+  );
+  assert.equal(
+    authority.prohibitedSubstitutions.some((value) => value.includes("skipping dedicated optical-composite review")),
     true,
   );
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
