@@ -17,10 +17,13 @@ def digest(path: Path) -> str:
 
 def matte_colour(cell: Image.Image) -> tuple[int, int, int]:
     rgb = cell.convert("RGB")
-    samples = Image.new("RGB", (4, 1))
-    points = ((0, 0), (rgb.width - 1, 0), (0, rgb.height - 1), (rgb.width - 1, rgb.height - 1))
-    for index, point in enumerate(points):
-        samples.putpixel((index, 0), rgb.getpixel(point))
+    border_pixels = []
+    for x in range(rgb.width):
+        border_pixels.extend((rgb.getpixel((x, 0)), rgb.getpixel((x, rgb.height - 1))))
+    for y in range(1, rgb.height - 1):
+        border_pixels.extend((rgb.getpixel((0, y)), rgb.getpixel((rgb.width - 1, y))))
+    samples = Image.new("RGB", (len(border_pixels), 1))
+    samples.putdata(border_pixels)
     return tuple(int(value) for value in ImageStat.Stat(samples).median)
 
 

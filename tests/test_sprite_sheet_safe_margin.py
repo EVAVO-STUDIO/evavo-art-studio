@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from tools.sprite_sheet_safe_margin import repair
+from tools.sprite_sheet_safe_margin import matte_colour, repair
 
 
 class SpriteSheetSafeMarginTests(unittest.TestCase):
@@ -31,6 +31,11 @@ class SpriteSheetSafeMarginTests(unittest.TestCase):
             image.save(source)
             with self.assertRaisesRegex(RuntimeError, "without scaling"):
                 repair(source, output, 1, 1, 0, 8, 30)
+
+    def test_uses_full_border_when_grid_divider_contaminates_two_corners(self):
+        image = Image.new("RGB", (64, 64), (0, 255, 0))
+        ImageDraw.Draw(image).line((0, 63, 63, 63), fill=(255, 255, 255))
+        self.assertEqual(matte_colour(image), (0, 255, 0))
 
 
 if __name__ == "__main__":
