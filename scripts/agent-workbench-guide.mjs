@@ -60,10 +60,12 @@ function identity(item, type) {
   return type === "script" ? text(item.name) : text(item.id);
 }
 
-function routePriority(type) {
-  if (type === "capability") return 4;
+function routePriority(type, item = {}) {
+  if (type === "capability") return 5;
+  if (type === "tool" && item.source === "development-tool-registry") return 4;
+  if (type === "estate-capability") return 3;
+  if (type === "tool" && item.source === "root-mcp-launch-manifest") return 2;
   if (type === "tool") return 3;
-  if (type === "estate-capability") return 2;
   if (type === "script") return 1;
   return 0;
 }
@@ -75,10 +77,10 @@ function candidateRoutes(snapshot) {
     if (!Array.isArray(items)) continue;
     for (const item of items) {
       if (!record(item) || !identity(item, type)) continue;
-      output.push({ type, item, id: identity(item, type), relevance: Number.isFinite(item.relevance) ? item.relevance : 0 });
+      output.push({ type, item, id: identity(item, type), relevance: Number.isFinite(item.relevance) ? item.relevance : 0, priority: routePriority(type, item) });
     }
   }
-  return output.sort((a, b) => b.relevance - a.relevance || routePriority(b.type) - routePriority(a.type) || a.id.localeCompare(b.id));
+  return output.sort((a, b) => b.priority - a.priority || b.relevance - a.relevance || a.id.localeCompare(b.id));
 }
 
 function selectRoute(snapshot, routeType = null, routeId = null) {
@@ -138,6 +140,13 @@ function classifyRoute(snapshot, selected) {
     handoffRecommended = true;
     blockers.push("Runtime readiness is unknown for estate-manifest capability evidence.");
     blockers.push("The receiving authority must perform its own runtime/effect admission.");
+  } else if (selected.type === "tool" && item.source === "root-mcp-launch-manifest") {
+    disposition = "mcp-runtime-verification-required";
+    nextAuthority = text(item.repository) || snapshot.repository;
+    handoffRecommended = nextAuthority !== snapshot.repository;
+    blockers.push("MCP launch registration proves only that a launch surface is configured; runtime readiness remains unknown.");
+    blockers.push("Obtain a live protocol/discovery receipt for the exact server before any tool call or effect claim.");
+    blockers.push("After runtime verification, apply the owning tool/capability effect gate before execution.");
   } else if (selected.type === "tool") {
     const owner = text(item.repository);
     if (owner && owner !== snapshot.repository) {
@@ -195,16 +204,17 @@ function selfTest() {
     authority: "test",
     objective: "repair alpha",
     orientation: { phases: [{ id: "orient", purpose: "orient", evidence: ["manifest"] }, { id: "execute", purpose: "execute", evidence: ["receipt"] }] },
-    matches: { capabilities: [{ id: "art.alpha", relevance: 2, effects: ["read", "compute"], requires: [] }], scripts: [], tools: [], estateCapabilities: [] },
+    matches: { capabilities: [{ id: "art.alpha", relevance: 1, effects: ["read", "compute"], requires: [] }], scripts: [], tools: [{ id: "mcp:art.alpha", source: "root-mcp-launch-manifest", relevance: 9, repository: "EVAVO-STUDIO/test", runtimeReadiness: "unknown" }], estateCapabilities: [] },
     automation: { neverImplied: ["execution from route"] },
     policy: { readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, routeDoesNotAuthorizeEffects: true, planDoesNotProveExecution: true, publicationRequiresSeparateAuthority: true },
   };
   const bytes = Buffer.from(JSON.stringify(snapshot), "utf8");
   const output = compileAgentWorkbenchGuidance({ snapshotRead: { value: snapshot, bytes, sha256: digest(bytes) } });
-  if (output.selectedRoute?.id !== "art.alpha") fail("top-route self-test failed");
+  if (output.selectedRoute?.id !== "art.alpha") fail("semantic route priority self-test failed");
   if (output.guidance.disposition !== "read-compute-route") fail("disposition self-test failed");
-  if (output.guidance.nextPhase !== "orient") fail("phase self-test failed");
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_guidance_self_test_v1", status: "passed", assertions: 3 }, null, 2)}\n`);
+  const mcp = compileAgentWorkbenchGuidance({ snapshotRead: { value: snapshot, bytes, sha256: digest(bytes) }, routeType: "tool", routeId: "mcp:art.alpha" });
+  if (mcp.guidance.disposition !== "mcp-runtime-verification-required") fail("MCP runtime verification self-test failed");
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_guidance_self_test_v2", status: "passed", assertions: 3 }, null, 2)}\n`);
 }
 
 function main() {
