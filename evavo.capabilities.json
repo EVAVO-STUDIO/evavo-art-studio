@@ -98,12 +98,12 @@
     {
       "id": "art.animation.human-cel-authority",
       "title": "Compile strict human-authored cel craft authority",
-      "description": "Compile and verify a digest-bound, side-effect-free authority bridge for limited-cel and full-cel animation that requires Cel Animation Studio's exact production authority, persisted strict authority-bound render prompt envelope, candidate provenance containing that envelope digest, deterministic multi-department quality evidence, one immutable candidate-byte-bound quality receipt and the receipt-backed strict artefact review path before promotion.",
+      "description": "Compile and verify a digest-bound, side-effect-free authority bridge for limited-cel and full-cel animation that requires Cel Animation Studio's exact production authority, strict acting/performance grammar, persisted strict authority-bound render prompt envelope, candidate provenance containing that envelope digest, deterministic multi-department quality evidence including performance review, one immutable candidate-byte-bound quality receipt and Store-level receipt enforcement before promotion.",
       "interfaces": ["automation", "mcp", "library", "testing"],
       "effects": ["read", "compute", "execute"],
       "entrypoints": ["node tools/human_cel_animation_authority_v1_mcp.mjs", ".mcp.human-cel-animation-authority-v1.json", "docs/human-cel-animation-authority-v1.md"],
-      "tags": ["animation", "cel", "human-cel", "draftsmanship", "timing", "cinematography", "anti-generic", "quality-gates", "quality-receipt", "authority-binding"],
-      "requires": ["limited-cel or full-cel motion style", "Cel or video sequence target", "Stable identity/camera/performance/style anchors", "Cel Animation Studio @evavo/cel-core 0.35.0 or newer", "Exact downstream work-order and direction authority before strict prompt compilation", "Candidate provenance containing the exact strict-envelope digest", "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces", "Zero-blocker persisted quality receipt for strict approval", "No provider execution, creative approval, repository mutation or publication authority"]
+      "tags": ["animation", "cel", "human-cel", "draftsmanship", "timing", "performance", "cinematography", "anti-generic", "quality-gates", "quality-receipt", "authority-binding", "promotion-gate"],
+      "requires": ["limited-cel or full-cel motion style", "Cel or video sequence target", "Stable identity/camera/performance/style anchors", "Cel Animation Studio @evavo/cel-core 0.37.0 or newer", "Cel Animation Studio @evavo/cel-store 0.26.0 or newer", "Exact downstream work-order and direction authority before strict prompt compilation", "createHumanCelPerformanceDirective and evaluateHumanCelPerformanceReview downstream surfaces", "Candidate provenance containing the exact strict-envelope digest", "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces", "Zero-blocker persisted quality receipt for strict approval", "Store strict-human-cel-promotion-receipt-gate before approved state is authoritative", "No provider execution, creative approval, repository mutation or publication authority"]
     },
     {
       "id": "art.pixel-font.build",
@@ -196,7 +196,7 @@
       "camera-aware animation production profiles and dependency-safe drawing batches",
       "event-sourced frame work ledgers and candidate-receipt integrity",
       "independent Cel Animation Studio moving-sequence review",
-      "strict human-cel authority, exact production binding, candidate-envelope provenance, candidate-byte quality receipts and receipt-backed promotion",
+      "strict human-cel authority, explicit acting/performance, candidate-envelope provenance, candidate-byte quality receipts and Store-level receipt-backed promotion",
       "targeted animation repair without redrawing accepted frames",
       "exact integer exposure timing and accepted runtime clips",
       "path-free Godot, Cel and Video animation sequence delivery",
