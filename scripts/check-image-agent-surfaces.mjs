@@ -11,6 +11,7 @@ const manifests = [
   "config/image-repair-agent.capabilities.json",
   "config/texture-review-agent.capabilities.json",
   "config/godot-material-delivery-agent.capabilities.json",
+  "config/godot-material-validation-agent.capabilities.json",
   "config/image-effects-agent.capabilities.json",
   "config/image-agent-router.capabilities.json",
 ];
@@ -63,7 +64,7 @@ for (const requiredPrimitive of ["convertTangentNormalYConvention", "composeOpac
 }
 
 const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts"), "utf8");
-for (const requiredExport of ["material-delivery", "material-resource"]) {
+for (const requiredExport of ["material-delivery", "material-resource", "material-validation"]) {
   if (!godotIndex.includes(`export * from "./${requiredExport}.js";`)) throw new Error(`packages/godot/src/index.ts does not export ${requiredExport}.`);
 }
 const godotMaterialDelivery = await readFile(path.join(root, "packages/godot/src/material-delivery.ts"), "utf8");
@@ -75,6 +76,12 @@ if (!godotMaterialResource.includes("renderGodotMaterialTres") || !godotMaterial
   throw new Error("Godot material resource renderer is missing current format=3 TRES rendering.");
 }
 if (godotMaterialResource.includes("load_steps=")) throw new Error("Godot material resource renderer must not emit deprecated load_steps for 4.6 resources.");
+const godotMaterialValidation = await readFile(path.join(root, "packages/godot/src/material-validation.ts"), "utf8");
+for (const requiredValidationContract of ["runGodotMaterialValidation", "--headless", "--script", "shell: false", "EVAVO_MATERIAL_VALIDATION="]) {
+  if (!godotMaterialValidation.includes(requiredValidationContract)) {
+    throw new Error(`Godot native material validation is missing ${requiredValidationContract}.`);
+  }
+}
 
 const enhancementSession = await readFile(path.join(root, "packages/media/src/enhancement-review-session.ts"), "utf8");
 if (!enhancementSession.includes("reviewEnhancementStructureRisk")) throw new Error("Enhancement review session does not enforce macro structure preservation.");
@@ -95,11 +102,14 @@ for (const requiredTest of [
   "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot/test/material-delivery.test.mjs",
   "packages/godot/test/material-resource.test.mjs",
+  "packages/godot/test/material-validation.test.mjs",
+  "packages/godot/test/material-validation-native.test.mjs",
   "packages/godot/test/material-delivery-mcp.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/texture_review_mcp.test.mjs",
   "tools/texture_preprocess_mcp.test.mjs",
   "tools/godot_material_delivery_mcp.test.mjs",
+  "tools/godot_material_validation_mcp.test.mjs",
 ]) await access(path.join(root, requiredTest));
 
 process.stdout.write(`${JSON.stringify({
@@ -111,6 +121,7 @@ process.stdout.write(`${JSON.stringify({
   textureProofSampling: ["continuous", "nearest"],
   textureMaterialReview: ["single-map", "material-set", "normal-y-conversion", "opacity-alpha-composition", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
   godotMaterialDelivery: ["StandardMaterial3D", "ORMMaterial3D", "guarded-preprocessing", "format-3-tres", "create-only-resource-write"],
+  godotMaterialValidation: ["execution-gated", "headless-native-load", "resource-class-check", "operator-configured-executable", "opt-in-runtime-test"],
   unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
