@@ -49,19 +49,9 @@ const REQUIRED_FILES = Object.freeze([
   "docs/human-cel-animation-authority-v1.md",
 ]);
 
-const SYNTAX_FILES = Object.freeze([
-  "tools/animation_pipeline_control_plane_v1_1_mcp.mjs",
-  "tools/animation_pipeline_doctor_v1.mjs",
-  "tools/animation_pipeline_doctor_v1_cli.mjs",
-  "tools/animation_frame_work_ledger_v1_mcp.mjs",
-  "tools/animation_sequence_delivery_canonical_v1_mcp.mjs",
-  "tools/animation_character_family_campaign_preflight_v1.mjs",
-  "tools/animation_execution_supervisor_v1_mcp.mjs",
-  "tools/human_cel_animation_authority_v1.mjs",
-  "tools/human_cel_animation_authority_v1_mcp.mjs",
-  "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
-  "scripts/check-game-production-contract.mjs",
-]);
+const SYNTAX_FILES = REQUIRED_FILES.filter(
+  (path) => path.endsWith(".mjs") && !path.startsWith(".mcp."),
+);
 
 function fail(code, detail) {
   throw new Error(detail ? `${code}:${detail}` : code);
@@ -89,42 +79,7 @@ async function requireRegularFile(path) {
 }
 
 async function readJson(path) {
-  const absolute = await requireRegularFile(path);
-  return JSON.parse(await readFile(absolute, "utf8"));
-}
-
-function exactServer(document, name, args) {
-  const server = document?.mcpServers?.[name];
-  assert.ok(server && typeof server === "object" && !Array.isArray(server), `${name} must be registered`);
-  assert.equal(server.command, "node", `${name} must use node`);
-  assert.deepEqual(server.args, args, `${name} must use the canonical entrypoint`);
-  return server;
-}
-
-function assertDisabled(environment, names, label) {
-  for (const name of names) {
-    assert.equal(environment?.[name], "disabled", `${label}:${name} must be explicitly disabled`);
-  }
-}
-
-function capability(document, id) {
-  const value = document?.capabilities?.find((entry) => entry?.id === id);
-  assert.ok(value, `Capability ${id} must be declared`);
-  return value;
-}
-
-function assertEntrypoints(entry, required) {
-  assert.ok(Array.isArray(entry.entrypoints), `${entry.id} entrypoints must be an array`);
-  for (const item of required) {
-    assert.ok(entry.entrypoints.includes(item), `${entry.id} must expose ${item}`);
-  }
-}
-
-function assertRequires(entry, required) {
-  assert.ok(Array.isArray(entry.requires), `${entry.id} requires must be an array`);
-  for (const item of required) {
-    assert.ok(entry.requires.includes(item), `${entry.id} must require ${item}`);
-  }
+  return JSON.parse(await readFile(await requireRegularFile(path), "utf8"));
 }
 
 function syntaxCheck(path) {
@@ -151,6 +106,36 @@ function runNodeCheck(path, code) {
     fail(code, String(result.stderr || result.stdout || `${path} failed`).trim());
   }
   return String(result.stdout || "").trim();
+}
+
+function exactServer(document, name, args) {
+  const server = document?.mcpServers?.[name];
+  assert.ok(server && typeof server === "object" && !Array.isArray(server), `${name} must be registered`);
+  assert.equal(server.command, "node", `${name} must use node`);
+  assert.deepEqual(server.args, args, `${name} must use the canonical entrypoint`);
+  return server;
+}
+
+function assertDisabled(environment, names, label) {
+  for (const name of names) {
+    assert.equal(environment?.[name], "disabled", `${label}:${name} must be explicitly disabled`);
+  }
+}
+
+function capability(document, id) {
+  const value = document?.capabilities?.find((entry) => entry?.id === id);
+  assert.ok(value, `Capability ${id} must be declared`);
+  return value;
+}
+
+function assertEntrypoints(entry, required) {
+  assert.ok(Array.isArray(entry.entrypoints), `${entry.id} entrypoints must be an array`);
+  for (const item of required) assert.ok(entry.entrypoints.includes(item), `${entry.id} must expose ${item}`);
+}
+
+function assertRequires(entry, required) {
+  assert.ok(Array.isArray(entry.requires), `${entry.id} requires must be an array`);
+  for (const item of required) assert.ok(entry.requires.includes(item), `${entry.id} must require ${item}`);
 }
 
 function humanCelSmokeAuthority() {
@@ -184,41 +169,29 @@ function humanCelSmokeAuthority() {
       exclusions: ["pseudo-text", "random line boil", "generic rim light"],
     },
   });
+
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
-  assert.equal(authority.protocolVersion, "2026-09-09.6");
+  assert.equal(authority.protocolVersion, "2026-09-09.7");
   assert.equal(authority.authority.mode, "human-cel-authored");
   assert.equal(authority.authority.performanceActing, "strict");
-  assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
-  assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
   assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
   assert.equal(authority.authority.canonicalApprovalHelper, "reviewHumanCelArtefact");
-  assert.equal(
-    authority.authority.requiredPersistenceGate,
-    "strict-human-cel-promotion-receipt-gate",
-  );
-  assert.equal(authority.authority.requiresExactProductionAuthority, true);
-  assert.equal(authority.authority.requiresCandidateEnvelopeProvenance, true);
+  assert.equal(authority.authority.requiredPersistenceGate, "strict-human-cel-promotion-receipt-gate");
+  assert.equal(authority.authority.requiredPersistedStateIntegrity, "canonical-snapshot-render-job-integrity");
   assert.equal(authority.authority.requiresPersistencePromotionGate, true);
-  assert.equal(authority.handoff.targetRepository, "EVAVO-STUDIO/cel-animation-studio");
+  assert.equal(authority.authority.requiresPersistedStateIntegrity, true);
   assert.equal(authority.handoff.minimumPackageVersion, "0.37.0");
   assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
-  assert.equal(authority.handoff.minimumStorePackageVersion, "0.26.0");
-  assert.equal(
-    authority.handoff.requiredStoreBehavior,
-    "strict-human-cel-promotion-receipt-gate",
-  );
+  assert.equal(authority.handoff.minimumStorePackageVersion, "0.27.0");
+  assert.equal(authority.handoff.requiredStoreBehavior, "strict-human-cel-promotion-receipt-gate");
+  assert.equal(authority.handoff.requiredStoreIntegrity, "canonical-snapshot-render-job-integrity");
   for (const required of [
     "createHumanCelProductionAuthority",
-    "assertHumanCelProductionAuthorityBinding",
     "createStrictHumanCelRenderPrompt",
     "createHumanCelPerformanceDirective",
-    "evaluateHumanCelQualityGate",
-    "evaluateHumanCelFinishReview",
-    "evaluateHumanCelCinematographyReview",
     "evaluateHumanCelPerformanceReview",
-    "evaluateHumanCelEnvironmentReview",
+    "evaluateHumanCelQualityGate",
     "createHumanCelQualityReceipt",
-    "assertHumanCelQualityReceiptBinding",
     "reviewHumanCelArtefact",
   ]) {
     assert.ok(authority.handoff.requiredExports.includes(required), required);
@@ -238,50 +211,50 @@ async function main() {
   );
 
   const pipelineConfig = await readJson(".mcp.animation-pipeline-v1.json");
-  const pipeline = exactServer(
-    pipelineConfig,
-    "evavo-animation-pipeline-v1",
-    ["tools/animation_pipeline_control_plane_v1_1_mcp.mjs"],
-  );
+  const pipeline = exactServer(pipelineConfig, "evavo-animation-pipeline-v1", [
+    "tools/animation_pipeline_control_plane_v1_1_mcp.mjs",
+  ]);
   assert.equal(pipeline.env?.EVAVO_ANIMATION_PIPELINE_ROLE, "art-studio");
   assertDisabled(pipeline.env, DANGEROUS_PIPELINE_FLAGS, "animation-pipeline");
 
   const ledgerConfig = await readJson(".mcp.animation-frame-ledger-v1.json");
-  const ledger = exactServer(
-    ledgerConfig,
-    "evavo-animation-frame-ledger-v1",
-    ["tools/animation_frame_work_ledger_v1_mcp.mjs"],
-  );
+  const ledger = exactServer(ledgerConfig, "evavo-animation-frame-ledger-v1", [
+    "tools/animation_frame_work_ledger_v1_mcp.mjs",
+  ]);
   assert.equal(ledger.env?.EVAVO_ANIMATION_FRAME_LEDGER_ROLE, "art-studio");
   assertDisabled(ledger.env, DANGEROUS_PIPELINE_FLAGS, "animation-frame-ledger");
 
   const canonicalConfig = await readJson(".mcp.animation-production-canonical-v1.json");
-  const profile = exactServer(
-    canonicalConfig,
-    "evavo-animation-production-profile",
-    ["tools/animation_production_profile_canonical_v1_mcp.mjs"],
+  const profile = exactServer(canonicalConfig, "evavo-animation-production-profile", [
+    "tools/animation_production_profile_canonical_v1_mcp.mjs",
+  ]);
+  assertDisabled(
+    profile.env,
+    [
+      "EVAVO_ANIMATION_PROVIDER_EXECUTION",
+      "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL",
+      "EVAVO_ANIMATION_ARTIFACT_PROMOTION",
+      "EVAVO_ANIMATION_RUNTIME_ACTIVATION",
+      "EVAVO_ANIMATION_REPOSITORY_MUTATION",
+      "EVAVO_ANIMATION_PUBLICATION",
+    ],
+    "animation-production-profile",
   );
-  assertDisabled(profile.env, [
-    "EVAVO_ANIMATION_PROVIDER_EXECUTION",
-    "EVAVO_ANIMATION_AUTOMATIC_CREATIVE_APPROVAL",
-    "EVAVO_ANIMATION_ARTIFACT_PROMOTION",
-    "EVAVO_ANIMATION_RUNTIME_ACTIVATION",
-    "EVAVO_ANIMATION_REPOSITORY_MUTATION",
-    "EVAVO_ANIMATION_PUBLICATION",
-  ], "animation-production-profile");
-  const delivery = exactServer(
-    canonicalConfig,
-    "evavo-animation-sequence-delivery",
-    ["tools/animation_sequence_delivery_canonical_v1_mcp.mjs"],
+  const delivery = exactServer(canonicalConfig, "evavo-animation-sequence-delivery", [
+    "tools/animation_sequence_delivery_canonical_v1_mcp.mjs",
+  ]);
+  assertDisabled(
+    delivery.env,
+    [
+      "EVAVO_ANIMATION_MEDIA_RESOLUTION",
+      "EVAVO_ANIMATION_TRANSCODING",
+      "EVAVO_ANIMATION_INTERPOLATION",
+      "EVAVO_ANIMATION_RUNTIME_ACTIVATION",
+      "EVAVO_ANIMATION_REPOSITORY_MUTATION",
+      "EVAVO_ANIMATION_PUBLICATION",
+    ],
+    "animation-sequence-delivery",
   );
-  assertDisabled(delivery.env, [
-    "EVAVO_ANIMATION_MEDIA_RESOLUTION",
-    "EVAVO_ANIMATION_TRANSCODING",
-    "EVAVO_ANIMATION_INTERPOLATION",
-    "EVAVO_ANIMATION_RUNTIME_ACTIVATION",
-    "EVAVO_ANIMATION_REPOSITORY_MUTATION",
-    "EVAVO_ANIMATION_PUBLICATION",
-  ], "animation-sequence-delivery");
 
   const campaignConfig = await readJson(".mcp.animation-character-family-campaign-preflight-v1.json");
   const campaign = exactServer(
@@ -289,33 +262,29 @@ async function main() {
     "evavo-animation-character-family-campaign-preflight-v1",
     ["tools/animation_character_family_campaign_preflight_v1.mjs", "mcp"],
   );
-  assert.equal(
-    campaign.env?.EVAVO_ANIMATION_CHARACTER_FAMILY_PREFLIGHT_READ_ENABLED,
-    "disabled",
-    "Character-family preflight must not gain ambient repository-read authority",
-  );
+  assert.equal(campaign.env?.EVAVO_ANIMATION_CHARACTER_FAMILY_PREFLIGHT_READ_ENABLED, "disabled");
 
   const supervisorConfig = await readJson(".mcp.animation-execution-supervisor-v1.json");
-  const supervisor = exactServer(
-    supervisorConfig,
-    "evavo-animation-execution-supervisor-v1",
-    ["scripts/start-animation-execution-supervisor-mcp-v1.mjs"],
-  );
+  const supervisor = exactServer(supervisorConfig, "evavo-animation-execution-supervisor-v1", [
+    "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
+  ]);
   assert.equal(supervisor.env?.EVAVO_ANIMATION_EXECUTION_ENABLED, "disabled");
   assert.equal(supervisor.env?.EVAVO_ANIMATION_CREATIVE_APPROVAL_WRITE_ENABLED, "disabled");
 
   const humanCelConfig = await readJson(".mcp.human-cel-animation-authority-v1.json");
-  const humanCel = exactServer(
-    humanCelConfig,
-    "evavo-human-cel-animation-authority-v1",
-    ["tools/human_cel_animation_authority_v1_mcp.mjs"],
+  const humanCel = exactServer(humanCelConfig, "evavo-human-cel-animation-authority-v1", [
+    "tools/human_cel_animation_authority_v1_mcp.mjs",
+  ]);
+  assertDisabled(
+    humanCel.env,
+    [
+      "EVAVO_HUMAN_CEL_PROVIDER_EXECUTION",
+      "EVAVO_HUMAN_CEL_CREATIVE_APPROVAL",
+      "EVAVO_HUMAN_CEL_REPOSITORY_MUTATION",
+      "EVAVO_HUMAN_CEL_PUBLICATION",
+    ],
+    "human-cel-animation-authority",
   );
-  assertDisabled(humanCel.env, [
-    "EVAVO_HUMAN_CEL_PROVIDER_EXECUTION",
-    "EVAVO_HUMAN_CEL_CREATIVE_APPROVAL",
-    "EVAVO_HUMAN_CEL_REPOSITORY_MUTATION",
-    "EVAVO_HUMAN_CEL_PUBLICATION",
-  ], "human-cel-animation-authority");
   const humanCelAuthority = humanCelSmokeAuthority();
 
   const capabilities = await readJson("evavo.capabilities.json");
@@ -339,10 +308,7 @@ async function main() {
     "node scripts/start-animation-execution-supervisor-mcp-v1.mjs",
     ".mcp.animation-execution-supervisor-v1.json",
   ]);
-  const humanCelCapability = capability(
-    capabilities,
-    "art.animation.human-cel-authority",
-  );
+  const humanCelCapability = capability(capabilities, "art.animation.human-cel-authority");
   assertEntrypoints(humanCelCapability, [
     "node tools/human_cel_animation_authority_v1_mcp.mjs",
     ".mcp.human-cel-animation-authority-v1.json",
@@ -350,12 +316,11 @@ async function main() {
   ]);
   assertRequires(humanCelCapability, [
     "Cel Animation Studio @evavo/cel-core 0.37.0 or newer",
-    "Cel Animation Studio @evavo/cel-store 0.26.0 or newer",
-    "createHumanCelPerformanceDirective and evaluateHumanCelPerformanceReview downstream surfaces",
+    "Cel Animation Studio @evavo/cel-store 0.27.0 or newer",
+    "Strict human-cel performance grammar and performance review",
     "Candidate provenance containing the exact strict-envelope digest",
-    "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces",
+    "Canonical persisted snapshot and render-job integrity before strict promotion",
     "Zero-blocker persisted quality receipt for strict approval",
-    "Store strict-human-cel-promotion-receipt-gate before approved state is authoritative",
   ]);
 
   const productionIntegration = await readJson("creative-production.integration.json");
@@ -365,21 +330,14 @@ async function main() {
   assert.equal(productionIntegration.authority?.grantsCreativeApproval, false);
 
   const capabilityText = JSON.stringify(capabilities);
-  assert.equal(
-    capabilityText.includes(STALE_SEQUENCE_ENTRY),
-    false,
-    `Capability registry must not reference stale entrypoint ${STALE_SEQUENCE_ENTRY}`,
-  );
+  assert.equal(capabilityText.includes(STALE_SEQUENCE_ENTRY), false);
   for (const stale of [
     "@evavo/cel-core 0.34.0",
     "@evavo/cel-core 0.35.0",
     "@evavo/cel-core 0.36.0",
+    "@evavo/cel-store 0.26.0",
   ]) {
-    assert.equal(
-      capabilityText.includes(stale),
-      false,
-      `Capability registry must not advertise stale strict human-cel contract ${stale}`,
-    );
+    assert.equal(capabilityText.includes(stale), false, `Capability registry must not advertise ${stale}`);
   }
 
   process.stdout.write(`${JSON.stringify({
@@ -397,7 +355,8 @@ async function main() {
       performanceActingRequired: true,
       candidateEnvelopeProvenanceRequired: true,
       qualityReceiptRequired: true,
-      persistencePromotionGateRequired: true,
+      storePromotionGateRequired: true,
+      persistedStateIntegrityRequired: true,
     },
     verifiedCapabilities: [
       "art.animation.pipeline",
