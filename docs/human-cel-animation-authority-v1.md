@@ -10,9 +10,10 @@ Art Studio owns reusable animation request/profile planning. It does not duplica
 - `human-cel-authored` mode;
 - strict draftsmanship and anti-generic enforcement;
 - strict cel timing authenticity;
-- `createHumanCelRenderPrompt` as the preferred downstream compiler;
+- one exact Cel Animation Studio production authority bound to the downstream work-order and direction digests;
+- `createStrictHumanCelRenderPrompt` as the required downstream compiler for a strict production claim;
 - `evaluateHumanCelQualityGate` before promotion;
-- Cel Animation Studio `@evavo/cel-core` 0.33.0 or newer.
+- Cel Animation Studio `@evavo/cel-core` 0.34.0 or newer.
 
 It grants no provider execution, creative approval, repository mutation or publication authority.
 
@@ -26,7 +27,10 @@ This prevents a generic or weakly specified animation request from being relabel
 
 The authority handoff requires these Cel Animation Studio core surfaces:
 
-- `createHumanCelRenderPrompt`
+- `createHumanCelProductionAuthority`
+- `assertHumanCelProductionAuthorityBinding`
+- `createStrictHumanCelRenderPrompt`
+- `assertStrictHumanCelRenderPromptIntegrity`
 - `createHumanCelShotLanguageDirective`
 - `createHumanCelLightingDirective`
 - `createHumanCelTimingDirective`
@@ -38,9 +42,11 @@ The authority handoff requires these Cel Animation Studio core surfaces:
 - `evaluateHumanCelEnvironmentReview`
 - `evaluateHumanCelQualityGate`
 
-The consolidated quality gate now requires deterministic evidence for drawing continuity, anti-generic artefacts, line/paint/light finish, cinematography and environment staging before the manual department approvals are even considered.
+The downstream Cel authority identifies one exact work order, craft-direction packet, render request, task and visual stage. Any change makes that authority stale. The strict compiler returns a digest-bound envelope containing both that authority and the exact governed render prompt, so a convenience/base compiler cannot silently satisfy a `human-cel-authored` claim.
 
-Art Studio can continue to provide deterministic camera, perspective, identity, pose-beat, delivery and runtime planning. Cel Animation Studio remains responsible for the stricter craft grammar and promotion evidence.
+The consolidated quality gate requires deterministic evidence for drawing continuity, anti-generic artefacts, line/paint/light finish, cinematography and environment staging before the manual department approvals are even considered.
+
+Art Studio can continue to provide deterministic camera, perspective, identity, pose-beat, delivery and runtime planning. Cel Animation Studio remains responsible for the stricter craft grammar, exact downstream authority and promotion evidence.
 
 ## MCP surface
 
@@ -53,4 +59,4 @@ Both operations are side-effect free.
 
 ## Prohibited substitutions
 
-The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, random line boil, fake analogue degradation, unmotivated rim/bloom/genre grading and generated pseudo-lettering.
+The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, random line boil, fake analogue degradation, unmotivated rim/bloom/genre grading, generated pseudo-lettering, and using a convenience/base prompt compiler to stand in for the required strict authority-bound path.
