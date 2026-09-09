@@ -74,6 +74,7 @@ export function compileProviderCandidateRuntimeContract(
     "provider.reference-lock",
     "provider.candidate-store",
     "evidence.bundle",
+    "evidence.provenance",
   ]);
   const labels = Object.freeze({
     providerRequestId: compiled.request.requestId,
