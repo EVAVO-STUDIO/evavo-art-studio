@@ -27,7 +27,7 @@ def normalize(source: Path, output: Path, columns: int, rows: int, factor: float
             outer = (column*cw, row*ch, (column+1)*cw, (row+1)*ch)
             cell = image.crop(outer)
             matte = matte_colour(cell)
-            alpha, removed_dividers = remove_edge_dividers(foreground_mask(cell, matte, threshold), gutter)
+            alpha, removed_dividers = remove_edge_dividers(foreground_mask(cell, matte, threshold), gutter, cell)
             bbox = alpha.getbbox()
             if bbox is None: raise RuntimeError(f"cell {row},{column} has no subject")
             actor = cell.crop(bbox).convert("RGBA"); actor.putalpha(alpha.crop(bbox))

@@ -53,7 +53,7 @@ def foreground_mask(cell: Image.Image, matte: tuple[int, int, int], threshold: i
     return difference.convert("L").point(lambda value: 255 if value >= threshold else 0)
 
 
-def remove_edge_dividers(mask: Image.Image, maximum_width: int) -> tuple[Image.Image, dict[str, int]]:
+def remove_edge_dividers(mask: Image.Image, maximum_width: int, cell: Image.Image | None = None) -> tuple[Image.Image, dict[str, int]]:
     """Remove only near-solid grid lines; retain partial silhouettes touching an edge."""
     cleaned = mask.copy()
     pixels = cleaned.load()
@@ -96,6 +96,15 @@ def remove_edge_dividers(mask: Image.Image, maximum_width: int) -> tuple[Image.I
                 elif edge in ("top", "bottom") and 0 <= neighbour < cleaned.height and row_ratio(neighbour) <= 0.10:
                     for x in range(cleaned.width):
                         pixels[x, neighbour] = 0
+    if cell is not None:
+        source = cell.convert("RGB").load()
+        for y in range(cleaned.height):
+            for x in range(cleaned.width):
+                if x >= maximum_width and y >= maximum_width and x < cleaned.width - maximum_width and y < cleaned.height - maximum_width:
+                    continue
+                r, g, b = source[x, y]
+                if min(r, g, b) >= 180 and max(r, g, b) - min(r, g, b) <= 60:
+                    pixels[x, y] = 0
     return cleaned, removed
 
 
@@ -120,7 +129,7 @@ def repair(source: Path, output: Path, columns: int, rows: int, gutter: int, mar
             outer = (column * cell_width, row * cell_height, (column + 1) * cell_width, (row + 1) * cell_height)
             cell = image.crop(outer)
             matte = matte_colour(cell)
-            mask, removed_dividers = remove_edge_dividers(foreground_mask(cell, matte, threshold), gutter)
+            mask, removed_dividers = remove_edge_dividers(foreground_mask(cell, matte, threshold), gutter, cell)
             before = mask.getbbox()
             if before is None:
                 raise RuntimeError(f"cell {row},{column} has no foreground")
