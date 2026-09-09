@@ -3,7 +3,7 @@
   "contractVersion": "evavo_repository_capabilities_v1",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "authority": "art-studio",
-  "summary": "EVAVO's governed art and animation production, source-review, mastering, pixel-font, delivery, provider-routing and runtime-validation authority. Art Studio can prepare, produce, review and package bounded creative assets and animation evidence, while automatic creative approval, target-repository mutation, Git publication and downstream runtime admission remain separate authorities.",
+  "summary": "EVAVO's governed art and animation production, source-review, mastering, pixel-font, delivery, provider-routing and runtime-validation authority. Art Studio can prepare, produce, review and package bounded creative assets and animation evidence, including strict human-cel authority handoffs, while automatic creative approval, target-repository mutation, Git publication and downstream runtime admission remain separate authorities.",
   "capabilities": [
     {
       "id": "art.source.review",
@@ -98,12 +98,12 @@
     {
       "id": "art.animation.human-cel-authority",
       "title": "Compile strict human-authored cel craft authority",
-      "description": "Compile and verify a digest-bound, side-effect-free authority bridge for limited-cel and full-cel animation that requires Cel Animation Studio's exact production authority, strict authority-bound render prompt envelope, draftsmanship/anti-generic review, authored exposure timing, source-based lighting, cinematography and environment gates before promotion.",
+      "description": "Compile and verify a digest-bound, side-effect-free authority bridge for limited-cel and full-cel animation that requires Cel Animation Studio's exact production authority, persisted strict authority-bound render prompt envelope, candidate provenance containing that envelope digest, deterministic multi-department quality evidence, one immutable candidate-byte-bound quality receipt and the receipt-backed strict artefact review path before promotion.",
       "interfaces": ["automation", "mcp", "library", "testing"],
       "effects": ["read", "compute", "execute"],
       "entrypoints": ["node tools/human_cel_animation_authority_v1_mcp.mjs", ".mcp.human-cel-animation-authority-v1.json", "docs/human-cel-animation-authority-v1.md"],
-      "tags": ["animation", "cel", "human-cel", "draftsmanship", "timing", "cinematography", "anti-generic", "quality-gates", "authority-binding"],
-      "requires": ["limited-cel or full-cel motion style", "Cel or video sequence target", "Stable identity/camera/performance/style anchors", "Cel Animation Studio @evavo/cel-core 0.34.0 or newer", "Exact downstream work-order and direction authority before strict prompt compilation", "No provider execution, creative approval, repository mutation or publication authority"]
+      "tags": ["animation", "cel", "human-cel", "draftsmanship", "timing", "cinematography", "anti-generic", "quality-gates", "quality-receipt", "authority-binding"],
+      "requires": ["limited-cel or full-cel motion style", "Cel or video sequence target", "Stable identity/camera/performance/style anchors", "Cel Animation Studio @evavo/cel-core 0.35.0 or newer", "Exact downstream work-order and direction authority before strict prompt compilation", "Candidate provenance containing the exact strict-envelope digest", "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces", "Zero-blocker persisted quality receipt for strict approval", "No provider execution, creative approval, repository mutation or publication authority"]
     },
     {
       "id": "art.pixel-font.build",
@@ -196,7 +196,7 @@
       "camera-aware animation production profiles and dependency-safe drawing batches",
       "event-sourced frame work ledgers and candidate-receipt integrity",
       "independent Cel Animation Studio moving-sequence review",
-      "strict human-cel craft authority, exact production binding, exposure timing and anti-generic review",
+      "strict human-cel authority, exact production binding, candidate-envelope provenance, candidate-byte quality receipts and receipt-backed promotion",
       "targeted animation repair without redrawing accepted frames",
       "exact integer exposure timing and accepted runtime clips",
       "path-free Godot, Cel and Video animation sequence delivery",
@@ -209,5 +209,5 @@
       "negative authority, recovery and publication boundaries"
     ]
   },
-  "reviewedAt": "2026-09-09T21:30:00+10:00"
+  "reviewedAt": "2026-09-09T12:53:00+10:00"
 }
