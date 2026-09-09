@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -39,6 +39,7 @@ test("capabilities expose bounded read-only delivery preflight", async () => {
   assert.equal(response.structuredContent.maximumBatchSize, 128);
   assert.ok(response.structuredContent.targets.includes("game-data-map"));
   assert.ok(response.structuredContent.checks.includes("effective-print-dpi-when-physical-size-is-known"));
+  assert.ok(response.structuredContent.checks.includes("encoded-byte-budget"));
 });
 
 test("single review catches alpha-incompatible JPEG intent without changing the source", async () => {
@@ -55,19 +56,37 @@ test("single review catches alpha-incompatible JPEG intent without changing the 
   assert.equal(response.structuredContent.bytesReturned, false);
   assert.equal(response.structuredContent.evidence.grade, "fail");
   assert.ok(response.structuredContent.evidence.blockers.includes("jpeg-delivery-cannot-preserve-alpha"));
+  assert.ok(response.structuredContent.evidence.blockers.some((blocker) => blocker.startsWith("encoded-format-does-not-match-intent:")));
 });
 
-test("batch review ranks failures first and supports per-image print dimensions", async () => {
+test("single review enforces encoded byte budgets against the actual file", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-delivery-byte-budget-"));
+  const inputPath = path.join(root, "candidate.png");
+  await makePng(inputPath, { width: 512, height: 512 });
+  const actualBytes = (await readFile(inputPath)).length;
+  const response = await call(root, "evavo_review_image_delivery_integrity", {
+    inputPath,
+    target: "web",
+    maximumBytes: Math.max(1, actualBytes - 1),
+  });
+  assert.equal(response.isError, false);
+  assert.equal(response.structuredContent.evidence.encodedBytes, actualBytes);
+  assert.equal(response.structuredContent.evidence.grade, "fail");
+  assert.ok(response.structuredContent.evidence.blockers.some((blocker) => blocker.startsWith("encoded-byte-budget-exceeded:")));
+});
+
+test("batch review ranks failures first and supports per-image print dimensions and byte budgets", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-delivery-batch-"));
   const goodPath = path.join(root, "good.png");
   const lowDpiPath = path.join(root, "low-dpi.png");
   await makePng(goodPath, { width: 3000, height: 3000 });
   await makePng(lowDpiPath, { width: 1000, height: 1000 });
+  const goodBytes = (await readFile(goodPath)).length;
 
   const response = await call(root, "evavo_review_image_delivery_batch", {
     target: "print",
     images: [
-      { id: "good", path: goodPath, outputWidthMm: 200, outputHeightMm: 200 },
+      { id: "good", path: goodPath, outputWidthMm: 200, outputHeightMm: 200, maximumBytes: goodBytes + 1000 },
       { id: "low", path: lowDpiPath, outputWidthMm: 254, outputHeightMm: 254 },
     ],
   });
@@ -76,6 +95,8 @@ test("batch review ranks failures first and supports per-image print dimensions"
   assert.equal(response.structuredContent.summary.fail, 1);
   assert.equal(response.structuredContent.reviewPriority[0], "low");
   assert.equal(response.structuredContent.sourcesModified, false);
+  const good = response.structuredContent.items.find((item) => item.id === "good");
+  assert.equal(good.encodedBytes, goodBytes);
   const low = response.structuredContent.items.find((item) => item.id === "low");
   assert.ok(low.blockers.some((blocker) => blocker.startsWith("print-effective-dpi-below-minimum:")));
 });
