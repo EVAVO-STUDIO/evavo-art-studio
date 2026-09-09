@@ -13,6 +13,10 @@ import { compileAgentWorkbenchGuidance } from "./agent-workbench-guide.mjs";
 
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(process.env.EVAVO_AGENT_WORKBENCH_ROOT || scriptRoot);
+const STANDARD_MCP_VERSION = "2025-03-26";
+const EVAVO_DISCOVERY_VERSION = "2026-07-28";
+const SUPPORTED_VERSIONS = Object.freeze([STANDARD_MCP_VERSION, EVAVO_DISCOVERY_VERSION]);
+const SERVER_INFO = Object.freeze({ name: "evavo-agent-workbench", version: "2.1.0" });
 const record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : null;
 const text = (value) => typeof value === "string" ? value.trim() : "";
 const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -185,6 +189,24 @@ function errorResponse(id, error) {
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32000, message: error instanceof Error ? error.message : String(error) } })}\n`);
 }
 
+function discoveryResult(requestedVersion) {
+  const requested = text(requestedVersion);
+  return {
+    protocolVersion: SUPPORTED_VERSIONS.includes(requested) ? requested : EVAVO_DISCOVERY_VERSION,
+    supportedVersions: [...SUPPORTED_VERSIONS],
+    serverInfo: SERVER_INFO,
+    capabilities: { tools: { count: tools.length, listChanged: false } },
+    transport: "stdio",
+    readOnly: true,
+    truthBoundary: {
+      executionGranted: false,
+      mutationGranted: false,
+      publicationGranted: false,
+      discoveryProvesRuntimeExecution: false,
+    },
+  };
+}
+
 const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
 for await (const line of input) {
   if (!line.trim()) continue;
@@ -192,7 +214,9 @@ for await (const line of input) {
   try {
     request = JSON.parse(line);
     if (request.method === "initialize") {
-      response(request.id, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "evavo-agent-workbench", version: "2.0.0" } });
+      response(request.id, { protocolVersion: STANDARD_MCP_VERSION, capabilities: { tools: {} }, serverInfo: SERVER_INFO });
+    } else if (request.method === "server/discover") {
+      response(request.id, discoveryResult(request.params?.protocolVersion));
     } else if (request.method === "notifications/initialized") {
       // Notification: no response.
     } else if (request.method === "tools/list") {
