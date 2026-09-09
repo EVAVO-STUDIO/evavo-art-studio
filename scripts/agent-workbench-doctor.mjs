@@ -8,8 +8,9 @@ import { fileURLToPath } from "node:url";
 import { planAgentWorkbenchMcpRegistration, applyAgentWorkbenchMcpRegistration } from "./agent-workbench-mcp-registration.mjs";
 
 const CONTRACT = "evavo_agent_workbench_doctor_v1";
+const STANDARD_PROTOCOL = "2025-03-26";
+const EVAVO_DISCOVERY_PROTOCOL = "2026-07-28";
 const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
-const record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : null;
 const fail = (message) => { throw new Error(message); };
 
 function readRegularJson(filePath, label) {
@@ -41,10 +42,15 @@ export function inspectAgentWorkbench(root) {
   if (config.repository !== bundle.repository || config.repository !== descriptor.repository || config.authority !== bundle.authority || config.authority !== descriptor.authority) fail("Workbench identity mismatch across config/bundle/descriptor.");
   const expectedTools = ["evavo_agent_workbench_capabilities", "evavo_agent_workbench_snapshot", "evavo_agent_workbench_guide", "evavo_agent_workbench_handoff"];
   if (JSON.stringify(descriptor.tools) !== JSON.stringify(expectedTools)) fail("Workbench MCP v2 tool set mismatch.");
+  if (descriptor.protocolVersion !== STANDARD_PROTOCOL || !Array.isArray(descriptor.supportedProtocolVersions) || !descriptor.supportedProtocolVersions.includes(STANDARD_PROTOCOL) || !descriptor.supportedProtocolVersions.includes(EVAVO_DISCOVERY_PROTOCOL) || descriptor.evavoDiscoveryMethod !== "server/discover") fail("Workbench MCP v2 dual-protocol contract mismatch.");
   if (descriptor.readOnly !== true || descriptor.truthBoundary?.grantsExecutionAuthority !== false || descriptor.truthBoundary?.grantsMutationAuthority !== false || descriptor.truthBoundary?.grantsPublicationAuthority !== false || descriptor.truthBoundary?.guidanceProvesReadiness !== false) fail("Workbench MCP v2 truth boundary mismatch.");
+  if (bundle.truthBoundary?.mcpLaunchEvidenceAuthorizesExecution !== false || bundle.truthBoundary?.mcpLaunchEvidenceRetainsEnvironmentValues !== false || bundle.truthBoundary?.mcpLaunchEvidenceRetainsArgumentValues !== false) fail("Workbench awareness truth boundary mismatch.");
 
   const requiredPaths = [
     bundle.entrypoints?.compileSnapshot,
+    bundle.entrypoints?.awarenessTest,
+    bundle.entrypoints?.verifyAwareness,
+    bundle.entrypoints?.awarenessVerifierTest,
     bundle.entrypoints?.verify,
     bundle.entrypoints?.compileHandoff,
     bundle.entrypoints?.guide,
@@ -77,6 +83,8 @@ export function inspectAgentWorkbench(root) {
     authority: config.authority,
     status: findings.length === 0 ? "ready" : "repair-required",
     contracts: { config: configRead.evidence, bundle: bundleRead.evidence, mcpV2: descriptorRead.evidence },
+    protocol: { standard: STANDARD_PROTOCOL, evavoDiscovery: EVAVO_DISCOVERY_PROTOCOL, dualProtocolReady: true },
+    awareness: { required: true, sanitizedMcpEvidenceRequired: true, siblingToolRegistryDiscoverySupported: true },
     artifactCount: artifacts.length,
     artifacts,
     registration: {
@@ -95,6 +103,9 @@ export function inspectAgentWorkbench(root) {
       doctorGrantsExecutionAuthority: false,
       doctorGrantsMutationAuthority: false,
       doctorGrantsPublicationAuthority: false,
+      mcpLaunchEvidenceAuthorizesExecution: false,
+      mcpLaunchEvidenceRetainsEnvironmentValues: false,
+      mcpLaunchEvidenceRetainsArgumentValues: false,
       repairScope: ".mcp.json workbench v2 registration only",
     },
   };
@@ -113,7 +124,7 @@ function parse(argv) {
 }
 
 function selfTest() {
-  if (!Array.isArray(["a"]) || digest(Buffer.from("test")).length !== 64) fail("doctor self-test failed");
+  if (digest(Buffer.from("test")).length !== 64 || STANDARD_PROTOCOL === EVAVO_DISCOVERY_PROTOCOL) fail("doctor self-test failed");
   process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v1", status: "passed", assertions: 2 }, null, 2)}\n`);
 }
 
