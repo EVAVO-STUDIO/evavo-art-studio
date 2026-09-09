@@ -57,6 +57,7 @@ const mediaExports = [
   "texture-set-review",
   "texture-channel-pack",
   "uv-layout-review",
+  "wavefront-obj-uv",
   "enhancement-structure-risk",
 ];
 for (const requiredExport of mediaExports) {
@@ -89,6 +90,7 @@ for (const requiredTest of [
   "packages/media/test/texture-set-review.test.mjs",
   "packages/media/test/texture-channel-pack.test.mjs",
   "packages/media/test/uv-layout-review.test.mjs",
+  "packages/media/test/wavefront-obj-uv.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/texture_review_mcp.test.mjs",
@@ -103,7 +105,7 @@ process.stdout.write(`${JSON.stringify({
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   textureProofSampling: ["continuous", "nearest"],
-  textureMaterialReview: ["single-map", "material-set", "godot-orm-pack", "uv-layout"],
+  textureMaterialReview: ["single-map", "material-set", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
   unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
