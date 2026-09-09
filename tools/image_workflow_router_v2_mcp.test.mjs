@@ -27,11 +27,13 @@ test("capabilities expose fifteen goals without gaining image/write/execution au
   assert.equal(response.isError, false);
   assert.equal(response.structuredContent.goalCount, 15);
   assert.ok(response.structuredContent.goals.includes("delivery-preflight"));
+  assert.ok(response.structuredContent.integrates.some((item) => /byte-bound provenance evidence/.test(item)));
   assert.equal(response.structuredContent.guarantees.readsImageBytes, false);
   assert.equal(response.structuredContent.guarantees.writesFiles, false);
   assert.equal(response.structuredContent.guarantees.executesProcesses, false);
   assert.equal(response.structuredContent.guarantees.carriesApprovalAuthority, false);
   assert.equal(response.structuredContent.guarantees.preservesV1RouterCompatibility, true);
+  assert.equal(response.structuredContent.guarantees.claimsAiOriginDetection, false);
 });
 
 test("frame consistency resolves to the sequence finishing surface", async () => {
@@ -41,6 +43,19 @@ test("frame consistency resolves to the sequence finishing surface", async () =>
   assert.equal(response.structuredContent.preferredSurface, "evavo-image-sequence-finishing");
   assert.equal(response.structuredContent.steps[0].tool, "evavo_review_image_sequence_finishing");
   assert.ok(response.structuredContent.steps.some((step) => step.tool === "evavo_create_image_finishing_batch_proof"));
+});
+
+test("artifact assessment routes actual origin evidence through the governed provenance surface", async () => {
+  const response = await call("evavo_route_image_workflow_v2", { goal: "ai-artifact-assessment" });
+  assert.equal(response.isError, false);
+  const provenance = response.structuredContent.steps.find((step) => step.tool === "evavo_review_image_provenance");
+  assert.ok(provenance);
+  assert.equal(provenance.surface, "evavo-image-provenance");
+  assert.equal(provenance.privilege, "read-only");
+  assert.match(response.structuredContent.preferredSurface, /evavo-image-provenance/);
+  assert.match(response.structuredContent.stopConditions.join(" "), /invalid or contradictory provenance/);
+  assert.match(response.structuredContent.invariants.join(" "), /exact image SHA-256/);
+  assert.ok(!response.structuredContent.steps.some((step) => step.tool === "review-origin-evidence"));
 });
 
 test("delivery preflight and finalization resolve to their modern dedicated surfaces", async () => {
