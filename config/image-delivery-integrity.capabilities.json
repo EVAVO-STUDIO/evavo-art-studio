@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "evavo-image-delivery-integrity",
   "purpose": "Read-only final-container and metadata preflight for web, game-art, game-data-map, print and archive image delivery.",
   "entrypoint": "tools/image_delivery_integrity_mcp.mjs",
@@ -27,12 +27,16 @@
     "orientation-metadata-normalization-risk",
     "EXIF-XMP-public-runtime-metadata-risk",
     "megapixel-budget",
+    "encoded-byte-budget",
     "effective-print-dpi",
     "game-data-map-linear-non-colour-guidance"
   ],
   "guarantees": {
     "sourceMutationAllowed": false,
     "writesFiles": false,
+    "explicitFormatMismatchBlocksDelivery": true,
+    "explicitForbiddenAlphaBlocksDelivery": true,
+    "srgbWebDeliveryDoesNotRequireEmbeddedIcc": true,
     "automaticColourConversion": false,
     "automaticMetadataStripping": false,
     "browserEnginePrintProofStillRequired": true
