@@ -11,6 +11,7 @@ const CONTRACT = "evavo_agent_workbench_doctor_v1";
 const STANDARD_PROTOCOL = "2025-03-26";
 const EVAVO_DISCOVERY_PROTOCOL = "2026-07-28";
 const FLEET_SCOPE = "local-workbench-enabled-siblings";
+const ORIENTATION_GUIDE = "WORKBENCH_FIRST.md";
 const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const fail = (message) => { throw new Error(message); };
 
@@ -40,6 +41,8 @@ export function inspectAgentWorkbench(root) {
 
   if (config.contractVersion !== "evavo_agent_workbench_config_v1") fail("Workbench config contract mismatch.");
   if (bundle.contractVersion !== "evavo_agent_workbench_contract_bundle_v1") fail("Workbench bundle contract mismatch.");
+  if (bundle.orientationGuide !== ORIENTATION_GUIDE) fail("Workbench orientation guide contract mismatch.");
+  if (!Array.isArray(config.readFirst) || config.readFirst[0] !== ORIENTATION_GUIDE) fail("Workbench config must read WORKBENCH_FIRST.md first.");
   if (descriptor.contractVersion !== "evavo_agent_workbench_mcp_v2") fail("Workbench MCP v2 descriptor contract mismatch.");
   if (config.repository !== bundle.repository || config.repository !== descriptor.repository || config.authority !== bundle.authority || config.authority !== descriptor.authority) fail("Workbench identity mismatch across config/bundle/descriptor.");
 
@@ -58,6 +61,7 @@ export function inspectAgentWorkbench(root) {
   if (bundle.truthBoundary?.fleetAuthorizesExecution !== false || bundle.truthBoundary?.fleetClaimsProviderCompleteness !== false || bundle.truthBoundary?.fleetAllowsAbsenceClaims !== false) fail("Workbench fleet truth boundary mismatch.");
 
   const requiredPaths = [
+    bundle.orientationGuide,
     bundle.entrypoints?.compileSnapshot,
     bundle.entrypoints?.awarenessTest,
     bundle.entrypoints?.verifyAwareness,
@@ -101,6 +105,7 @@ export function inspectAgentWorkbench(root) {
     authority: config.authority,
     status: findings.length === 0 ? "ready" : "repair-required",
     contracts: { config: configRead.evidence, bundle: bundleRead.evidence, mcpV2: descriptorRead.evidence },
+    orientation: { guide: ORIENTATION_GUIDE, readFirst: true },
     protocol: { standard: STANDARD_PROTOCOL, evavoDiscovery: EVAVO_DISCOVERY_PROTOCOL, dualProtocolReady: true },
     awareness: { required: true, sanitizedMcpEvidenceRequired: true, siblingToolRegistryDiscoverySupported: true },
     fleet: { required: true, toolExposed: true, localSiblingDiscoveryOnly: true, providerEstateCompletenessClaimed: false, absenceClaimsAllowed: false },
@@ -146,8 +151,8 @@ function parse(argv) {
 }
 
 function selfTest() {
-  if (digest(Buffer.from("test")).length !== 64 || STANDARD_PROTOCOL === EVAVO_DISCOVERY_PROTOCOL || FLEET_SCOPE !== "local-workbench-enabled-siblings") fail("doctor self-test failed");
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v2", status: "passed", assertions: 3 }, null, 2)}\n`);
+  if (digest(Buffer.from("test")).length !== 64 || STANDARD_PROTOCOL === EVAVO_DISCOVERY_PROTOCOL || FLEET_SCOPE !== "local-workbench-enabled-siblings" || ORIENTATION_GUIDE !== "WORKBENCH_FIRST.md") fail("doctor self-test failed");
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v3", status: "passed", assertions: 4 }, null, 2)}\n`);
 }
 
 function main() {
