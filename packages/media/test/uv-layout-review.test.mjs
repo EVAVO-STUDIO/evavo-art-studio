@@ -14,6 +14,7 @@ test("accepts a clean connected quad without false overlap", () => {
   assert.equal(result.grade, "pass");
   assert.equal(result.islandCount, 1);
   assert.deepEqual(result.overlapPairs, []);
+  assert.equal(result.orientation.referenceSign, "positive");
 });
 
 test("rejects accidental stacked UVs but permits an explicit shared overlap group", () => {
@@ -37,12 +38,22 @@ test("rejects out-of-range UV coordinates unless tiled coordinates are explicitl
   assert.equal(reviewUvLayout(triangles, { allowTiledCoordinates: true }).grade, "pass");
 });
 
-test("mirrored UV winding is visible and policy-controlled", () => {
+test("majority orientation avoids flagging a globally flipped UV convention", () => {
+  const result = reviewUvLayout([
+    { id: "a", uv: [p(0, 0), p(0, 1), p(1, 1)] },
+    { id: "b", uv: [p(0, 0), p(1, 1), p(1, 0)] },
+  ]);
+  assert.equal(result.grade, "pass");
+  assert.equal(result.orientation.referenceSign, "negative");
+  assert.deepEqual(result.mirroredTriangleIds, []);
+});
+
+test("mirrored UV winding is visible relative to an explicit expected convention", () => {
   const triangles = [{ id: "mirrored", uv: [p(0, 0), p(0, 1), p(1, 0)] }];
-  const warned = reviewUvLayout(triangles);
+  const warned = reviewUvLayout(triangles, { orientationConvention: "positive" });
   assert.equal(warned.grade, "warn");
   assert.deepEqual(warned.mirroredTriangleIds, ["mirrored"]);
-  const rejected = reviewUvLayout(triangles, { mirroredPolicy: "reject" });
+  const rejected = reviewUvLayout(triangles, { orientationConvention: "positive", mirroredPolicy: "reject" });
   assert.equal(rejected.grade, "fail");
 });
 
@@ -71,4 +82,19 @@ test("can enforce atlas boundary padding in texels", () => {
   });
   assert.equal(result.grade, "fail");
   assert.ok(result.blockers.some((item) => item.startsWith("atlas-boundary-padding-below-4px:")));
+});
+
+test("measures true inter-island spacing in output texels", () => {
+  const result = reviewUvLayout([
+    { id: "left", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)] },
+    { id: "right", uv: [p(0.405, 0.1), p(0.7, 0.1), p(0.7, 0.4)] },
+  ], {
+    textureWidth: 1000,
+    textureHeight: 1000,
+    minimumIslandPaddingTexels: 8,
+  });
+  assert.equal(result.grade, "fail");
+  assert.ok(result.islandSpacing);
+  assert.ok(result.islandSpacing.minimumPaddingTexels > 4.9 && result.islandSpacing.minimumPaddingTexels < 5.1);
+  assert.ok(result.blockers.some((item) => item.startsWith("inter-island-padding-below-8px:")));
 });
