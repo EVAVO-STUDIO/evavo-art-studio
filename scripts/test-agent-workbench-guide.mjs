@@ -40,4 +40,32 @@ assert(remote.guidance.handoffRecommended === true, "remote handoff failed");
 const script = guidance({ ...base, matches: { capabilities: [], tools: [], estateCapabilities: [], scripts: [{ name: "build", command: "tool build", relevance: 3 }] } });
 assert(script.guidance.disposition === "resolve-script-through-capability", "script classification failed");
 
-process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_guidance_test_v1", status: "passed", assertions: 9 }, null, 2)}\n`);
+const capabilityBeatsLauncher = guidance({ ...base, matches: {
+  capabilities: [{ id: "semantic.read", relevance: 1, effects: ["read", "compute"], requires: [] }],
+  tools: [{ id: "mcp:semantic.read", source: "root-mcp-launch-manifest", repository: "EVAVO-STUDIO/test", runtimeReadiness: "unknown", relevance: 99 }],
+  estateCapabilities: [], scripts: [],
+} });
+assert(capabilityBeatsLauncher.selectedRoute.id === "semantic.read", "raw MCP launcher outranked matching capability");
+assert(capabilityBeatsLauncher.guidance.disposition === "read-compute-route", "capability priority classification failed");
+
+const semanticToolBeatsLauncher = guidance({ ...base, matches: {
+  capabilities: [],
+  tools: [
+    { id: "shared-tool", source: "development-tool-registry", repository: "EVAVO-STUDIO/dev", purpose: "shared tool", relevance: 1 },
+    { id: "mcp:shared-tool", source: "root-mcp-launch-manifest", repository: "EVAVO-STUDIO/test", runtimeReadiness: "unknown", relevance: 99 },
+  ],
+  estateCapabilities: [], scripts: [],
+} });
+assert(semanticToolBeatsLauncher.selectedRoute.id === "shared-tool", "raw MCP launcher outranked semantic registered tool");
+assert(semanticToolBeatsLauncher.guidance.disposition === "handoff-registered-tool", "semantic registered tool handoff classification failed");
+
+const explicitMcp = guidance({ ...base, matches: {
+  capabilities: [],
+  tools: [{ id: "mcp:exact", source: "root-mcp-launch-manifest", repository: "EVAVO-STUDIO/test", runtimeReadiness: "unknown", relevance: 10 }],
+  estateCapabilities: [], scripts: [],
+} }, { routeType: "tool", routeId: "mcp:exact" });
+assert(explicitMcp.guidance.disposition === "mcp-runtime-verification-required", "MCP launcher classification failed");
+assert(explicitMcp.guidance.blockers.some((item) => item.includes("live protocol/discovery receipt")), "MCP live protocol blocker missing");
+assert(explicitMcp.guidance.handoffRecommended === false, "local MCP launcher should not require repository handoff");
+
+process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_guidance_test_v2", status: "passed", assertions: 16 }, null, 2)}\n`);
