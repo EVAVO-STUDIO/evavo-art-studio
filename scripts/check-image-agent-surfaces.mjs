@@ -13,6 +13,7 @@ const manifestContracts = [
   ["config/image-repair-agent.capabilities.json", 1],
   ["config/image-reference-consistency.capabilities.json", 1],
   ["config/image-artifact-triage.capabilities.json", 1],
+  ["config/image-provenance.capabilities.json", 1],
   ["config/image-sequence-finishing.capabilities.json", 1],
   ["config/image-delivery-integrity.capabilities.json", 1],
   ["config/image-finalization.capabilities.json", 1],
@@ -34,6 +35,11 @@ function supportedSchema(value, major) {
   return typeof value === "string" && new RegExp(`^${major}\\.\\d+$`, "u").test(value);
 }
 
+function runDoctor(relative, label) {
+  const result = spawnSync(process.execPath, [path.join(root, relative)], { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`${label} failed:\n${result.stderr || result.stdout}`);
+}
+
 const manifests = new Map();
 const surfaces = [];
 for (const [relative, major] of manifestContracts) {
@@ -52,13 +58,23 @@ for (const [relative, major] of manifestContracts) {
     }
   }
   manifests.set(relative, manifest);
-  surfaces.push({ id: manifest.id, schemaVersion: manifest.schemaVersion, entrypoint: manifest.entrypoint, tools: manifest.tools?.length ?? 0 });
+  surfaces.push({
+    id: manifest.id,
+    schemaVersion: manifest.schemaVersion,
+    entrypoint: manifest.entrypoint,
+    tools: manifest.tools?.length ?? 0,
+  });
 }
 
 const routerV2 = manifests.get("config/image-workflow-router-v2.capabilities.json");
-if (!Array.isArray(routerV2.goals) || routerV2.goals.length !== 15) throw new Error("Image workflow router v2 must advertise exactly fifteen goals.");
-for (const goal of ["frame-consistency", "delivery-preflight", "finalize-image"]) {
+if (!Array.isArray(routerV2.goals) || routerV2.goals.length !== 15) {
+  throw new Error("Image workflow router v2 must advertise exactly fifteen goals.");
+}
+for (const goal of ["frame-consistency", "ai-artifact-assessment", "delivery-preflight", "finalize-image"]) {
   if (!routerV2.goals.includes(goal)) throw new Error(`Image workflow router v2 is missing ${goal}.`);
+}
+if (!routerV2.preferredModernSurfaces?.includes("evavo-image-provenance")) {
+  throw new Error("Image workflow router v2 must advertise evavo-image-provenance as a preferred modern surface.");
 }
 if (routerV2.guarantees?.v1RouterCompatibilityPreserved !== true || routerV2.guarantees?.explicitPrivilegeSeparation !== true) {
   throw new Error("Image workflow router v2 must preserve v1 routing and explicit privilege separation.");
@@ -73,6 +89,24 @@ if (sequenceManifest.guarantees?.writesFiles !== false
   || sequenceManifest.guarantees?.semanticMotionQualityClaimed !== false
   || sequenceManifest.guarantees?.automaticPromotionAllowed !== false) {
   throw new Error("Sequence finishing must remain read-only, technically scoped and non-promoting.");
+}
+
+const provenanceManifest = manifests.get("config/image-provenance.capabilities.json");
+for (const status of ["verified", "unverified", "absent", "invalid"]) {
+  if (!provenanceManifest.packetStatuses?.includes(status)) throw new Error(`Image provenance is missing ${status}.`);
+}
+for (const kind of ["source-binding", "generation-receipt", "content-credential", "evavo-record"]) {
+  if (!provenanceManifest.evidenceKinds?.includes(kind)) throw new Error(`Image provenance is missing ${kind}.`);
+}
+if (provenanceManifest.guarantees?.writesFiles !== false
+  || provenanceManifest.guarantees?.sourceMutationAllowed !== false
+  || provenanceManifest.guarantees?.localSha256BindingPerformedByArtStudio !== true
+  || provenanceManifest.guarantees?.externalCryptographicVerificationPerformedByThisTool !== false
+  || provenanceManifest.guarantees?.verifiedExternalClaimsRequireVerifierAndRecordId !== true
+  || provenanceManifest.guarantees?.claimsPixelAiOriginDetection !== false
+  || provenanceManifest.guarantees?.automaticCreativeApproval !== false
+  || provenanceManifest.guarantees?.publicationAllowed !== false) {
+  throw new Error("Image provenance must remain exact-byte-bound, read-only, non-promoting and truthful about delegated verification.");
 }
 
 const deliveryManifest = manifests.get("config/image-delivery-integrity.capabilities.json");
@@ -104,6 +138,7 @@ const mediaExports = [
   "image-reference-consistency",
   "image-reference-consistency-proof",
   "image-generated-detail-risk",
+  "image-provenance-packet",
   "image-sequence-finishing-review",
   "image-delivery-integrity",
   "image-finalization-review",
@@ -116,7 +151,12 @@ const mediaExports = [
   "wavefront-obj-uv",
   "enhancement-structure-risk",
 ];
-for (const name of mediaExports) requireIncludes(mediaIndex, [`export * from "./${name}.js";`], "@evavo/art-media public index");
+for (const name of mediaExports) {
+  requireIncludes(mediaIndex, [`export * from "./${name}.js";`], "@evavo/art-media public index");
+}
+if (mediaIndex.includes('export * from "./image-provenance-evidence.js";')) {
+  throw new Error("Legacy caller-authenticated provenance helper must remain internal; export image-provenance-packet instead.");
+}
 
 const reviewProfiles = await readFile(path.join(root, "packages/media/src/image-review-profiles.ts"), "utf8");
 const canonicalProfiles = ["logo-transparent", "web-hero", "ui-screenshot", "product-cutout", "photo", "cel-animation-frame", "pixel-art", "texture", "illustration"];
@@ -132,6 +172,18 @@ requireIncludes(finishingPacket, [
   "approved-reference-set-is-not-stable-enough",
   "generated-detail-risk:",
 ], "Unified finishing packet");
+
+const provenancePacket = await readFile(path.join(root, "packages/media/src/image-provenance-packet.ts"), "utf8");
+requireIncludes(provenancePacket, [
+  "createImageProvenancePacket",
+  'createHash("sha256")',
+  "contradictory-verified-origin-claims",
+  "externalVerificationPerformedByArtStudio: false",
+  'aiGenerated: "not-determined"',
+  "pixelHeuristicsUsedForOrigin: false",
+  "automaticCreativeApproval: false",
+  "publicationAllowed: false",
+], "Image provenance packet");
 
 const sequenceReview = await readFile(path.join(root, "packages/media/src/image-sequence-finishing-review.ts"), "utf8");
 requireIncludes(sequenceReview, [
@@ -166,6 +218,8 @@ requireIncludes(finalizationReview, [
 const routerV2Core = await readFile(path.join(root, "packages/media/src/image-agent-routing-v2.ts"), "utf8");
 requireIncludes(routerV2Core, [
   "evavo_review_image_sequence_finishing",
+  "evavo_review_image_provenance",
+  "invalid or contradictory provenance evidence",
   "evavo_review_image_delivery_integrity",
   "evavo_review_image_finalization",
   "evavo_validate_godot_material_resource",
@@ -189,7 +243,9 @@ const enhancementSession = await readFile(path.join(root, "packages/media/src/en
 requireIncludes(enhancementSession, ["reviewEnhancementStructureRisk"], "Enhancement review session");
 
 const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts"), "utf8");
-for (const name of ["material-delivery", "material-resource", "material-validation"]) requireIncludes(godotIndex, [`export * from "./${name}.js";`], "@evavo/art-godot public index");
+for (const name of ["material-delivery", "material-resource", "material-validation"]) {
+  requireIncludes(godotIndex, [`export * from "./${name}.js";`], "@evavo/art-godot public index");
+}
 
 const godotResource = await readFile(path.join(root, "packages/godot/src/material-resource.ts"), "utf8");
 requireIncludes(godotResource, ["renderGodotMaterialTres", "format=3"], "Godot material resource renderer");
@@ -209,6 +265,7 @@ const requiredTests = [
   "packages/media/test/image-reference-consistency.test.mjs",
   "packages/media/test/image-reference-consistency-proof.test.mjs",
   "packages/media/test/image-generated-detail-risk.test.mjs",
+  "packages/media/test/image-provenance-packet.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
   "packages/media/test/texture-tile-proof.test.mjs",
   "packages/media/test/texture-set-review.test.mjs",
@@ -226,6 +283,7 @@ const requiredTests = [
   "tools/image_finishing_packet_mcp.test.mjs",
   "tools/image_reference_consistency_mcp.test.mjs",
   "tools/image_artifact_triage_mcp.test.mjs",
+  "tools/image_provenance_mcp.test.mjs",
   "tools/image_sequence_finishing_mcp.test.mjs",
   "tools/image_delivery_integrity_mcp.test.mjs",
   "tools/image_finalization_mcp.test.mjs",
@@ -237,8 +295,8 @@ const requiredTests = [
 ];
 for (const relative of requiredTests) await access(path.join(root, relative));
 
-const routerDoctor = spawnSync(process.execPath, [path.join(root, "scripts/check-image-workflow-router-v2.mjs")], { cwd: root, encoding: "utf8" });
-if (routerDoctor.status !== 0) throw new Error(`Image workflow router v2 doctor failed:\n${routerDoctor.stderr || routerDoctor.stdout}`);
+runDoctor("scripts/check-image-workflow-router-v2.mjs", "Image workflow router v2 doctor");
+runDoctor("scripts/check-image-provenance-surface.mjs", "Image provenance surface doctor");
 
 process.stdout.write(`${JSON.stringify({
   contract: "evavo.image-agent-surfaces.check.v2",
@@ -247,11 +305,17 @@ process.stdout.write(`${JSON.stringify({
   surfaces,
   mediaExports,
   canonicalProfiles,
-  finishingPipeline: ["review", "sequence", "repair", "delivery-preflight", "finalization-admission", "explicit-approval-gate"],
+  finishingPipeline: ["review", "sequence", "repair", "provenance-when-origin-matters", "delivery-preflight", "finalization-admission", "explicit-approval-gate"],
   sequenceFinishing: ["ordered-frames", "adjacent-similarity", "technical-continuity", "no-semantic-motion-claim", "no-auto-promotion"],
   deliveryIntegrity: ["format", "alpha", "colour-space", "metadata", "megapixel-budget", "encoded-byte-budget", "print-dpi", "read-only"],
   finalizationAdmission: ["blocked", "needs-image-finishing", "needs-delivery-review", "ready-for-approval-review", "ready-is-not-approved"],
   routing: ["v2-preferred", "v1-preserved", "deterministic-pipeline-preserved", "model-router-preserved", "privilege-separated"],
-  provenancePolicy: ["artifact-risk-is-advisory", "no-pixel-only-ai-origin-claim"],
+  provenancePolicy: [
+    "artifact-risk-is-advisory",
+    "exact-byte-sha256-lineage",
+    "external-verifier-results-remain-delegated",
+    "no-caller-authenticated-boolean",
+    "no-pixel-only-ai-origin-claim",
+  ],
   requiredTests: requiredTests.length,
 }, null, 2)}\n`);
