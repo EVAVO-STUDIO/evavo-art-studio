@@ -115,6 +115,7 @@ const ROUTES: Readonly<Record<ImageAgentGoal, Omit<ImageAgentRoute, "contract" |
       "evavo_create_texture_tile_proof",
       "evavo_pack_godot_orm_texture",
       "evavo_plan_godot_material_delivery",
+      "evavo_write_godot_material_resource",
     ]),
     writeClass: "write-gated-create-only",
     prerequisites: Object.freeze([
@@ -122,6 +123,7 @@ const ROUTES: Readonly<Record<ImageAgentGoal, Omit<ImageAgentRoute, "contract" |
       "declare seamless expectation when applicable",
       "OBJ mesh or extracted triangle UV/world-position data when UV assurance is required",
       "target Godot material workflow before final delivery planning",
+      "Godot project res:// paths for material resource materialization",
     ]),
     stopConditions: Object.freeze([
       "scalar colour contamination",
@@ -130,7 +132,8 @@ const ROUTES: Readonly<Record<ImageAgentGoal, Omit<ImageAgentRoute, "contract" |
       "material-set dimension/role conflict",
       "UV overlap, degenerate, range, spacing or texel-density blocker",
       "unsupported standalone opacity/specular workflow without preprocessing/custom shader decision",
-      "Godot binding plan reject",
+      "Godot binding plan reject or needs-preprocess",
+      "generated material fails native Godot/runtime review",
     ]),
     evidenceExpected: Object.freeze([
       "per-map channel and seam evidence",
@@ -139,10 +142,12 @@ const ROUTES: Readonly<Record<ImageAgentGoal, Omit<ImageAgentRoute, "contract" |
       "optional diagnostic tile proof",
       "optional lossless ORM packing receipt",
       "explicit StandardMaterial3D or ORMMaterial3D delivery plan",
+      "optional create-only unapproved .tres material and receipt",
     ]),
     notes: Object.freeze([
-      "Map, material-set and UV reviews are read-only. Tile proofs and ORM packing are optional create-only writes that require the texture agent's explicit write admission.",
+      "Map, material-set, UV and Godot delivery planning are read-only. Tile proofs, ORM packing and .tres materialization are optional create-only writes with separate explicit write admission.",
       "Use evavo_review_uv_layout instead of OBJ review when the calling 3D pipeline already has extracted triangles; provide vertexKeys whenever possible for topology-aware island detection.",
+      "A written .tres remains unapproved until Godot loads it successfully and representative geometry is visually reviewed under target lighting.",
       "Never silently flip normal channels, repack PBR maps, compose opacity, or reinterpret specular maps without an explicit target-engine preprocessing decision.",
     ]),
   }),
