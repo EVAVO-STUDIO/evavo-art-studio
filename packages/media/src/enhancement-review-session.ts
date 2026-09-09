@@ -5,6 +5,7 @@ import {
   type EnhancementStudioReviewManifest,
 } from "./enhancement-review-bridge.js";
 import { reviewEnhancementLocalDetailRisk } from "./enhancement-local-detail-risk.js";
+import { reviewEnhancementStructureRisk } from "./enhancement-structure-risk.js";
 import { orchestrateImageReview } from "./image-review-orchestrator.js";
 import { reviewExistingImageEdit } from "./existing-image-quality-review.js";
 import { createWorkPageMediaReviewBundle } from "./work-page-media-review.js";
@@ -34,6 +35,7 @@ export interface EnhancementReviewSessionResult {
     nativeCandidateReview: Awaited<ReturnType<typeof orchestrateImageReview>>;
     sourceSpaceEditReview: Awaited<ReturnType<typeof reviewExistingImageEdit>>["evidence"];
     localDetailRisk: Awaited<ReturnType<typeof reviewEnhancementLocalDetailRisk>> | null;
+    structureRisk: Awaited<ReturnType<typeof reviewEnhancementStructureRisk>>;
     pageContextReview: Awaited<ReturnType<typeof createWorkPageMediaReviewBundle>>["evidence"] | null;
     materialTechnicalBenefitFound: boolean;
     currentHeaderBaselineComplete: boolean;
@@ -97,13 +99,16 @@ export async function reviewEnhancementStudioCandidate(
   });
 
   const projected = await sourceSpaceCandidate(spec.source, spec.candidate);
-  const sourceSpaceEdit = await reviewExistingImageEdit(spec.source, projected, {
-    preserveOpaqueRgb: false,
-    maximumChangedPixelRatio: 1,
-    maximumSharpnessRegressionRatio: 0.08,
-    maximumHaloRegression: 0.006,
-    maximumPinholeRegression: 0.00003,
-  });
+  const [sourceSpaceEdit, structureRisk] = await Promise.all([
+    reviewExistingImageEdit(spec.source, projected, {
+      preserveOpaqueRgb: false,
+      maximumChangedPixelRatio: 1,
+      maximumSharpnessRegressionRatio: 0.08,
+      maximumHaloRegression: 0.006,
+      maximumPinholeRegression: 0.00003,
+    }),
+    reviewEnhancementStructureRisk(spec.source, spec.candidate),
+  ]);
 
   const localDetailRisk = admitted.learnedCandidate
     ? await reviewEnhancementLocalDetailRisk(spec.source, spec.candidate)
@@ -175,6 +180,26 @@ export async function reviewEnhancementStudioCandidate(
     }
   }
 
+  if (structureRisk.globalAlphaError >= 0.01 || structureRisk.alphaRiskPatchFraction >= 0.10) {
+    blockers.push(`art-studio-enhancement-alpha-structure-drift:${structureRisk.globalAlphaError.toFixed(4)}:${structureRisk.alphaRiskPatchFraction.toFixed(3)}`);
+  } else if (structureRisk.globalAlphaError >= 0.003 || structureRisk.alphaRiskPatchFraction > 0) {
+    warnings.push(`art-studio-enhancement-alpha-drift-review:${structureRisk.globalAlphaError.toFixed(4)}:${structureRisk.alphaRiskPatchFraction.toFixed(3)}`);
+  }
+
+  if (admitted.learnedCandidate) {
+    if (structureRisk.structureRiskPatchFraction >= 0.25) {
+      blockers.push(`art-studio-learned-enhancement-macro-redraw-risk:${structureRisk.structureRiskPatchFraction.toFixed(3)}`);
+    } else if (structureRisk.structureRiskPatchFraction >= 0.08) {
+      warnings.push(`art-studio-learned-enhancement-macro-drift-review:${structureRisk.structureRiskPatchFraction.toFixed(3)}`);
+    }
+    if (structureRisk.globalLumaError >= 0.12) {
+      warnings.push(`art-studio-learned-enhancement-global-luma-drift:${structureRisk.globalLumaError.toFixed(4)}`);
+    }
+    if (structureRisk.globalChromaError >= 0.14) {
+      warnings.push(`art-studio-learned-enhancement-global-colour-drift:${structureRisk.globalChromaError.toFixed(4)}`);
+    }
+  }
+
   const materialTechnicalBenefitFound = sourceSpaceEdit.evidence.improvements.length > 0 ||
     sourceSpaceEdit.evidence.edited.score >= sourceSpaceEdit.evidence.source.score + 3;
   if (!materialTechnicalBenefitFound) {
@@ -223,6 +248,7 @@ export async function reviewEnhancementStudioCandidate(
       nativeCandidateReview,
       sourceSpaceEditReview: sourceSpaceEdit.evidence,
       localDetailRisk,
+      structureRisk,
       pageContextReview,
       materialTechnicalBenefitFound,
       currentHeaderBaselineComplete,
