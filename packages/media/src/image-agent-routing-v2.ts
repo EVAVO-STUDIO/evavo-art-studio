@@ -220,17 +220,17 @@ const ROUTES: Readonly<Record<ImageAgentGoalV2, Omit<ImageAgentRouteV2, "contrac
     invariants: COMMON_INVARIANTS,
   }),
   "ai-artifact-assessment": Object.freeze({
-    preferredSurface: "evavo-image-artifact-triage + evavo-image-reference-consistency",
+    preferredSurface: "evavo-image-artifact-triage + evavo-image-reference-consistency + evavo-image-provenance",
     steps: Object.freeze([
       step("evavo-image-artifact-triage", "evavo_review_image_artifact_risk", READ_ONLY, "Measure ringing, posterization, resampling, repeated-detail and detail-density anomalies."),
       step("evavo-image-reference-consistency", "evavo_review_image_against_references", READ_ONLY, "Measure drift from approved visual references when supplied.", true),
-      step("trusted provenance/lineage", "review-origin-evidence", READ_ONLY, "Use source/generation lineage when the question is actual image origin."),
+      step("evavo-image-provenance", "evavo_review_image_provenance", READ_ONLY, "Bind exact image bytes to source/generation/content-credential evidence; external verifier results remain explicitly delegated and pixel heuristics never establish authorship."),
       step("human semantic visual review", "inspect-semantic-artifacts", READ_ONLY, "Inspect anatomy, text, identity, reflections, perspective and object logic."),
     ]),
-    prerequisites: Object.freeze(["actual image", "approved references when consistency matters", "trusted provenance when authorship matters"]),
-    stopConditions: Object.freeze(["do not infer authorship from pixel heuristics", "reference baseline unstable", "semantic finding unresolved"]),
-    evidenceExpected: Object.freeze(["technical artifact signals", "generated-detail signals", "optional reference drift", "provenance status", "semantic visual verdict"]),
-    invariants: COMMON_INVARIANTS,
+    prerequisites: Object.freeze(["actual image", "approved references when consistency matters", "byte-bound provenance evidence or a trusted external verifier result when origin/authorship matters"]),
+    stopConditions: Object.freeze(["do not infer authorship from pixel heuristics", "invalid or contradictory provenance evidence", "reference baseline unstable", "semantic finding unresolved"]),
+    evidenceExpected: Object.freeze(["technical artifact signals", "generated-detail signals", "optional reference drift", "byte-bound provenance packet", "semantic visual verdict"]),
+    invariants: Object.freeze([...COMMON_INVARIANTS, "Provenance claims must be bound to the exact image SHA-256, and externally verified status must remain distinguishable from verification performed by Art Studio itself."]),
   }),
   "delivery-preflight": Object.freeze({
     preferredSurface: "evavo-image-delivery-integrity",
