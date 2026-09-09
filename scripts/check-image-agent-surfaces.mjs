@@ -39,10 +39,23 @@ for (const relative of manifests) {
 }
 
 const mediaIndex = await readFile(path.join(root, "packages/media/src/index.ts"), "utf8");
-for (const requiredExport of ["./image-repair-routing.js", "./texture-map-review.js"]) {
-  if (!mediaIndex.includes(`export * from "${requiredExport}";`)) {
+const mediaExports = [
+  "image-repair-routing",
+  "texture-map-review",
+  "enhancement-structure-risk",
+];
+for (const requiredExport of mediaExports) {
+  if (!mediaIndex.includes(`export * from "./${requiredExport}.js";`)) {
     throw new Error(`packages/media/src/index.ts does not export ${requiredExport}.`);
   }
+}
+
+const enhancementSession = await readFile(
+  path.join(root, "packages/media/src/enhancement-review-session.ts"),
+  "utf8",
+);
+if (!enhancementSession.includes("reviewEnhancementStructureRisk")) {
+  throw new Error("Enhancement review session does not enforce macro structure preservation.");
 }
 
 const spriteEffectsIndex = await readFile(
@@ -56,6 +69,7 @@ if (!spriteEffectsIndex.includes('export * from "./agent-planner.js";')) {
 for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
+  "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
 ]) {
   await access(path.join(root, requiredTest));
@@ -65,6 +79,7 @@ process.stdout.write(`${JSON.stringify({
   contract: "evavo.image-agent-surfaces.check.v1",
   ok: true,
   surfaces: parsed,
-  mediaExports: ["image-repair-routing", "texture-map-review"],
+  mediaExports,
+  enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
