@@ -26,6 +26,10 @@ const gatedAssemblySource = readFileSync(
   path.join(root, 'scripts/project-art/eva-dense-motion-family-release-assembly-v2-provenance.mjs'),
   'utf8',
 );
+const runnerSource = readFileSync(
+  path.join(root, 'scripts/run-project-art-eva-dense-motion-family-release-assembly-v2.mjs'),
+  'utf8',
+);
 for (const marker of [
   "'2026-08-22.2'",
   "schema: 'evavo.project-art-eva-dense-motion-family-evidence-fingerprint.v1'",
@@ -77,6 +81,26 @@ for (const forbidden of [
   'runtimeActivation: true',
 ]) assert.equal(gatedAssemblySource.includes(forbidden), false, forbidden);
 
+for (const marker of [
+  "from './project-art/eva-dense-motion-family-release-assembly-v2-provenance.mjs'",
+  'compileEvaDenseMotionFamilyReleaseEvidenceV2WithProvenance({',
+  'approvalProvenanceStatus: result.approvalProvenance.status',
+  'approvalProvenanceCount: result.approvalProvenance.approvalCount',
+  'writeOutput(args.get(\'--output\'), result.evidence)',
+]) assert.ok(runnerSource.includes(marker), `runner missing ${marker}`);
+assert.equal(
+  runnerSource.includes(
+    "from './project-art/eva-dense-motion-family-release-assembly-v2.mjs'",
+  ),
+  false,
+  'operational runner must not import the legacy assembler directly',
+);
+assert.equal(
+  runnerSource.includes('compileEvaDenseMotionFamilyReleaseEvidenceV2({'),
+  false,
+  'operational runner must not call the legacy assembler directly',
+);
+
 assert.equal(EVA_DENSE_MOTION_FAMILY_RELEASE_ASSEMBLY_PROTOCOL_VERSION_V2, '2026-08-22.2');
 const capabilities = evaDenseMotionFamilyReleaseAssemblyV2Capabilities();
 assert.equal(capabilities.nonCircularFamilyEvidenceFingerprintRequired, true);
@@ -111,6 +135,7 @@ console.log('EVA dense family release assembler v2 guard passed.');
 console.log('- family approvals sign non-circular evidence fingerprint');
 console.log('- owner, creative director and technical director must be distinct humans');
 console.log('- human approval provenance is file-backed, byte-hashed and semantically bound');
+console.log('- operational family runner cannot bypass the provenance gate');
 console.log('- exact ten-frame and ten-continuity-edge release semantics remain authoritative');
 console.log('- existing release evaluator remains authoritative');
 console.log('- publication, deployment and activation remain closed');
