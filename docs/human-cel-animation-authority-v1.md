@@ -10,13 +10,17 @@ Art Studio owns reusable animation request/profile planning. It does not duplica
 - `human-cel-authored` mode;
 - strict draftsmanship and anti-generic enforcement;
 - strict cel timing authenticity;
+- strict acting/performance authorship rather than generic idle motion, timer blinking or mouth flapping;
 - one exact Cel Animation Studio production authority bound to the downstream work-order and direction digests;
 - `createStrictHumanCelRenderPrompt` as the required downstream compiler for a strict production claim;
-- `evaluateHumanCelQualityGate` before promotion;
+- `createHumanCelPerformanceDirective` inside the strict prompt grammar;
+- `evaluateHumanCelQualityGate`, including `evaluateHumanCelPerformanceReview`, before promotion;
 - the strict candidate to cite the exact strict-envelope digest in its provenance;
 - `createHumanCelQualityReceipt` for the exact candidate bytes after deterministic and manual craft review;
-- `reviewHumanCelArtefact` as the required positive approval path;
-- Cel Animation Studio `@evavo/cel-core` 0.35.0 or newer.
+- `reviewHumanCelArtefact` as the canonical positive review helper;
+- the Cel Animation Studio persistence-level strict receipt gate before any approved state becomes authoritative;
+- Cel Animation Studio `@evavo/cel-core` 0.37.0 or newer;
+- Cel Animation Studio `@evavo/cel-store` 0.26.0 or newer.
 
 It grants no provider execution, creative approval, repository mutation or publication authority.
 
@@ -37,26 +41,32 @@ The authority handoff requires these Cel Animation Studio core surfaces:
 - `createHumanCelShotLanguageDirective`
 - `createHumanCelLightingDirective`
 - `createHumanCelTimingDirective`
+- `createHumanCelPerformanceDirective`
 - `createHumanCelEnvironmentStagingDirective`
 - `evaluateHumanCelDrawingContinuity`
 - `evaluateHumanCelAntiGenericReview`
 - `evaluateHumanCelFinishReview`
 - `evaluateHumanCelCinematographyReview`
+- `evaluateHumanCelPerformanceReview`
 - `evaluateHumanCelEnvironmentReview`
 - `evaluateHumanCelQualityGate`
 - `createHumanCelQualityReceipt`
 - `assertHumanCelQualityReceiptBinding`
 - `reviewHumanCelArtefact`
 
+The authority also requires Store 0.26's `strict-human-cel-promotion-receipt-gate` behaviour. That gate is the final persisted-state authority: if a candidate cites a persisted strict envelope, a render-job revision cannot newly approve it or advance using it until a matching immutable zero-blocker receipt exists. The ordinary annotation-clearance and risk-acceptance gates still apply afterward.
+
 The downstream Cel authority identifies one exact work order, craft-direction packet, render request, task and visual stage. Any change makes that authority stale. The strict compiler returns a digest-bound envelope containing both that authority and the exact governed render prompt, so a convenience/base compiler cannot silently satisfy a `human-cel-authored` claim.
 
-The consolidated quality gate requires deterministic evidence for drawing continuity, anti-generic artefacts, line/paint/light finish, cinematography and environment staging before the manual department approvals are even considered.
+The production authority explicitly marks `strictPerformanceActing: true`. The strict prompt therefore includes performance grammar for gaze/thought beats, reaction delay, authored blinking, stable face/head construction, contained mouth substitution, genuine held body parts and character-specific asymmetry.
+
+The consolidated quality gate requires deterministic evidence for drawing continuity, anti-generic artefacts, line/paint/light finish, cinematography, acting/performance and environment staging before the manual department approvals are even considered. Manual review includes acting/performance approval as its own required decision.
 
 The output-side quality receipt then binds those decisions to the exact candidate content digest plus the strict-envelope, authority, prompt, work-order and direction digests. A filename or visually similar replacement cannot reuse the receipt. Changing the candidate or any strict upstream identity requires a new receipt.
 
-Strict approval is finally delegated through `reviewHumanCelArtefact`. It refuses an `approved` decision without a current zero-blocker receipt. Rejection remains available without a passing receipt, so obviously bad work never needs fabricated positive evidence.
+`reviewHumanCelArtefact` is the canonical strict positive-review helper. The store is deliberately stronger than helper identity: even an older or generic caller cannot make a strict approved job revision authoritative unless the same exact persisted receipt evidence passes the global promotion gate.
 
-Art Studio can continue to provide deterministic camera, perspective, identity, pose-beat, delivery and runtime planning. Cel Animation Studio remains responsible for the stricter craft grammar, exact downstream authority and promotion evidence.
+Art Studio can continue to provide deterministic camera, perspective, identity, pose-beat, delivery and runtime planning. Cel Animation Studio remains responsible for the stricter craft grammar, exact downstream authority, immutable quality evidence and persisted promotion enforcement.
 
 ## MCP surface
 
@@ -69,4 +79,4 @@ Both operations are side-effect free.
 
 ## Prohibited substitutions
 
-The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, random line boil, fake analogue degradation, unmotivated rim/bloom/genre grading, generated pseudo-lettering, using a convenience/base prompt compiler to stand in for the required strict authority-bound path, and approving a strict candidate through the generic artefact review path without a current quality receipt.
+The authority explicitly forbids one-pass anime filters, independent per-frame regeneration, generic optical-flow smoothing over authored timing, morphing between keys, random line boil, fake analogue degradation, constant idle body bob, timer-like blinking, generic mouth flapping, unmotivated rim/bloom/genre grading, generated pseudo-lettering, using a convenience/base prompt compiler to stand in for the required strict authority-bound path, and persisting a strict approved candidate without a current candidate-byte-bound zero-blocker quality receipt.
