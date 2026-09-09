@@ -419,6 +419,7 @@ export function providerWorkerCapabilities(
   if (registry.list().length) {
     capabilities.add("provider.candidate-store");
     capabilities.add("evidence.bundle");
+    capabilities.add("evidence.provenance");
   }
   return [...capabilities].sort();
 }

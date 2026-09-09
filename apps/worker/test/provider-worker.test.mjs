@@ -109,6 +109,7 @@ test("durable provider worker preserves identity lineage and stores only unappro
     timeoutMs: 60_000,
   });
   const capabilities = providerWorkerCapabilities(registry);
+  assert.ok(capabilities.includes("evidence.provenance"));
   const worker = new RuntimeWorker({
     runtime,
     artifacts,
