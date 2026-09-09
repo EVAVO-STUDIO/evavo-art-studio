@@ -8,28 +8,49 @@ const v = (x, y, z = 0) => ({ x, y, z });
 
 test("accepts a clean connected quad without false overlap", () => {
   const result = reviewUvLayout([
-    { id: "a", uv: [p(0, 0), p(1, 0), p(1, 1)] },
-    { id: "b", uv: [p(0, 0), p(1, 1), p(0, 1)] },
+    { id: "a", uv: [p(0, 0), p(1, 0), p(1, 1)], vertexKeys: ["v1", "v2", "v3"] },
+    { id: "b", uv: [p(0, 0), p(1, 1), p(0, 1)], vertexKeys: ["v1", "v3", "v4"] },
   ]);
   assert.equal(result.grade, "pass");
   assert.equal(result.islandCount, 1);
   assert.deepEqual(result.overlapPairs, []);
   assert.equal(result.orientation.referenceSign, "positive");
+  assert.equal(result.connectivity.mode, "mesh-aware");
+});
+
+test("keeps coincident UVs from unrelated topology as separate islands", () => {
+  const result = reviewUvLayout([
+    { id: "a", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)], vertexKeys: ["v1", "v2", "v3"] },
+    { id: "b", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)], vertexKeys: ["v4", "v5", "v6"] },
+  ], {
+    textureWidth: 1024,
+    textureHeight: 1024,
+    minimumIslandPaddingTexels: 1,
+  });
+  assert.equal(result.islandCount, 2);
+  assert.equal(result.grade, "fail");
+  assert.equal(result.islandSpacing.minimumPaddingTexels, 0);
+  assert.ok(result.blockers.includes("unapproved-uv-overlaps:1"));
 });
 
 test("rejects accidental stacked UVs but permits an explicit shared overlap group", () => {
   const triangles = [
-    { id: "a", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)] },
-    { id: "b", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)] },
+    { id: "a", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)], vertexKeys: ["v1", "v2", "v3"] },
+    { id: "b", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)], vertexKeys: ["v4", "v5", "v6"] },
   ];
   const rejected = reviewUvLayout(triangles);
   assert.equal(rejected.grade, "fail");
   assert.equal(rejected.overlapPairs.length, 1);
   assert.ok(rejected.blockers.includes("unapproved-uv-overlaps:1"));
 
-  const allowed = reviewUvLayout(triangles.map((triangle) => ({ ...triangle, overlapGroup: "intentional-stack" })));
+  const allowed = reviewUvLayout(
+    triangles.map((triangle) => ({ ...triangle, overlapGroup: "intentional-stack" })),
+    { textureWidth: 1024, textureHeight: 1024, minimumIslandPaddingTexels: 4 },
+  );
   assert.equal(allowed.grade, "pass");
+  assert.equal(allowed.islandCount, 2);
   assert.equal(allowed.overlapPairs[0].allowedByGroup, true);
+  assert.equal(allowed.islandSpacing.eligiblePairCount, 0);
 });
 
 test("rejects out-of-range UV coordinates unless tiled coordinates are explicitly allowed", () => {
@@ -86,8 +107,8 @@ test("can enforce atlas boundary padding in texels", () => {
 
 test("measures true inter-island spacing in output texels", () => {
   const result = reviewUvLayout([
-    { id: "left", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)] },
-    { id: "right", uv: [p(0.405, 0.1), p(0.7, 0.1), p(0.7, 0.4)] },
+    { id: "left", uv: [p(0.1, 0.1), p(0.4, 0.1), p(0.1, 0.4)], vertexKeys: ["v1", "v2", "v3"] },
+    { id: "right", uv: [p(0.405, 0.1), p(0.7, 0.1), p(0.7, 0.4)], vertexKeys: ["v4", "v5", "v6"] },
   ], {
     textureWidth: 1000,
     textureHeight: 1000,
