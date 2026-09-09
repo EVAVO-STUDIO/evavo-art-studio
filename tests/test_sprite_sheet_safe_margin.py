@@ -4,7 +4,21 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from tools.sprite_sheet_safe_margin import matte_colour, repair
+from tools.sprite_sheet_safe_margin import foreground_mask, matte_colour, remove_edge_dividers, repair
+
+
+def test_chroma_gradient_and_white_grid_are_background():
+    image = Image.new("RGB", (8, 8), (0, 250, 5))
+    pixels = image.load()
+    for y in range(8):
+        for x in range(8):
+            pixels[x, y] = (min(20, x * 2), 235 + y, min(20, y * 2))
+    for x in range(8):
+        pixels[x, 7] = (255, 255, 255)
+    pixels[3, 3] = (120, 40, 20)
+    mask, removed = remove_edge_dividers(foreground_mask(image, matte_colour(image), 30), 2)
+    assert mask.getbbox() == (3, 3, 4, 4)
+    assert removed["bottom"] == 1
 
 
 class SpriteSheetSafeMarginTests(unittest.TestCase):

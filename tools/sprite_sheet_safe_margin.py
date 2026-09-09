@@ -36,6 +36,19 @@ def foreground_bbox(cell: Image.Image, matte: tuple[int, int, int], threshold: i
 
 
 def foreground_mask(cell: Image.Image, matte: tuple[int, int, int], threshold: int) -> Image.Image:
+    if matte[1] >= 160 and matte[1] - max(matte[0], matte[2]) >= 70:
+        # Chroma generators often paint a subtle green gradient instead of an
+        # exact solid fill. Treat the complete green family as background so
+        # those variations cannot become a false full-cell subject. White grid
+        # separators remain in the mask for remove_edge_dividers(), which keeps
+        # divider diagnostics accurate and removes only near-solid edge lines.
+        rgb = cell.convert("RGB")
+        mask = Image.new("L", cell.size)
+        mask.putdata([
+            0 if (g >= 120 and g - r >= 45 and g - b >= 45) else 255
+            for r, g, b in rgb.getdata()
+        ])
+        return mask
     difference = ImageChops.difference(cell.convert("RGB"), Image.new("RGB", cell.size, matte))
     return difference.convert("L").point(lambda value: 255 if value >= threshold else 0)
 
