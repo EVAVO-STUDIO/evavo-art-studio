@@ -10,6 +10,7 @@ const manifests = [
   "config/image-finishing-artist.capabilities.json",
   "config/image-repair-agent.capabilities.json",
   "config/texture-review-agent.capabilities.json",
+  "config/godot-material-delivery-agent.capabilities.json",
   "config/image-effects-agent.capabilities.json",
   "config/image-agent-router.capabilities.json",
 ];
@@ -66,6 +67,11 @@ for (const requiredExport of mediaExports) {
   }
 }
 
+const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts"), "utf8");
+if (!godotIndex.includes('export * from "./material-delivery.js";')) {
+  throw new Error("packages/godot/src/index.ts does not export material-delivery.");
+}
+
 const enhancementSession = await readFile(
   path.join(root, "packages/media/src/enhancement-review-session.ts"),
   "utf8",
@@ -92,8 +98,10 @@ for (const requiredTest of [
   "packages/media/test/uv-layout-review.test.mjs",
   "packages/media/test/wavefront-obj-uv.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
+  "packages/godot/test/material-delivery.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/texture_review_mcp.test.mjs",
+  "tools/godot_material_delivery_mcp.test.mjs",
 ]) {
   await access(path.join(root, requiredTest));
 }
@@ -106,6 +114,7 @@ process.stdout.write(`${JSON.stringify({
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   textureProofSampling: ["continuous", "nearest"],
   textureMaterialReview: ["single-map", "material-set", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
+  godotMaterialDelivery: ["StandardMaterial3D", "ORMMaterial3D", "guarded-preprocessing"],
   unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
