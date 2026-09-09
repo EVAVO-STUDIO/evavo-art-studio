@@ -1,4 +1,5 @@
 import { compareImageSimilarity } from "./image-similarity.js";
+import sharp from "sharp";
 import {
   createImageFinishingReviewBatch,
   type ImageFinishingPacketPriority,
@@ -19,6 +20,9 @@ export interface ImageSequenceFinishingReviewSpec extends ImageFinishingReviewBa
   readonly maximumSharpnessRatio?: number;
   readonly maximumVisibleMassDelta?: number;
   readonly maximumQualityScoreDelta?: number;
+  readonly maximumBoundingBoxAspectDelta?: number;
+  readonly maximumCentroidDelta?: number;
+  readonly maximumBoundingBoxScaleDelta?: number;
   readonly duplicateNeighborPolicy?: "ignore" | "warn";
 }
 
@@ -27,6 +31,13 @@ export interface ImageSequenceFrameContinuity {
   readonly index: number;
   readonly flags: readonly string[];
   readonly continuityRisk: "low" | "review" | "high";
+  readonly silhouetteGeometry: Readonly<{
+    boundingBoxAspect: number;
+    boundingBoxWidthRatio: number;
+    boundingBoxHeightRatio: number;
+    centroidX: number;
+    centroidY: number;
+  }>;
 }
 
 export interface ImageSequenceNeighborEvidence {
@@ -53,6 +64,11 @@ export interface ImageSequenceFinishingReviewResult {
     lumaStdDev: number;
     sharpness: number;
     visiblePixelRatio: number;
+    boundingBoxAspect: number;
+    boundingBoxWidthRatio: number;
+    boundingBoxHeightRatio: number;
+    centroidX: number;
+    centroidY: number;
   }>;
   readonly frames: readonly ImageSequenceFrameContinuity[];
   readonly neighbors: readonly ImageSequenceNeighborEvidence[];
@@ -92,6 +108,51 @@ function unique(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values)]);
 }
 
+async function measureSilhouetteGeometry(encoded: Buffer): Promise<{
+  boundingBoxAspect: number;
+  boundingBoxWidthRatio: number;
+  boundingBoxHeightRatio: number;
+  centroidX: number;
+  centroidY: number;
+}> {
+  const decoded = await sharp(encoded, { failOn: "error" })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = decoded.info;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let sumX = 0;
+  let sumY = 0;
+  let count = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (decoded.data[(y * width + x) * channels + 3]! <= 32) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      sumX += x;
+      sumY += y;
+      count += 1;
+    }
+  }
+  if (!count) {
+    return { boundingBoxAspect: 0, boundingBoxWidthRatio: 0, boundingBoxHeightRatio: 0, centroidX: 0, centroidY: 0 };
+  }
+  const boxWidth = maxX - minX + 1;
+  const boxHeight = maxY - minY + 1;
+  return {
+    boundingBoxAspect: boxWidth / boxHeight,
+    boundingBoxWidthRatio: boxWidth / width,
+    boundingBoxHeightRatio: boxHeight / height,
+    centroidX: sumX / count / width,
+    centroidY: sumY / count / height,
+  };
+}
+
 function priorityRank(priority: ImageFinishingPacketPriority): number {
   switch (priority) {
     case "critical": return 4;
@@ -125,6 +186,9 @@ export async function createImageSequenceFinishingReview(
   if (maximumSharpnessRatio < 1) throw new Error("maximumSharpnessRatio must be at least 1.");
   const maximumVisibleMassDelta = finiteNonNegative(spec.maximumVisibleMassDelta, 0.25, "maximumVisibleMassDelta");
   const maximumQualityScoreDelta = finiteNonNegative(spec.maximumQualityScoreDelta, 18, "maximumQualityScoreDelta");
+  const maximumBoundingBoxAspectDelta = finiteNonNegative(spec.maximumBoundingBoxAspectDelta, 0.30, "maximumBoundingBoxAspectDelta");
+  const maximumCentroidDelta = finiteNonNegative(spec.maximumCentroidDelta, 0.16, "maximumCentroidDelta");
+  const maximumBoundingBoxScaleDelta = finiteNonNegative(spec.maximumBoundingBoxScaleDelta, 0.30, "maximumBoundingBoxScaleDelta");
   const duplicateNeighborPolicy = spec.duplicateNeighborPolicy ?? "warn";
   if (duplicateNeighborPolicy !== "ignore" && duplicateNeighborPolicy !== "warn") {
     throw new Error("duplicateNeighborPolicy must be ignore or warn.");
@@ -135,6 +199,7 @@ export async function createImageSequenceFinishingReview(
     ...(spec.approvedReferences?.length ? { approvedReferences: spec.approvedReferences } : {}),
   });
   const quality = batch.items.map((item) => item.packet.technicalReview.quality);
+  const geometry = await Promise.all(frames.map((frame) => measureSilhouetteGeometry(frame.encoded)));
   const baseline = Object.freeze({
     width: median(quality.map((item) => item.width)),
     height: median(quality.map((item) => item.height)),
@@ -144,11 +209,17 @@ export async function createImageSequenceFinishingReview(
     lumaStdDev: median(quality.map((item) => item.lumaStdDev)),
     sharpness: median(quality.map((item) => item.sharpness)),
     visiblePixelRatio: median(quality.map((item) => item.visiblePixelRatio)),
+    boundingBoxAspect: median(geometry.map((item) => item.boundingBoxAspect)),
+    boundingBoxWidthRatio: median(geometry.map((item) => item.boundingBoxWidthRatio)),
+    boundingBoxHeightRatio: median(geometry.map((item) => item.boundingBoxHeightRatio)),
+    centroidX: median(geometry.map((item) => item.centroidX)),
+    centroidY: median(geometry.map((item) => item.centroidY)),
   });
   const alphaStates = unique(quality.map((item) => String(item.hasAlpha)));
 
   const continuity = batch.items.map((item, index) => {
     const q = item.packet.technicalReview.quality;
+    const g = geometry[index]!;
     const flags: string[] = [];
     const aspect = q.width / q.height;
     if (Math.abs(q.width - baseline.width) > 1 || Math.abs(q.height - baseline.height) > 1) flags.push("canvas-size-outlier");
@@ -159,11 +230,18 @@ export async function createImageSequenceFinishingReview(
     const sharpnessRatio = ratio(q.sharpness, baseline.sharpness);
     if (sharpnessRatio < 1 / maximumSharpnessRatio || sharpnessRatio > maximumSharpnessRatio) flags.push("sharpness-outlier");
     if (Math.abs(q.visiblePixelRatio - baseline.visiblePixelRatio) > maximumVisibleMassDelta) flags.push("visible-mass-outlier");
+    if (Math.abs(g.boundingBoxAspect - baseline.boundingBoxAspect) > maximumBoundingBoxAspectDelta) flags.push("silhouette-proportion-outlier");
+    if (
+      Math.abs(g.boundingBoxWidthRatio - baseline.boundingBoxWidthRatio) > maximumBoundingBoxScaleDelta
+      || Math.abs(g.boundingBoxHeightRatio - baseline.boundingBoxHeightRatio) > maximumBoundingBoxScaleDelta
+    ) flags.push("silhouette-scale-outlier");
+    if (Math.hypot(g.centroidX - baseline.centroidX, g.centroidY - baseline.centroidY) > maximumCentroidDelta) flags.push("registration-centroid-outlier");
     return Object.freeze({
       id: item.id,
       index,
       flags: Object.freeze(flags),
       continuityRisk: flags.length >= 2 ? "high" as const : flags.length ? "review" as const : "low" as const,
+      silhouetteGeometry: Object.freeze(g),
     });
   });
 
@@ -174,12 +252,20 @@ export async function createImageSequenceFinishingReview(
     const to = frames[index + 1]!;
     const similarity = await compareImageSimilarity(from.encoded, to.encoded);
     const flags: string[] = [];
+    const fromGeometry = geometry[index]!;
+    const toGeometry = geometry[index + 1]!;
     if (duplicateNeighborPolicy === "warn" && similarity.recommendation === "reject-duplicate") {
       flags.push("exact-or-effectively-duplicate-neighbor");
       duplicateFrameIds.add(from.id);
       duplicateFrameIds.add(to.id);
     } else if (duplicateNeighborPolicy === "warn" && similarity.nearDuplicate) {
       flags.push("near-duplicate-neighbor");
+    }
+    if (Math.abs(toGeometry.boundingBoxAspect - fromGeometry.boundingBoxAspect) > maximumBoundingBoxAspectDelta) {
+      flags.push("adjacent-silhouette-proportion-jump");
+    }
+    if (Math.hypot(toGeometry.centroidX - fromGeometry.centroidX, toGeometry.centroidY - fromGeometry.centroidY) > maximumCentroidDelta) {
+      flags.push("adjacent-registration-centroid-jump");
     }
     neighbors.push(Object.freeze({
       fromId: from.id,
@@ -196,6 +282,9 @@ export async function createImageSequenceFinishingReview(
   const setWarnings: string[] = [];
   if (alphaStates.length > 1) setWarnings.push("mixed-alpha-channel-state");
   if (continuity.some((item) => item.continuityRisk === "high")) setWarnings.push("technical-frame-continuity-outliers-present");
+  if (neighbors.some((item) => item.flags.some((flag) => flag.startsWith("adjacent-")))) {
+    setWarnings.push("adjacent-silhouette-or-registration-jumps-present");
+  }
   if (neighbors.some((item) => item.flags.includes("exact-or-effectively-duplicate-neighbor"))) {
     setWarnings.push("duplicate-neighbor-frames-present; verify whether these are intentional animation holds");
   } else if (neighbors.some((item) => item.flags.includes("near-duplicate-neighbor"))) {

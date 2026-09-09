@@ -87,3 +87,28 @@ test("semantic findings stay attached to their frame inside sequence finishing",
   assert.equal(semantic.priority, "high");
   assert.equal(result.reviewPriority[0], "semantic");
 });
+
+async function alphaFigure({ width = 128, height = 128, left = 40, top = 20, boxWidth = 40, boxHeight = 90 } = {}) {
+  const raw = Buffer.alloc(width * height * 4);
+  for (let y = top; y < Math.min(height, top + boxHeight); y += 1) {
+    for (let x = left; x < Math.min(width, left + boxWidth); x += 1) {
+      const i = (y * width + x) * 4;
+      raw[i] = 160; raw[i + 1] = 80; raw[i + 2] = 40; raw[i + 3] = 255;
+    }
+  }
+  return sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+
+test("flags silhouette proportion and registered-centroid drift hidden by a common canvas", async () => {
+  const result = await createImageSequenceFinishingReview([
+    { id: "locked-a", encoded: await alphaFigure(), reviewContext: { declaredProfile: "cel-animation-frame" } },
+    { id: "locked-b", encoded: await alphaFigure({ left: 42 }), reviewContext: { declaredProfile: "cel-animation-frame" } },
+    { id: "drift", encoded: await alphaFigure({ left: 88, top: 54, boxWidth: 30, boxHeight: 30 }), reviewContext: { declaredProfile: "cel-animation-frame" } },
+  ], { maximumCentroidDelta: 0.12, maximumBoundingBoxAspectDelta: 0.20, maximumBoundingBoxScaleDelta: 0.20 });
+  const drift = result.frames.find((frame) => frame.id === "drift");
+  assert.ok(drift.flags.includes("silhouette-proportion-outlier"));
+  assert.ok(drift.flags.includes("silhouette-scale-outlier"));
+  assert.ok(drift.flags.includes("registration-centroid-outlier"));
+  assert.ok(result.neighbors[1].flags.includes("adjacent-registration-centroid-jump"));
+  assert.notEqual(result.sequenceDecision, "pass-to-visual-review");
+});

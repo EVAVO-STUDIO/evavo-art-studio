@@ -110,6 +110,7 @@ A sprite cannot be approved until the required evidence passes:
 - identity and proportion comparison against the canonical master;
 - cross-direction identity and equipment agreement;
 - silhouette, palette, line-treatment and material consistency;
+- alpha-silhouette bounding-box proportion, visible scale and registered-centroid continuity, including adjacent-frame jumps;
 - exact canvas, pivot, baseline and ground contact;
 - safe-bound and crop proof;
 - complete direction, frame, tag and duration ordering;
@@ -121,3 +122,5 @@ A sprite cannot be approved until the required evidence passes:
 - editable-source completeness and provenance.
 
 Automatic approval never lowers thresholds. If bounded repair cannot pass a blocking gate, the run stops with a decision packet rather than accepting a weak frame.
+
+`createImageSequenceFinishingReview` records these geometry measures for every frame. They are triage evidence: an extreme action pose may legitimately change its bounds, but the change must be visually adjudicated against the canonical identity and adjacent approved poses. A common canvas alone is never evidence of stable character scale or registration.
