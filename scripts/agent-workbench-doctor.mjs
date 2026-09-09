@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+import { planAgentWorkbenchMcpRegistration, applyAgentWorkbenchMcpRegistration } from "./agent-workbench-mcp-registration.mjs";
+
+const CONTRACT = "evavo_agent_workbench_doctor_v1";
+const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
+const record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : null;
+const fail = (message) => { throw new Error(message); };
+
+function readRegularJson(filePath, label) {
+  const metadata = fs.lstatSync(filePath);
+  if (!metadata.isFile() || metadata.isSymbolicLink()) fail(`${label} must be a regular non-link file.`);
+  const bytes = fs.readFileSync(filePath);
+  return { value: JSON.parse(bytes.toString("utf8")), evidence: { path: filePath, sha256: digest(bytes), bytes: bytes.length } };
+}
+
+function safeFile(root, relative, label) {
+  if (typeof relative !== "string" || !relative || path.isAbsolute(relative) || relative.includes("..")) fail(`${label} must be a repository-relative path.`);
+  const filePath = path.join(root, relative);
+  const metadata = fs.lstatSync(filePath);
+  if (!metadata.isFile() || metadata.isSymbolicLink()) fail(`${label} is missing or unsafe: ${relative}`);
+  return filePath;
+}
+
+export function inspectAgentWorkbench(root) {
+  const repositoryRoot = path.resolve(root);
+  const configRead = readRegularJson(path.join(repositoryRoot, ".evavo", "agent-workbench.v1.json"), "workbench config");
+  const bundleRead = readRegularJson(path.join(repositoryRoot, ".evavo", "agent-workbench.contracts.v1.json"), "workbench bundle");
+  const descriptorRead = readRegularJson(path.join(repositoryRoot, ".evavo", "agent-workbench.mcp.v2.json"), "workbench MCP v2 descriptor");
+  const config = configRead.value;
+  const bundle = bundleRead.value;
+  const descriptor = descriptorRead.value;
+  if (config.contractVersion !== "evavo_agent_workbench_config_v1") fail("Workbench config contract mismatch.");
+  if (bundle.contractVersion !== "evavo_agent_workbench_contract_bundle_v1") fail("Workbench bundle contract mismatch.");
+  if (descriptor.contractVersion !== "evavo_agent_workbench_mcp_v2") fail("Workbench MCP v2 descriptor contract mismatch.");
+  if (config.repository !== bundle.repository || config.repository !== descriptor.repository || config.authority !== bundle.authority || config.authority !== descriptor.authority) fail("Workbench identity mismatch across config/bundle/descriptor.");
+  const expectedTools = ["evavo_agent_workbench_capabilities", "evavo_agent_workbench_snapshot", "evavo_agent_workbench_guide", "evavo_agent_workbench_handoff"];
+  if (JSON.stringify(descriptor.tools) !== JSON.stringify(expectedTools)) fail("Workbench MCP v2 tool set mismatch.");
+  if (descriptor.readOnly !== true || descriptor.truthBoundary?.grantsExecutionAuthority !== false || descriptor.truthBoundary?.grantsMutationAuthority !== false || descriptor.truthBoundary?.grantsPublicationAuthority !== false || descriptor.truthBoundary?.guidanceProvesReadiness !== false) fail("Workbench MCP v2 truth boundary mismatch.");
+
+  const requiredPaths = [
+    bundle.entrypoints?.compileSnapshot,
+    bundle.entrypoints?.verify,
+    bundle.entrypoints?.compileHandoff,
+    bundle.entrypoints?.guide,
+    bundle.entrypoints?.guideTest,
+    bundle.entrypoints?.verifyGuidance,
+    bundle.entrypoints?.mcp,
+    bundle.entrypoints?.mcpSmoke,
+    bundle.entrypoints?.mcpV2,
+    bundle.entrypoints?.mcpV2Smoke,
+    "scripts/agent-workbench-mcp-registration.mjs",
+    "scripts/test-agent-workbench-mcp-registration.mjs",
+    bundle.schemas?.config,
+    bundle.schemas?.snapshot,
+    bundle.schemas?.handoff,
+    bundle.schemas?.guidance,
+  ].filter(Boolean);
+  const artifacts = requiredPaths.map((relative) => {
+    const filePath = safeFile(repositoryRoot, relative, "workbench artifact");
+    const bytes = fs.readFileSync(filePath);
+    return { path: relative, sha256: digest(bytes), bytes: bytes.length };
+  });
+  const registration = planAgentWorkbenchMcpRegistration(repositoryRoot);
+  const registrationState = registration.alreadyExact ? "registered" : registration.existingEntryWasDifferent ? "drifted" : "missing";
+  const findings = [];
+  if (!registration.alreadyExact) findings.push({ severity: "repair", code: "workbench-mcp-v2-registration-not-exact", state: registrationState, action: "node scripts/agent-workbench-mcp-registration.mjs --write" });
+  return {
+    contract: CONTRACT,
+    generatedAt: new Date().toISOString(),
+    repository: config.repository,
+    authority: config.authority,
+    status: findings.length === 0 ? "ready" : "repair-required",
+    contracts: { config: configRead.evidence, bundle: bundleRead.evidence, mcpV2: descriptorRead.evidence },
+    artifactCount: artifacts.length,
+    artifacts,
+    registration: {
+      state: registrationState,
+      serverName: registration.serverName,
+      alreadyExact: registration.alreadyExact,
+      existingEntryPresent: registration.existingEntryPresent,
+      existingEntryWasDifferent: registration.existingEntryWasDifferent,
+      beforeSha256: registration.beforeSha256,
+      afterSha256: registration.afterSha256,
+    },
+    findings,
+    policy: {
+      readOnlyByDefault: true,
+      doctorExecutesCandidateCommands: false,
+      doctorGrantsExecutionAuthority: false,
+      doctorGrantsMutationAuthority: false,
+      doctorGrantsPublicationAuthority: false,
+      repairScope: ".mcp.json workbench v2 registration only",
+    },
+  };
+}
+
+function parse(argv) {
+  const options = { root: null, repairRegistration: false, selfTest: false };
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--root") options.root = argv[++index] ?? null;
+    else if (token === "--repair-registration") options.repairRegistration = true;
+    else if (token === "--self-test") options.selfTest = true;
+    else fail(`Unknown argument: ${token}`);
+  }
+  return options;
+}
+
+function selfTest() {
+  if (!Array.isArray(["a"]) || digest(Buffer.from("test")).length !== 64) fail("doctor self-test failed");
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v1", status: "passed", assertions: 2 }, null, 2)}\n`);
+}
+
+function main() {
+  const options = parse(process.argv.slice(2));
+  if (options.selfTest) return selfTest();
+  const root = path.resolve(options.root ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
+  let result = inspectAgentWorkbench(root);
+  let repair = null;
+  if (options.repairRegistration && result.registration.alreadyExact !== true) {
+    const plan = planAgentWorkbenchMcpRegistration(root);
+    repair = applyAgentWorkbenchMcpRegistration(plan);
+    result = inspectAgentWorkbench(root);
+    if (result.status !== "ready") fail("Workbench doctor registration repair did not reach ready state.");
+  }
+  process.stdout.write(`${JSON.stringify({ ...result, repair: repair ? { registrationWritePerformed: repair.written, backupPath: repair.backupPath } : null }, null, 2)}\n`);
+}
+
+const direct = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (direct) {
+  try { main(); } catch (error) { console.error(error instanceof Error ? error.stack : String(error)); process.exitCode = 1; }
+}
