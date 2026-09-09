@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-delivery-integrity",
+  "purpose": "Read-only final-container and metadata preflight for web, game-art, game-data-map, print and archive image delivery.",
+  "entrypoint": "tools/image_delivery_integrity_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_IMAGE_DELIVERY_ALLOWED_ROOTS": {
+      "requiredForImageReads": true,
+      "description": "Platform-delimited canonical roots containing final image derivatives to preflight."
+    }
+  },
+  "tools": [
+    "evavo_image_delivery_integrity_capabilities",
+    "evavo_review_image_delivery_integrity",
+    "evavo_review_image_delivery_batch"
+  ],
+  "targets": ["web", "game-art", "game-data-map", "print", "archive"],
+  "limits": {
+    "batchImages": 128
+  },
+  "checks": [
+    "encoded-format-vs-intent",
+    "alpha-channel-compatibility",
+    "colour-space-and-icc-presence",
+    "orientation-metadata-normalization-risk",
+    "EXIF-XMP-public-runtime-metadata-risk",
+    "megapixel-budget",
+    "effective-print-dpi",
+    "game-data-map-linear-non-colour-guidance"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "writesFiles": false,
+    "automaticColourConversion": false,
+    "automaticMetadataStripping": false,
+    "browserEnginePrintProofStillRequired": true
+  }
+}
