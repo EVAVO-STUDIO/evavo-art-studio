@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-godot-material-delivery-agent",
+  "purpose": "Read-only Godot 4.x material binding planning after texture, PBR and UV assurance.",
+  "entrypoint": "tools/godot_material_delivery_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-godot build",
+  "tools": [
+    "evavo_godot_material_delivery_capabilities",
+    "evavo_plan_godot_material_delivery"
+  ],
+  "targetClasses": ["StandardMaterial3D", "ORMMaterial3D"],
+  "directBindings": [
+    "albedo_texture",
+    "normal_texture",
+    "roughness_texture",
+    "metallic_texture",
+    "ao_texture",
+    "heightmap_texture",
+    "emission_texture",
+    "orm_texture"
+  ],
+  "guardedWorkflows": {
+    "directxNormals": "Explicit Y/green conversion to Godot OpenGL normal convention is required before normal_texture binding.",
+    "opacity": "Standalone opacity maps are not silently bound; compose into albedo alpha or use a reviewed custom shader.",
+    "specular": "Standalone per-pixel specular maps are not silently bound; re-author for metallic/roughness or use a reviewed custom shader.",
+    "ormAuthority": "Packed ORM and separate AO/roughness/metallic inputs cannot both be authoritative."
+  },
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "projectWritesAllowed": false,
+    "automaticShaderGeneration": false,
+    "explicitUnsupportedMapRouting": true,
+    "runtimeVisualReviewRequired": true
+  }
+}
