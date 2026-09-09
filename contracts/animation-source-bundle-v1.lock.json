@@ -2,7 +2,7 @@
   "schema": "evavo.animation-source-contract-lock.v1",
   "contractSchema": "evavo.animation-source-bundle.v1",
   "schemaSha256": "sha256:b8e355066d1f937acf7d3e60998b38d8a133fcaf719e5f760efc206cbf01bedd",
-  "contractSetDigest": "sha256:e8ea163a56364cf8fe40c61e9428f6861c891944f7e31f4ccb793f1a447b9314",
+  "contractSetDigest": "sha256:79c702c56aaed2ed3c75b374406726e590c1f4875381cf15c51fb5877dafc512",
   "files": [
     {
       "path": "contracts/animation-source-bundle-v1.schema.json",
@@ -26,7 +26,7 @@
     },
     {
       "path": "scripts/lib/animation-source-observation-common.mjs",
-      "gitBlobSha1": "f7097e7c0c8b65a86241e9d7e8ab29d7a587f90e"
+      "gitBlobSha1": "6855977a87b94bd5f9e35a42175b5c67be1ed7e2"
     },
     {
       "path": "scripts/lib/animation-source-stable-observation.mjs",

@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOW_ROOT = path.join(ROOT, ".github/workflows");
+const hostedWorkflowTest = (await readdir(WORKFLOW_ROOT, { withFileTypes: true })).some(
+  (entry) => entry.isFile() && /\.ya?ml$/u.test(entry.name),
+) ? test : test.skip;
 
 const COMMAND_FILES = Object.freeze([
   { kind: "output", variable: "GITHUB_OUTPUT" },
@@ -337,7 +340,7 @@ function exactSorted(values) {
   return [...values].sort((left, right) => left.localeCompare(right));
 }
 
-test("workflow command-file writes are exact-reviewed", async () => {
+hostedWorkflowTest("workflow command-file writes are exact-reviewed", async () => {
   const observed = (await workflowSources())
     .flatMap(commandFileSurfaces)
     .sort((left, right) => left.key.localeCompare(right.key));
@@ -404,7 +407,7 @@ test("workflow command-file writes are exact-reviewed", async () => {
   );
 });
 
-test("workflow command-file contracts never admit direct GitHub expressions", () => {
+hostedWorkflowTest("workflow command-file contracts never admit direct GitHub expressions", () => {
   const violations = [];
   for (const [key, contract] of APPROVED_COMMAND_FILE_WRITES) {
     for (const text of [
@@ -420,7 +423,7 @@ test("workflow command-file contracts never admit direct GitHub expressions", ()
   assert.deepEqual(violations, []);
 });
 
-test("command-file authority remains limited to environment and output files", () => {
+hostedWorkflowTest("command-file authority remains limited to environment and output files", () => {
   const kinds = new Set(
     [...APPROVED_COMMAND_FILE_WRITES.keys()].map((key) =>
       key.slice(key.lastIndexOf("::") + 2),

@@ -8,5 +8,5 @@
   "schemaPath": "contracts/animation-frame-work-ledger-v1.schema.json",
   "schemaSha256": "sha256:2e02ecaf173dfd9c986709b02c5068e4053a7d9c23da21c13b7402fe7de059fa",
   "internalImplementationPath": "tools/animation_frame_work_ledger_v1_internal.mjs",
-  "internalImplementationSha256": "sha256:9dc5a556369b1aa04bf11bf506a910e9a89a34b27cd80aaf3b386769f41ee9d2"
+  "internalImplementationSha256": "sha256:d06400d5b46a48794cc86d2e321a54acb233cef0d9d91625e2536d3484b4aadd"
 }

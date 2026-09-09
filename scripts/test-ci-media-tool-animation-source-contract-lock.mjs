@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const checker = "scripts/check-animation-source-contract-lock.mjs";
 const contractSetDigest =
-  "sha256:e8ea163a56364cf8fe40c61e9428f6861c891944f7e31f4ccb793f1a447b9314";
+  "sha256:79c702c56aaed2ed3c75b374406726e590c1f4875381cf15c51fb5877dafc512";
 const lockedPaths = [
   "contracts/animation-source-bundle-v1.lock.json",
   "contracts/animation-source-bundle-v1.schema.json",

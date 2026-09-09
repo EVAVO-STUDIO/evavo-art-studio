@@ -15,7 +15,6 @@ const files = [
   'tools/project_art_review_mcp.mjs',
   'config/mcp.project-art-review.windows.example.json',
   'docs/PROJECT_ART_REVIEW_STUDIO.md',
-  '.github/workflows/project-art-review-studio.yml',
   'package.json',
 ];
 const source = {};
@@ -113,24 +112,6 @@ assert.ok(
   configuration.mcpServers['evavo-project-art-review'].args[0].endsWith('tools\\project_art_review_mcp.mjs'),
 );
 
-const workflow = source['.github/workflows/project-art-review-studio.yml'];
-for (const token of [
-  'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
-  'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97',
-  'pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86',
-  'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
-  'persist-credentials: false',
-  'python-version: "3.13.5"',
-  'node-version: "22.14.0"',
-  'version: 10.13.1',
-  'pnpm install --frozen-lockfile',
-  'pnpm run project-art:review:check',
-  'pnpm check',
-  'git diff --exit-code',
-]) {
-  assert.equal(workflow.includes(token), true, `review workflow lost ${token}`);
-}
-
 const packageDocument = JSON.parse(source['package.json']);
 for (const name of [
   'project-art:review:compile',
@@ -147,4 +128,4 @@ console.log('Project Art Review Studio contract passed.');
 console.log('- exact source-bound offline comparison, candidate, animation and atlas review surfaces retained');
 console.log('- exported browser decisions remain drafts until governed identity and gate validation seals them');
 console.log('- MCP bytes, provider execution, approval, promotion, repository mutation and publication remain absent');
-console.log('- permanent workflow runs focused attacks and complete Art Studio validation');
+console.log('- the permanent local gate runs focused attacks and complete Art Studio validation');

@@ -71,8 +71,8 @@ async function executeBatch(manifestPath: string): Promise<{ stdout: string; std
     stdio: ["ignore", "pipe", "pipe"],
     shell: false,
   });
-  let stdout = Buffer.alloc(0);
-  let stderr = Buffer.alloc(0);
+  let stdout: Buffer = Buffer.alloc(0);
+  let stderr: Buffer = Buffer.alloc(0);
   child.stdout.on("data", (chunk: Buffer) => { stdout = appendBounded(stdout, Buffer.from(chunk)); });
   child.stderr.on("data", (chunk: Buffer) => { stderr = appendBounded(stderr, Buffer.from(chunk)); });
   await new Promise<void>((resolve, reject) => {

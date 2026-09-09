@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOW_ROOT = path.join(ROOT, ".github/workflows");
+const hostedWorkflowTest = (await readdir(WORKFLOW_ROOT, { withFileTypes: true })).some(
+  (entry) => entry.isFile() && /\.ya?ml$/u.test(entry.name),
+) ? test : test.skip;
 
 const WRITE_PERMISSION_ALLOWLIST = new Map([
   [
@@ -271,7 +274,7 @@ function isPrivileged(workflow) {
   );
 }
 
-test("workflow write permissions are exact and allowlisted", async () => {
+hostedWorkflowTest("workflow write permissions are exact and allowlisted", async () => {
   const violations = [];
   const observed = new Set();
 
@@ -324,7 +327,7 @@ test("workflow write permissions are exact and allowlisted", async () => {
   );
 });
 
-test("pull-request events never receive privileged workflow authority", async () => {
+hostedWorkflowTest("pull-request events never receive privileged workflow authority", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
     const events = workflowEvents(workflow.source);
@@ -341,7 +344,7 @@ test("pull-request events never receive privileged workflow authority", async ()
   );
 });
 
-test("privileged workflow surfaces remain an exact reviewed set", async () => {
+hostedWorkflowTest("privileged workflow surfaces remain an exact reviewed set", async () => {
   const workflows = await workflowSources();
   const privileged = workflows.filter(isPrivileged);
   const observed = exactSorted(privileged.map((workflow) => workflow.path));
@@ -379,7 +382,7 @@ test("privileged workflow surfaces remain an exact reviewed set", async () => {
   );
 });
 
-test("workflow permissions never use write-all", async () => {
+hostedWorkflowTest("workflow permissions never use write-all", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
     for (const block of permissionBlocks(workflow.source)) {
@@ -396,7 +399,7 @@ test("workflow permissions never use write-all", async () => {
 });
 
 
-test("repository write workflows are manual-only and SHA-confirmed", async () => {
+hostedWorkflowTest("repository write workflows are manual-only and SHA-confirmed", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
     if (writePermissions(workflow.source).length === 0) continue;

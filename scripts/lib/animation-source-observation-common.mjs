@@ -145,13 +145,15 @@ function bigintText(value) {
 
 export function observationStatFingerprint(stats) {
   return Object.freeze({
-    dev: bigintText(stats.dev),
+    dev: bigintText(process.platform === "win32" ? 0n : stats.dev),
     ino: bigintText(stats.ino),
     mode: bigintText(stats.mode),
     nlink: bigintText(stats.nlink),
     size: bigintText(stats.size),
     mtimeNs: bigintText(stats.mtimeNs),
-    ctimeNs: bigintText(stats.ctimeNs),
+    // Windows reports creation time for a path stat but change time for a file
+    // handle stat. Birth time is stable across both views of the same file.
+    ctimeNs: bigintText(process.platform === "win32" ? stats.birthtimeNs : stats.ctimeNs),
     birthtimeNs: bigintText(stats.birthtimeNs),
   });
 }

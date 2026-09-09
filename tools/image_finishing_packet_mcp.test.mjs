@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import sharp from "../packages/media/node_modules/sharp/lib/index.js";
+import sharp from "../packages/media/node_modules/sharp/dist/index.mjs";
 
 const serverPath = fileURLToPath(new URL("./image_finishing_packet_mcp.mjs", import.meta.url));
 

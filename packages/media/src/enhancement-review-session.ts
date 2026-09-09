@@ -121,10 +121,10 @@ export async function reviewEnhancementStudioCandidate(
       const page = await createWorkPageMediaReviewBundle({
         pageSlug: "enhancement-review",
         header: spec.candidate,
-        support: spec.support,
-        tile: spec.tile,
-        desktopScreenshot: spec.desktopScreenshot,
-        mobileScreenshot: spec.mobileScreenshot,
+        ...(spec.support ? { support: spec.support } : {}),
+        ...(spec.tile ? { tile: spec.tile } : {}),
+        ...(spec.desktopScreenshot ? { desktopScreenshot: spec.desktopScreenshot } : {}),
+        ...(spec.mobileScreenshot ? { mobileScreenshot: spec.mobileScreenshot } : {}),
       });
       pageContextReview = page.evidence;
       pageProofPng = page.proofPng;
@@ -133,9 +133,9 @@ export async function reviewEnhancementStudioCandidate(
         pageSlug: "enhancement-review",
         header: spec.header,
         support: spec.candidate,
-        tile: spec.tile,
-        desktopScreenshot: spec.desktopScreenshot,
-        mobileScreenshot: spec.mobileScreenshot,
+        ...(spec.tile ? { tile: spec.tile } : {}),
+        ...(spec.desktopScreenshot ? { desktopScreenshot: spec.desktopScreenshot } : {}),
+        ...(spec.mobileScreenshot ? { mobileScreenshot: spec.mobileScreenshot } : {}),
       });
       pageContextReview = page.evidence;
       pageProofPng = page.proofPng;
@@ -143,10 +143,10 @@ export async function reviewEnhancementStudioCandidate(
       const page = await createWorkPageMediaReviewBundle({
         pageSlug: "enhancement-review",
         header: spec.header,
-        support: spec.support,
+        ...(spec.support ? { support: spec.support } : {}),
         tile: spec.candidate,
-        desktopScreenshot: spec.desktopScreenshot,
-        mobileScreenshot: spec.mobileScreenshot,
+        ...(spec.desktopScreenshot ? { desktopScreenshot: spec.desktopScreenshot } : {}),
+        ...(spec.mobileScreenshot ? { mobileScreenshot: spec.mobileScreenshot } : {}),
       });
       pageContextReview = page.evidence;
       pageProofPng = page.proofPng;

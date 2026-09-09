@@ -441,6 +441,14 @@ for (const relativePath of workflowPaths) {
   }
 }
 
+if (workflowPaths.length > 0) {
+  errors.push("active GitHub workflow YAML is forbidden by the zero-cost local-first policy");
+}
+
+// Retain the old hosted-CI contract validator as dormant migration evidence.
+// It becomes relevant only if a future, explicit budget decision restores an
+// active workflow; the normal local-first checkout must never enter this block.
+if (workflowPaths.length > 0) {
 const workflow = read(".github/workflows/ci.yml");
 const events = workflowEvents(workflow);
 if (JSON.stringify(events) !== JSON.stringify(["push", "workflow_dispatch"])) {
@@ -662,13 +670,15 @@ for (const action of workflowActions(toolchainWorkflow)) {
     errors.push(`repository toolchain action must use a full 40-character commit SHA: ${action}`);
   }
 }
+}
 
 if (!skipRuntime) {
   if (process.versions.node !== EXPECTED_NODE) {
     errors.push(`Node.js runtime must be ${EXPECTED_NODE}; observed ${process.versions.node}`);
   }
-  const executable = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-  const result = spawnSync(executable, ["--version"], {
+  const executable = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "pnpm";
+  const arguments_ = process.platform === "win32" ? ["/d", "/s", "/c", "pnpm --version"] : ["--version"];
+  const result = spawnSync(executable, arguments_, {
     encoding: "utf8",
     timeout: 10_000,
     windowsHide: true,

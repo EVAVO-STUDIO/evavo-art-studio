@@ -40,7 +40,6 @@ const files = [
   "docs/PIXEL_FONT_STUDIO.md",
   "docs/BRASS_BRINE_PIXEL_FONT_FAMILY.md",
   "config/mcp.pixel-font-studio.windows.example.json",
-  ".github/workflows/pixel-font-studio.yml",
   "evavo.reliability.json",
   "package.json",
 ];

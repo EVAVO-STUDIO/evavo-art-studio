@@ -20,7 +20,6 @@ const files = [
   'docs/RAW_ART_FOLDER_WORKBENCH.md',
   'docs/AVATAR_FRAME_CATALOGUE.md',
   'config/mcp.raw-art-folder.windows.example.json',
-  '.github/workflows/raw-art-folder-workbench.yml',
 ];
 const source = {};
 for (const rel of files) {
@@ -96,9 +95,6 @@ const server = config.mcpServers?.['evavo-raw-art-folder-workbench'];
 assert.ok(server);
 assert.equal(server.env.EVAVO_RAW_ART_FOLDER_MCP_MODE, 'read-write');
 assert.equal(server.env.EVAVO_RAW_ART_FOLDER_MCP_ALLOW_WRITES, 'true');
-for (const token of ['contents: read', 'persist-credentials: false', 'scripts/raw-art-folder/**', 'node scripts/check-raw-art-folder-workbench.mjs']) {
-  assert.equal(source['.github/workflows/raw-art-folder-workbench.yml'].includes(token), true, `workflow lost ${token}`);
-}
 for (const forbidden of ['shell: true', 'git push', '--force-with-lease', 'contents: write', 'pull-requests: write', 'sourceDeletion:true', 'sourceMutation:true', 'creativeApproval:true', 'semanticInferenceAuthoritative:true']) {
   assert.equal(combined.includes(forbidden), false, `forbidden ${forbidden}`);
 }

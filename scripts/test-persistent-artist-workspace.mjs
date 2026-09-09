@@ -15,12 +15,15 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import { canonicalJson, sha256, verifyDocumentHash } from './project-art/common.mjs';
 
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
 function run(executable, args, { expectFailure = false } = {}) {
   const result = spawnSync(executable, args, {
-    cwd: path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'),
+    cwd: root,
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -58,7 +61,6 @@ function pythonCommand() {
   return null;
 }
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const python = pythonCommand();
 if (!python) {
   console.log('Persistent Artist Workspace runtime regressions skipped: Pillow unavailable; the dedicated Project Art workflow requires the exact backend.');

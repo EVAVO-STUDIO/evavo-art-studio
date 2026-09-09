@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOW_ROOT = path.join(ROOT, ".github/workflows");
+const hostedWorkflowTest = (await readdir(WORKFLOW_ROOT, { withFileTypes: true })).some(
+  (entry) => entry.isFile() && /\.ya?ml$/u.test(entry.name),
+) ? test : test.skip;
 
 const NETWORK_PRIMITIVES = [
   ["curl", /(?:^|\s)curl(?:\s|$)/u],
@@ -248,7 +251,7 @@ function assertOrdered(source, evidence, label, violations) {
   }
 }
 
-test("workflow network and ephemeral execution surfaces are exact-reviewed", async () => {
+hostedWorkflowTest("workflow network and ephemeral execution surfaces are exact-reviewed", async () => {
   const observed = (await workflowSources())
     .flatMap(networkSurfaces)
     .sort((left, right) => left.key.localeCompare(right.key));
@@ -273,7 +276,7 @@ test("workflow network and ephemeral execution surfaces are exact-reviewed", asy
   );
 });
 
-test("approved workflow network surfaces retain exact transport and digest contracts", async () => {
+hostedWorkflowTest("approved workflow network surfaces retain exact transport and digest contracts", async () => {
   const workflows = await workflowSources();
   const workflowMap = new Map(workflows.map((workflow) => [workflow.path, workflow]));
   const surfaceMap = new Map(
@@ -306,7 +309,7 @@ test("approved workflow network surfaces retain exact transport and digest contr
   );
 });
 
-test("ephemeral remote package execution is forbidden", async () => {
+hostedWorkflowTest("ephemeral remote package execution is forbidden", async () => {
   const forbiddenKinds = new Set([
     "ephemeral-npm-exec",
     "ephemeral-pnpm-dlx",

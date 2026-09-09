@@ -34,7 +34,6 @@ const files = new Map([
     "scripts/project-art/intake-test-support.mjs",
     "scripts/test-project-art-atlas-contract.mjs",
     "scripts/test_project_art_atlas_alpha_bleed.py",
-    ".github/workflows/project-art-workbench.yml",
   ]],
   ["documentation", [
     "docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md",
@@ -109,8 +108,6 @@ const required = new Map([
     "PROJECT_ART_REQUIRE_PILLOW",
     "No Python 3 executable with Pillow is available.",
     "regressions skipped: Pillow unavailable",
-    "python-version: \"3.13.5\"",
-    "PIL.__version__",
     "hidden RGB",
     "expectedSha256",
   ]],

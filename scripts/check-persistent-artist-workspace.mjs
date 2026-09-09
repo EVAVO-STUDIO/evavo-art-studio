@@ -12,7 +12,6 @@ const files = {
   documentation: 'docs/PERSISTENT_ARTIST_WORKSPACE.md',
   mcp: 'tools/project_art_workspace_mcp.mjs',
   package: 'package.json',
-  workflow: '.github/workflows/project-art-workbench.yml',
 };
 const contents = new Map();
 for (const [label, relative] of Object.entries(files)) {
@@ -81,16 +80,6 @@ requireTokens('package', contents.get('package'), [
   'project-art:workspace:persistent',
   'project-art:workspace:persistent:check',
 ]);
-const workflowPaths = [
-  'scripts/project-art/persistent-workspace.mjs',
-  'scripts/persistent-artist-workspace.mjs',
-  'scripts/check-persistent-artist-workspace.mjs',
-  'scripts/test-persistent-artist-workspace.mjs',
-  'docs/PERSISTENT_ARTIST_WORKSPACE.md',
-];
-for (const workflowPath of workflowPaths) {
-  assert.equal(contents.get('workflow').split(`- "${workflowPath}"`).length - 1, 2, `${workflowPath} must trigger PR and main validation`);
-}
 forbidTokens('library', contents.get('library'), [
   'child_process',
   'git push',

@@ -7,6 +7,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 from PIL import Image
 
@@ -39,7 +40,9 @@ def write_plan(file: Path, frames: list[dict], *, fps: int = 10, scale: int = 2)
 
 
 def make_frame(file: Path, value: int) -> None:
-    Image.new("RGBA", (4, 4), (value, 255 - value, value // 2, 255)).save(file, "PNG")
+    image = Image.new("RGBA", (4, 4), (value, 255 - value, value // 2, 255))
+    image.putpixel((0, 0), (0, 0, 0, 0))
+    image.save(file, "PNG")
 
 
 def expect_failure(fn, text: str, output: Path, parent: Path) -> None:
@@ -99,9 +102,33 @@ def assert_stable_read_exhaustion(file: Path) -> None:
         preview.time.sleep = real_sleep
 
 
+def assert_platform_identity_times() -> None:
+    fields = dict(st_dev=1, st_ino=2, st_mode=0o100600, st_nlink=1,
+                  st_size=10, st_mtime_ns=200, st_ctime_ns=100, st_birthtime_ns=100)
+    path_stat = SimpleNamespace(**fields)
+    handle_stat = SimpleNamespace(**{**fields, "st_ctime_ns": 200})
+    platform = preview.sys.platform
+    try:
+        preview.sys.platform = "win32"
+        assert preview.same_identity(path_stat, handle_stat)
+        for field in ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size",
+                      "st_mtime_ns", "st_birthtime_ns"):
+            changed = SimpleNamespace(**{**vars(handle_stat), field: fields[field] + 1})
+            assert not preview.same_identity(path_stat, changed), field
+        preview.sys.platform = "linux"
+        assert not preview.same_identity(path_stat, handle_stat)
+    finally:
+        preview.sys.platform = platform
+
+
 def main() -> int:
+    assert_platform_identity_times()
     with tempfile.TemporaryDirectory(prefix="evavo-preview-contract-") as temporary:
         workspace = Path(temporary).resolve()
+        binary_source = workspace / "binary-control-bytes.bin"
+        binary_payload = b"before\x1aafter\r\nunchanged\x00"
+        binary_source.write_bytes(binary_payload)
+        assert preview.stable_bytes(binary_source, 100, "binary source") == binary_payload
         frame_a = workspace / "frame-a.png"
         frame_b = workspace / "frame-b.png"
         make_frame(frame_a, 64)
@@ -124,6 +151,12 @@ def main() -> int:
             plan_sha256=plan_sha,
             output_root=str(output),
         )
+        with Image.open(output / "animation-preview.gif") as animation:
+            for index in range(animation.n_frames):
+                animation.seek(index)
+                rgba = animation.convert("RGBA")
+                assert rgba.getpixel((0, 0))[3] == 0, "transparent GIF corner lost"
+                assert rgba.getpixel((4, 4))[3] == 255, "opaque GIF subject lost"
         if receipt["timingMode"] != "per-frame-or-fps-fallback":
             raise AssertionError("timing mode was not recorded")
         if receipt["defaultFrameDurationMs"] != 100:

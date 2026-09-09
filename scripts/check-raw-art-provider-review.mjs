@@ -33,13 +33,6 @@ const REVIEW_DOC = path.join(
   'docs',
   'RAW_ART_PROVIDER_REVIEW_AND_REPAIR.md',
 );
-const REVIEW_WORKFLOW = path.join(
-  path.dirname(ROOT),
-  '.github',
-  'workflows',
-  'raw-art-provider-review.yml',
-);
-
 const GAME_HEAD = 'a'.repeat(40);
 const QUEUE_SHA = 'b'.repeat(64);
 const CAMPAIGN_SHA = 'c'.repeat(64);
@@ -679,7 +672,6 @@ async function main() {
 
     const moduleSource = fs.readFileSync(REVIEW_MODULE, 'utf8');
     const docSource = fs.readFileSync(REVIEW_DOC, 'utf8');
-    const workflowSource = fs.readFileSync(REVIEW_WORKFLOW, 'utf8');
     assert.match(moduleSource, /requiresFreshAdmission: true/u);
     assert.match(moduleSource, /requiresFreshExecutionAuthorization: true/u);
     assert.match(moduleSource, /independentApprovalPerformed: false/u);
@@ -688,8 +680,6 @@ async function main() {
     assert.doesNotMatch(moduleSource, /targetRepositoryMutation: true/u);
     assert.doesNotMatch(moduleSource, /publication: true/u);
     assert.match(docSource, /ComfyUI/u);
-    assert.match(workflowSource, /check-raw-art-provider-review\.mjs/u);
-    assert.match(workflowSource, /pnpm check/u);
 
     process.stdout.write(
       [

@@ -58,13 +58,15 @@ function bigintText(value) {
 
 function fingerprint(value) {
   return {
-    dev: bigintText(value.dev),
+    dev: bigintText(process.platform === "win32" ? 0n : value.dev),
     ino: bigintText(value.ino),
     mode: bigintText(value.mode),
     nlink: bigintText(value.nlink),
     size: bigintText(value.size),
     mtimeNs: bigintText(value.mtimeNs),
-    ctimeNs: bigintText(value.ctimeNs),
+    // Windows path and handle stats expose incompatible ctime semantics.
+    // Normalize identity to the shared creation/birth timestamp there.
+    ctimeNs: bigintText(process.platform === "win32" ? value.birthtimeNs : value.ctimeNs),
     birthtimeNs: bigintText(value.birthtimeNs),
   };
 }

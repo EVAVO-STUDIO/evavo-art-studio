@@ -14,7 +14,6 @@ const files = new Map(
       "docs/COMFYUI_PROVIDER_ADAPTER.md",
       "docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md",
       ".env.example",
-      ".github/workflows/comfyui-provider-adapter.yml",
       "package.json",
     ].map(async (file) => [file, await readFile(file, "utf8")]),
   ),
@@ -111,12 +110,6 @@ requireTokens("docs/COMFYUI_PROVIDER_ADAPTER.md", [
   "matching animation frames",
   "retainedByProvider: true",
   "uploaded `input` object back through `view`",
-]);
-requireTokens(".github/workflows/comfyui-provider-adapter.yml", [
-  "pnpm install --frozen-lockfile",
-  "Run governed ComfyUI adapter regressions",
-  "Run complete Art Studio validation",
-  "Verify immutable lockfile and clean source",
 ]);
 requireTokens("package.json", [
   "provider:comfyui:catalog:compile",

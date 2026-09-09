@@ -34,15 +34,25 @@ import {
   withLoopHash,
 } from "./art-production-loop-state.js";
 
+// Production loops are recursively frozen. Remember only exact object identities
+// that this process compiled or fully replay-verified; deserialized/untrusted loops
+// still take the complete deterministic verification path below.
+const verifiedLoopObjects = new WeakSet<object>();
+
+function rememberVerifiedLoop(loop: ArtProductionLoop): ArtProductionLoop {
+  verifiedLoopObjects.add(loop);
+  return loop;
+}
+
 export function compileArtProductionLoop(
   plan: CompiledLayeredProductionPlan,
   profileInput: unknown,
 ): ArtProductionLoop {
   verifyLayeredProductionPlan(plan);
   const profile = validateArtProductionProfile(profileInput, plan);
-  return withLoopHash(
+  return rememberVerifiedLoop(withLoopHash(
     loopPayload(plan, profile, initialUnitStates(plan, profile), []),
-  );
+  ));
 }
 
 function applyAttemptInternal(
@@ -109,7 +119,11 @@ function applyAttemptInternal(
       : undefined;
   const states = refreshStatuses(nextStates, scope);
   const attempts = freeze([...loop.attempts, attempt]);
-  return withLoopHash(loopPayload(plan, loop.profile, states, attempts));
+  const next = withLoopHash(loopPayload(plan, loop.profile, states, attempts));
+  if (verifyCurrent || verifiedLoopObjects.has(loop)) {
+    rememberVerifiedLoop(next);
+  }
+  return next;
 }
 
 export function evaluateArtProductionAttempt(
@@ -196,6 +210,11 @@ export function verifyArtProductionLoop(
   plan: CompiledLayeredProductionPlan,
   loop: ArtProductionLoop,
 ): true {
+  if (
+    verifiedLoopObjects.has(loop) &&
+    loop.planId === plan.planId &&
+    loop.planSha256 === plan.planSha256
+  ) return true;
   verifyLayeredProductionPlan(plan);
   if (
     loop.schemaVersion !== "1.0" ||
@@ -264,6 +283,7 @@ export function verifyArtProductionLoop(
       },
     );
   }
+  rememberVerifiedLoop(loop);
   return true;
 }
 

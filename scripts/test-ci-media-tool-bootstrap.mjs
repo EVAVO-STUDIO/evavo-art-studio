@@ -41,6 +41,11 @@ async function exists(filePath) {
   }
 }
 
+const hostedCiTest =
+  process.platform !== "win32" && (await exists(MAINLINE_WORKFLOW))
+    ? test
+    : test.skip;
+
 async function mediaTool(filePath, label) {
   await executable(
     filePath,
@@ -123,7 +128,7 @@ exec "$@"`,
   );
 }
 
-test("media bootstrap reuses validated preinstalled tools without apt", async (t) => {
+hostedCiTest("media bootstrap reuses validated preinstalled tools without apt", async (t) => {
   const paths = await fixture(t, "evavo-ci-media-fast-");
   const aptMarker = path.join(paths.root, "apt-called");
   await mediaTool(paths.ffmpeg, "ffmpeg");
@@ -155,7 +160,7 @@ exit 90
   assert.match(output, /ART_STUDIO_FFPROBE_SHA256=[0-9a-f]{64}/);
 });
 
-test("media bootstrap retries bounded apt work through an independent official Ubuntu source list", async (t) => {
+hostedCiTest("media bootstrap retries bounded apt work through an independent official Ubuntu source list", async (t) => {
   const paths = await fixture(t, "evavo-ci-media-retry-");
   const updateCount = path.join(paths.root, "update-count");
   const installCount = path.join(paths.root, "install-count");
@@ -240,7 +245,7 @@ exit 91
   );
 });
 
-test("media bootstrap fails after the configured bounded attempts", async (t) => {
+hostedCiTest("media bootstrap fails after the configured bounded attempts", async (t) => {
   const paths = await fixture(t, "evavo-ci-media-failure-");
   const updateCount = path.join(paths.root, "update-count");
   await writeForwarders(paths);
@@ -272,7 +277,7 @@ exit 92
   assert.equal(await exists(paths.ffprobe), false);
 });
 
-test("media bootstrap rejects an unreadable explicit direct source list", async (t) => {
+hostedCiTest("media bootstrap rejects an unreadable explicit direct source list", async (t) => {
   const paths = await fixture(t, "evavo-ci-media-source-list-");
   await writeForwarders(paths);
   await executable(paths.aptGet, "#!/usr/bin/env bash\nexit 92\n");
@@ -292,7 +297,7 @@ test("media bootstrap rejects an unreadable explicit direct source list", async 
   assert.match(result.stderr, /CI_MEDIA_APT_DIRECT_SOURCE_LIST is not readable/);
 });
 
-test("critical workflows permanently use the bounded bootstrap contract", async () => {
+hostedCiTest("critical workflows permanently use the bounded bootstrap contract", async () => {
   const [mainline, bookArt, workflow, bootstrap] = await Promise.all([
     readFile(MAINLINE_WORKFLOW, "utf8"),
     readFile(BOOK_ART_WORKFLOW, "utf8"),

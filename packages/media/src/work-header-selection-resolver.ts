@@ -106,7 +106,7 @@ export function resolveWorkHeaderSelection(spec: WorkHeaderSelectionResolverSpec
     contract: WORK_HEADER_SELECTION_RESOLVER_CONTRACT,
     candidateReviewEvidenceSha256: reviewEvidenceSha256,
     currentHeaderVisualScore: currentVisualScore,
-    currentHeaderTechnicalScore,
+    currentHeaderTechnicalScore: currentTechnicalScore,
     semanticBriefProvided,
     critiqueHashBindingVerified: true,
     reviewEvidenceHashBindingVerified: true,

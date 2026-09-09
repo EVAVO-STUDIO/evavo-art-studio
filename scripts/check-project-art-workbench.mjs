@@ -46,7 +46,6 @@ const relativeFiles = [
   'docs/PROJECT_ART_CHAT_INTAKE_AND_ATLASES.md',
   'docs/TRANSPARENCY_PRODUCTION_STANDARD.md',
   'docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md',
-  '.github/workflows/project-art-workbench.yml',
   'package.json',
 ];
 const contents = new Map();
@@ -94,12 +93,14 @@ const expectedOperations = [
   'alpha-clean',
   'chroma-to-alpha',
   'component-prune',
+  'repack-alpha-components',
   'rect-clear',
   'rect-fill',
   'clone-stamp',
   'alpha-premultiply',
   'alpha-unpremultiply',
   'connected-matte-to-alpha',
+  'matte-colour-to-alpha',
   'edge-decontaminate',
   'hidden-rgb-rebuild',
   'palette-normalize',
@@ -425,19 +426,6 @@ const sourceAssertions = {
     'No creative approval',
     'No source, provider, repository, Git, deployment or publication authority',
   ],
-  '.github/workflows/project-art-workbench.yml': [
-    'PROJECT_ART_REQUIRE_PILLOW: "1"',
-    'PROJECT_ART_REQUIRE_PROVIDER_VALIDATION: "1"',
-    'Verify persistent Artist Workspace contracts and regressions',
-    'Run professional mastering and keyframed motion adversary',
-    'pnpm run project-art:workspace:persistent:check',
-    'pnpm run project-art:mastering:check',
-    'Run callable project-art workspace MCP regressions',
-    'credentialsForwardedToSubprocess: false',
-    'pnpm run build:domain',
-    'pnpm check',
-    'git diff --exit-code',
-  ],
 };
 for (const [relative, tokens] of Object.entries(sourceAssertions)) {
   const source = contents.get(relative);
@@ -508,7 +496,7 @@ const expectedScripts = {
   'project-art:workspace:persistent:check': 'node scripts/check-persistent-artist-workspace.mjs && node scripts/test-persistent-artist-workspace.mjs',
   'project-art:eva-source-repair:check': 'node scripts/check-project-art-eva-source-repair-intake.mjs && node --test scripts/test-project-art-eva-source-repair-intake.mjs scripts/test-project-art-eva-source-repair-candidate-assurance.mjs',
   'project-art:eva-source-repair:assurance': 'node scripts/compile-project-art-eva-source-repair-candidate-assurance.mjs',
-  'project-art:mastering:check': 'node scripts/check-project-art-mastering-and-motion.mjs && node scripts/test-project-art-mastering-and-motion.mjs',
+  'project-art:mastering:check': 'node scripts/check-project-art-mastering-and-motion.mjs && node scripts/test-project-art-mastering-and-motion.mjs && python -m unittest scripts/test_project_art_granular_edits.py',
   'project-art:check': 'node scripts/check-project-art-workbench.mjs && node scripts/test-project-art-workbench.mjs && pnpm run project-art:avatar-assurance:check && pnpm run project-art:avatar-animation:check && pnpm run project-art:eva-source-repair:check && pnpm run project-art:mastering:check && pnpm run project-art:workspace:persistent:check && pnpm run project-art:loop:check && pnpm run project-art:workspace:mcp:check',
 };
 for (const [name, command] of Object.entries(expectedScripts)) {

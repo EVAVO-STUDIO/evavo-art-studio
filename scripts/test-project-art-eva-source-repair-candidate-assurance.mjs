@@ -295,7 +295,9 @@ test('unbound file primitive is stable, single-link, permission-restricted and c
       JSON.parse(readFileSync(outputPath, 'utf8')).assuranceSha256,
       result.assurance.assuranceSha256,
     );
-    assert.equal(statSync(outputPath).mode & 0o777, 0o600);
+    if (process.platform !== 'win32') {
+      assert.equal(statSync(outputPath).mode & 0o777, 0o600);
+    }
     assert.throws(
       () => inspectEvaSourceRepairCandidateUnboundFileForTesting(fileOptions),
       (error) => error?.code === 'EEXIST',

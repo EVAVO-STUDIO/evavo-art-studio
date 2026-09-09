@@ -51,6 +51,14 @@ def valid_sha256(value: Any) -> bool:
 
 
 def same_identity(left: os.stat_result, right: os.stat_result) -> bool:
+    # Windows Python 3.12+ can expose creation time through lstat().st_ctime
+    # but change time through fstat().st_ctime. Birth time has consistent
+    # semantics across both calls; retain ctime checks on other platforms.
+    left_identity_time = left.st_ctime_ns
+    right_identity_time = right.st_ctime_ns
+    if sys.platform == "win32":
+        left_identity_time = getattr(left, "st_birthtime_ns", left_identity_time)
+        right_identity_time = getattr(right, "st_birthtime_ns", right_identity_time)
     return (
         left.st_dev == right.st_dev
         and left.st_ino == right.st_ino
@@ -58,7 +66,7 @@ def same_identity(left: os.stat_result, right: os.stat_result) -> bool:
         and left.st_nlink == right.st_nlink
         and left.st_size == right.st_size
         and left.st_mtime_ns == right.st_mtime_ns
-        and left.st_ctime_ns == right.st_ctime_ns
+        and left_identity_time == right_identity_time
     )
 
 
@@ -72,7 +80,9 @@ def _stable_bytes_once(file: Path, maximum: int, label: str) -> bytes:
         or before.st_size > maximum
     ):
         fail(f"{label} must be a bounded ordinary file")
-    descriptor = os.open(file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    descriptor = os.open(
+        file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    )
     try:
         opened = os.fstat(descriptor)
         if not same_identity(before, opened):
@@ -289,12 +299,16 @@ def render_preview(
                 image,
                 ((cell_width - image.width) // 2, (cell_height - image.height) // 2),
             )
-            gif_frames.append(
-                frame.resize(
-                    (cell_width * scale, cell_height * scale),
-                    Image.Resampling.NEAREST,
-                ).convert("P", palette=Image.Palette.ADAPTIVE, colors=255)
+            scaled = frame.resize(
+                (cell_width * scale, cell_height * scale), Image.Resampling.NEAREST
             )
+            # Reserve index 255 explicitly: adaptive quantization does not
+            # guarantee that transparent input pixels receive that index.
+            paletted = scaled.convert("RGB").quantize(colors=255)
+            if background == "transparent":
+                transparent = scaled.getchannel("A").point(lambda alpha: 255 if alpha < 128 else 0)
+                paletted.paste(255, mask=transparent)
+            gif_frames.append(paletted)
 
         gif_path = staging / "animation-preview.gif"
         gif_frames[0].save(
@@ -350,7 +364,9 @@ def render_preview(
         }
         receipt_bytes = (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode("utf-8")
         receipt_path = staging / "receipt.json"
-        descriptor = os.open(receipt_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        descriptor = os.open(
+            receipt_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600
+        )
         try:
             offset = 0
             while offset < len(receipt_bytes):

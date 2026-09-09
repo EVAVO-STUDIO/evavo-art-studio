@@ -50,7 +50,10 @@ export async function rasterizeFxResidueSvgCandidate(
   const source = Buffer.isBuffer(svg) ? svg : Buffer.from(svg, "utf8");
   if (!source.byteLength || source.byteLength > 16 * 1024 * 1024) throw new Error("FX residue SVG input size is invalid.");
 
-  const initial = await sharp(source, { density: 192, failOn: "error", limitInputPixels: width * height * 4 })
+  // The authored SVG has an explicit delivery canvas. Decode it at CSS pixel
+  // density so the input-pixel guard describes the real requested canvas;
+  // supersampling here would silently exceed that bounded contract.
+  const initial = await sharp(source, { density: 72, failOn: "error", limitInputPixels: width * height * 4 })
     .resize(width, height, { fit: "fill" })
     .ensureAlpha()
     .png({ compressionLevel: 9, adaptiveFiltering: false, palette: false })

@@ -85,7 +85,8 @@ export async function detectImageArtifactSignals(encoded: Buffer, spec: ImageArt
       const lum = luma(raw[i]!, raw[i + 1]!, raw[i + 2]!);
       lumaSum += lum;
       lumaSq += lum * lum;
-      bins[Math.max(0, Math.min(255, Math.round(lum)))] += 1;
+      const bin = Math.max(0, Math.min(255, Math.round(lum)));
+      bins[bin] = bins[bin]! + 1;
 
       if (x > 0 && x + 1 < width && visible(x - 1, y) && visible(x + 1, y)) {
         const left = sampleLuma(x - 1, y);

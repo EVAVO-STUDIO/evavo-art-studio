@@ -106,8 +106,8 @@ export function registerLornaLocalAcceptanceTool(server: McpServer): void {
             env: process.env,
           },
         );
-        let stdout = Buffer.alloc(0);
-        let stderr = Buffer.alloc(0);
+        let stdout: Buffer = Buffer.alloc(0);
+        let stderr: Buffer = Buffer.alloc(0);
         child.stdout.on("data", (chunk: Buffer) => {
           stdout = appendBounded(stdout, Buffer.from(chunk));
         });

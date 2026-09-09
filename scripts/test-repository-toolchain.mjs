@@ -43,6 +43,7 @@ const discoverWorkflows = () =>
 
 const files = [
   ".nvmrc",
+  ".github/workflows/README.md",
   "README.md",
   "evavo.reliability.json",
   "package.json",
@@ -154,11 +155,11 @@ try {
 
   reset();
   mutateText("pnpm-lock.yaml", (value) => {
-    const candidate = ["  apps/api:", "  'apps/api':", '  "apps/api":'].find((line) =>
-      value.includes(`${line}\n`),
+    const candidate = value.split(/\r?\n/u).find((line) =>
+      ["  apps/api:", "  'apps/api':", '  "apps/api":'].includes(line),
     );
     assert.ok(candidate, "lockfile fixture must contain the apps/api importer");
-    return value.replace(`${candidate}\n`, `${candidate.replace("apps/api", "apps/api-missing")}\n`);
+    return value.replace(candidate, candidate.replace("apps/api", "apps/api-missing"));
   });
   expectFailure(run(), "workspace importer drift must fail");
 
@@ -196,6 +197,7 @@ try {
   });
   expectFailure(run(), "floating latest dependency must fail");
 
+  if (discoverWorkflows().length > 0) {
   reset();
   mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "pnpm install --frozen-lockfile", "pnpm install --no-frozen-lockfile"),
@@ -396,6 +398,11 @@ try {
     ),
   );
   expectFailure(run(), "floating artifact action must fail");
+  } else {
+    reset();
+    writeFileSync(path.join(fixtureRoot, ".github/workflows/forbidden.yml"), "name: forbidden\n", "utf8");
+    expectFailure(run(), "active workflow YAML must fail under zero-cost policy");
+  }
 
   reset();
   mutateJson("evavo.reliability.json", (value) => {

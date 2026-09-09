@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const cwd = new URL("..", import.meta.url);
@@ -37,7 +38,7 @@ test("compiles the example into continuity blueprints", () => {
   const input = new URL("../../../examples/game-art-brief.json", import.meta.url);
   const result = spawnSync(
     process.execPath,
-    ["dist/index.js", "plan", "--input", input.pathname],
+    ["dist/index.js", "plan", "--input", fileURLToPath(input)],
     { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
   );
   assert.equal(result.status, 0, result.stderr);

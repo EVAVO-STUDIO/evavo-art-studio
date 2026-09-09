@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WORKFLOW_ROOT = path.join(ROOT, ".github/workflows");
+const hostedWorkflowTest = (await readdir(WORKFLOW_ROOT, { withFileTypes: true })).some(
+  (entry) => entry.isFile() && /\.ya?ml$/u.test(entry.name),
+) ? test : test.skip;
 const SHARED_BOOTSTRAP = "bash scripts/bootstrap-ci-media-tools.sh";
 const PINNED_PYTHON_ACTION =
   "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97";
@@ -121,7 +124,7 @@ function scalarInput(step, key) {
   return step.match(pattern)?.[1] ?? null;
 }
 
-test("workflows never perform unbounded apt or direct FFmpeg installation", async () => {
+hostedWorkflowTest("workflows never perform unbounded apt or direct FFmpeg installation", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
     for (const pattern of FORBIDDEN_PATTERNS) {
@@ -137,7 +140,7 @@ test("workflows never perform unbounded apt or direct FFmpeg installation", asyn
   );
 });
 
-test("workflow runner and action identities are immutable", async () => {
+hostedWorkflowTest("workflow runner and action identities are immutable", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
     const floatingRunners = [...workflow.source.matchAll(FLOATING_HOSTED_RUNNER)].map(
@@ -164,7 +167,7 @@ test("workflow runner and action identities are immutable", async () => {
   );
 });
 
-test("Node and Python setup actions select exact patch releases", async () => {
+hostedWorkflowTest("Node and Python setup actions select exact patch releases", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
     for (const step of workflowSteps(workflow.source)) {
@@ -194,7 +197,7 @@ test("Node and Python setup actions select exact patch releases", async () => {
   );
 });
 
-test("checkout credentials are disabled except for exact reviewed publishers", async () => {
+hostedWorkflowTest("checkout credentials are disabled except for exact reviewed publishers", async () => {
   const workflows = await workflowSources();
   const sources = new Map(workflows.map((workflow) => [workflow.path, workflow.source]));
   const persistedCounts = new Map();
@@ -255,7 +258,7 @@ test("checkout credentials are disabled except for exact reviewed publishers", a
   );
 });
 
-test("critical media workflows use the shared bounded bootstrap", async () => {
+hostedWorkflowTest("critical media workflows use the shared bounded bootstrap", async () => {
   const required = new Set([
     ".github/workflows/artifact-descriptor-integrity.yml",
     ".github/workflows/artifact-json-canonicalization.yml",
@@ -288,7 +291,7 @@ test("critical media workflows use the shared bounded bootstrap", async () => {
   );
 });
 
-test("complete-validation workflows install the exact Python image backend", async () => {
+hostedWorkflowTest("complete-validation workflows install the exact Python image backend", async () => {
   const violations = [];
   for (const workflow of await workflowSources()) {
     const validationIndex = workflow.source.indexOf("pnpm check");

@@ -2,15 +2,15 @@
   "schema": "evavo.animation-pipeline-doctor-lock.v1",
   "implementationVersion": "1.0.0",
   "publicPath": "tools/animation_pipeline_doctor_v1.mjs",
-  "publicSha256": "sha256:PLACEHOLDER",
+  "publicSha256": "sha256:434611a99d20659abf3e435e6ff09b75afa4bd6d7151312dd10d905bd92b8634",
   "internalPath": "tools/animation_pipeline_doctor_v1_internal.mjs",
-  "internalSha256": "sha256:PLACEHOLDER",
+  "internalSha256": "sha256:deb43400dba5b2bf4851487acbb430f8d173d35a957218f9959714451bf32e65",
   "mcpPath": "tools/animation_pipeline_doctor_v1_mcp.mjs",
-  "mcpSha256": "sha256:PLACEHOLDER",
+  "mcpSha256": "sha256:1bb8c189233505a71205e7bb13f2d4869cd62c2724a3710397a167add85f7e9a",
   "cliPath": "tools/animation_pipeline_doctor_v1_cli.mjs",
-  "cliSha256": "sha256:PLACEHOLDER",
+  "cliSha256": "sha256:92f411b79d3bcb1144bdfb70d7235c55f68474dc09814004a5eba56f342a4f74",
   "testPath": "scripts/test-animation-pipeline-doctor-v1.mjs",
-  "testSha256": "sha256:PLACEHOLDER",
+  "testSha256": "sha256:001b574df80673c8e6c924292f527a1b2833d1dd6850604769c62bca394d256c",
   "documentationPath": "docs/ANIMATION_PIPELINE_DOCTOR_V1.md",
-  "documentationSha256": "sha256:PLACEHOLDER"
+  "documentationSha256": "sha256:43ef9265c24e2b728ac9ce0ceae0069beb5e70863d23f594188ea616ad296005"
 }

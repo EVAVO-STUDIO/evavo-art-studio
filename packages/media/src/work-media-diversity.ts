@@ -160,7 +160,14 @@ function cleanImage(input: WorkMediaDiversityInput): WorkMediaDiversityInput {
   if (route !== undefined && route !== "" && !/^\/work\/[a-z0-9-]+$/u.test(route)) throw new Error(`Work media item ${id} has an invalid route.`);
   const role = input.role ?? "other";
   if (!ROLES.has(role)) throw new Error(`Work media item ${id} has an invalid role.`);
-  return Object.freeze({ id, image: input.image, role, route: route || undefined, story: cleanStory(input.story, id) });
+  const story = cleanStory(input.story, id);
+  return Object.freeze({
+    id,
+    image: input.image,
+    role,
+    ...(route ? { route } : {}),
+    ...(story ? { story } : {}),
+  });
 }
 
 function clustersFromPairs(ids: readonly string[], linkedPairs: readonly [string, string][]): readonly (readonly string[])[] {

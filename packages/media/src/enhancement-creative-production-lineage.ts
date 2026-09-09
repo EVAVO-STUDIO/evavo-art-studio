@@ -153,7 +153,7 @@ export function admitEnhancementCreativeProductionLineage(input: EnhancementCrea
   if (!Number.isSafeInteger(input.candidateByteLength) || input.candidateByteLength < 1) throw new Error("candidateByteLength must be a positive safe integer.");
   const matches = manifest.files.filter((file) => file.path === candidateArtifactPath);
   if (matches.length !== 1) throw new Error("candidateArtifactPath must identify exactly one file in the Enhancement artifact manifest.");
-  const candidate = matches[0];
+  const candidate = matches[0]!;
   if (candidate.reviewOnly !== true || candidate.canonicalRuntimeAsset !== false) throw new Error("Enhancement candidate must remain review-only and non-canonical in the creative-production artifact manifest.");
   if (!candidate.mediaType.startsWith("image/")) throw new Error("Enhancement review candidate must be an image artifact.");
   const expectedCandidateDigest = `sha256:${admittedReview.candidateSha256}`;

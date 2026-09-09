@@ -20,11 +20,11 @@
     },
     {
       "path": "scripts/check-animation-character-family-v1.mjs",
-      "sha256": "sha256:6fa37dcfbc51c758c042b896bf9ff261c1bfe9d3efea647aa6ff8c0cfb92bbbd"
+      "sha256": "sha256:733331b4474671c9affe05b8f6383d904950a66a04a0f98b9ad427f9a5c39991"
     },
     {
       "path": "scripts/test-animation-character-family-v1.mjs",
-      "sha256": "sha256:74a66b651bbcdda904402db4160bcbf7d36f647b293243dd7492c1aa94559cc9"
+      "sha256": "sha256:4f9973fb83c718fdbac4bf5050f6511706c8522037fbba5035b47140028b5bcd"
     },
     {
       "path": "scripts/test-animation-character-family-v1-mcp.mjs",

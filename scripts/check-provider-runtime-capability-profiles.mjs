@@ -123,18 +123,4 @@ await includes("docs/governed-provider-candidates.md", [
   "requiredCapabilityProfile",
   "never combines identity support from one adapter",
 ]);
-await includes(".github/workflows/provider-control-capabilities.yml", [
-  "check-provider-runtime-capability-profiles.mjs",
-  "packages/runtime/src/**",
-  "packages/sprite-supervisor/src/**",
-]);
-await includes(".github/workflows/runtime-worker-options-integrity.yml", [
-  "worker-options-integrity-security.test.mjs",
-  "check-provider-runtime-capability-profiles.mjs",
-]);
-await includes(".github/workflows/runtime-claim-input-integrity.yml", [
-  "claim-input-integrity-security.test.mjs",
-  "check-provider-runtime-capability-profiles.mjs",
-]);
-
 console.log("Provider runtime capability-profile contract passed.");

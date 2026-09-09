@@ -48,13 +48,13 @@ const MAXIMUM_HANDOFF_ITEMS = 10_000;
 
 function fileSnapshot(metadata) {
   return {
-    device: metadata.dev,
+    device: process.platform === 'win32' ? 0 : metadata.dev,
     inode: metadata.ino,
     mode: metadata.mode,
     links: metadata.nlink,
     size: metadata.size,
     modifiedMs: metadata.mtimeMs,
-    changedMs: metadata.ctimeMs,
+    changedMs: process.platform === 'win32' ? metadata.birthtimeMs : metadata.ctimeMs,
   };
 }
 

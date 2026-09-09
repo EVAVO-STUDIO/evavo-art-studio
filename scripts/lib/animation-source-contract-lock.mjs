@@ -18,7 +18,7 @@ import {
 export const ANIMATION_SOURCE_CONTRACT_LOCK_SCHEMA =
   "evavo.animation-source-contract-lock.v1";
 export const ANIMATION_SOURCE_CONTRACT_SET_DIGEST =
-  "sha256:e8ea163a56364cf8fe40c61e9428f6861c891944f7e31f4ccb793f1a447b9314";
+  "sha256:79c702c56aaed2ed3c75b374406726e590c1f4875381cf15c51fb5877dafc512";
 export const ANIMATION_SOURCE_CONTRACT_LOCK_PATH =
   "contracts/animation-source-bundle-v1.lock.json";
 export const ANIMATION_SOURCE_CONTRACT_PATHS = Object.freeze([

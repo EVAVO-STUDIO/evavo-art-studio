@@ -583,7 +583,7 @@ async function main() {
       'verifyRawArtProviderExecutionRuntimeState',
       'createRawArtProviderExecutionAuthorizer',
       'RAW_ART_PROVIDER_EXECUTION_UNAUTHORIZED',
-      'requireRawArtExecutionAuthorization',
+      'requireProviderExecutionAuthorization',
       'restrictProviderRegistry',
     ]) {
       if (!`${executionSource}\n${handlerSource}`.includes(required)) {

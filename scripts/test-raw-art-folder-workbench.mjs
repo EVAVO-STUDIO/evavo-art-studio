@@ -62,6 +62,10 @@ function digest(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+const yellowIconPath = process.platform === 'win32'
+  ? 'ui-yellow/icon.png'
+  : 'ui/icon.png';
+
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), 'evavo-raw-art-folder-'));
   const raw = path.join(root, 'RAW_ART');
@@ -69,7 +73,7 @@ async function fixture() {
   const evidence = path.join(root, 'evidence');
   await mkdir(path.join(raw, 'characters'), { recursive: true });
   await mkdir(path.join(raw, 'UI'), { recursive: true });
-  await mkdir(path.join(raw, 'ui'), { recursive: true });
+  await mkdir(path.join(raw, path.dirname(yellowIconPath)), { recursive: true });
   await mkdir(workspace, { recursive: true });
   await mkdir(evidence, { recursive: true });
   const a = png(4, 4, [255, 0, 0, 255]);
@@ -78,7 +82,7 @@ async function fixture() {
   await writeFile(path.join(raw, 'characters', 'hero-frame-002.png'), b);
   await copyFile(path.join(raw, 'characters', 'hero-frame-001.png'), path.join(raw, 'characters', 'hero-duplicate.png'));
   await writeFile(path.join(raw, 'UI', 'Icon.png'), png(8, 8, [0, 0, 255, 255]));
-  await writeFile(path.join(raw, 'ui', 'icon.png'), png(8, 8, [255, 255, 0, 255]));
+  await writeFile(path.join(raw, ...yellowIconPath.split('/')), png(8, 8, [255, 255, 0, 255]));
   await writeFile(path.join(raw, 'README.txt'), 'source notes\n');
   return { root, raw, workspace, evidence };
 }
@@ -125,7 +129,7 @@ async function inventoryAndPlan(current) {
         destination: 'icon-blue.png',
         repositoryTarget: 'assets/ui/icons/icon-blue.png',
       }),
-      selection('ui/icon.png', 'atlas-frame', {
+      selection(yellowIconPath, 'atlas-frame', {
         groupId: 'ui-icons',
         destination: 'icon-yellow.png',
         repositoryTarget: 'assets/ui/icons/icon-yellow.png',
@@ -158,7 +162,7 @@ test('RAW_ART scan, reviewed plan, materialisation and independent verification 
     );
     assert.equal(inventory.sequenceCandidates.some((group) => group.paths.includes('characters/hero-frame-001.png')), true);
     assert.equal(inventory.atlasCandidates.some((group) => group.paths.includes('UI/Icon.png')), true);
-    assert.equal(inventory.caseCollisions.length, 1);
+    assert.equal(inventory.caseCollisions.length, process.platform === 'win32' ? 0 : 1);
     assert.equal(plan.operations.length, 6);
     assert.equal(plan.downstream.sequenceGroups.length, 1);
     assert.equal(plan.downstream.atlasGroups.length, 1);

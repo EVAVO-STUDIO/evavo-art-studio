@@ -708,7 +708,7 @@ function workOrder(profile, ledger, drawing, mode, references, repair, now) {
       exposureFrames: drawing.exposureFrames,
       durationMs: drawing.durationMs,
       dependencyDrawingIds: [...drawing.dependencyDrawingIds],
-      eventIds: [...drawing.eventIds],
+      eventIds: [...(drawing.eventIds ?? [])],
     },
     immutableLocks: {
       subject: clone(profile.request.subject),
