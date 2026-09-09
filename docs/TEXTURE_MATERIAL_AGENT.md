@@ -1,10 +1,10 @@
 # EVAVO Texture Material Agent
 
-The texture material agent turns individual texture-map checks into a governed material workflow for game assets such as walls, floors, furniture, doors, props and environment surfaces.
+The texture material workflow extends the canonical texture review agent from individual map checks into governed material-set validation and Godot-ready derived assets for walls, floors, furniture, doors, props and environment surfaces.
 
-## What it does
+## Canonical entrypoint
 
-The MCP entrypoint is `tools/texture_material_mcp.mjs`.
+Use `tools/texture_review_mcp.mjs` with the v1.2 contract in `config/texture-review-agent.capabilities.json`.
 
 It exposes:
 
@@ -13,18 +13,20 @@ It exposes:
 - `evavo_create_texture_tile_proof` — create-only 3x3 diagnostic proof for visually checking repeats and seams.
 - `evavo_pack_godot_orm_texture` — create-only lossless channel packing using `R=ambient occlusion`, `G=roughness`, `B=metallic` and `A=255`.
 
+There is intentionally one texture agent surface rather than separate review and material servers. Existing map-review callers keep their original tool names and environment configuration.
+
 ## Safety model
 
-Source textures are never overwritten. All derived writes are create-only and must remain inside `EVAVO_TEXTURE_MATERIAL_ALLOWED_ROOTS`.
+Source textures are never overwritten. All derived writes are create-only and must remain inside `EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS`.
 
 Writes require both:
 
-1. `EVAVO_TEXTURE_MATERIAL_ALLOW_WRITES=true`
+1. `EVAVO_TEXTURE_REVIEW_ALLOW_WRITES=true`
 2. `confirmLocalWrite=true` on that exact MCP call
 
 An existing output path is an error. Output and receipt paths must be distinct from source paths.
 
-Read-only review works without enabling writes.
+Read-only map and material-set review works without enabling writes.
 
 ## Godot material contract
 
@@ -57,7 +59,7 @@ For tileable assets, set `expectSeamless=true`. Numeric opposite-edge checks are
 
 By default, scalar inputs are validated before packing. Chromatic contamination is rejected rather than silently converted. A specific source channel (`r`, `g`, `b` or `a`) can be selected when the source is intentionally channel-packed; disabling strict scalar validation must be explicit.
 
-The packer performs no resizing and refuses mismatched source dimensions. Selected byte values are copied directly into the destination ORM channels.
+The packer performs no resizing and refuses mismatched source dimensions. Selected byte values are copied directly into the destination ORM channels. The packed output is reviewed as `orm-packed` before it is written.
 
 ## Recommended agent sequence
 
