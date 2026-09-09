@@ -12,7 +12,7 @@ const files = {
   tests: "scripts/test-foundation-media-plan.mjs",
   docs: "docs/foundation-kit-media-production.md",
   example: "examples/foundation-kit-media-plan-request.json",
-  workflow: ".github/workflows/foundation-media-plan-authority.yml",
+  workflow: "ops/github-actions-reference/workflows/foundation-media-plan-authority.yml",
 };
 
 const read = (relative, maximum = 1_500_000) => {
@@ -67,6 +67,10 @@ const run = (label, command, args, timeout = 60_000) => {
 };
 
 try {
+  const activeWorkflowFiles = fs.existsSync(path.join(root, ".github", "workflows"))
+    ? fs.readdirSync(path.join(root, ".github", "workflows")).filter((name) => /\.ya?ml$/iu.test(name))
+    : [];
+  if (activeWorkflowFiles.length > 0) errors.push("Foundation authority must remain local; active GitHub workflow YAML is forbidden");
   const source = Object.fromEntries(
     Object.entries(files).map(([name, relative]) => [name, read(relative)]),
   );
@@ -142,7 +146,7 @@ try {
     "create-only plan file",
   ]);
 
-  requireTokens("Foundation workflow", source.workflow, [
+  requireTokens("Inert Foundation workflow reference", source.workflow, [
     "name: Foundation Media Plan Authority",
     "ubuntu-24.04",
     "node-version: \"22.14.0\"",

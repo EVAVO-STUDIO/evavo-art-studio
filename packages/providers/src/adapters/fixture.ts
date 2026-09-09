@@ -260,7 +260,7 @@ export class FixtureImageProviderAdapter implements ProviderAdapter {
     return {
       adapterId: this.descriptor.id,
       model:
-        resolved.request.selection.preferredModel ??
+        resolved.request.selection?.preferredModel ??
         this.descriptor.models[0]!,
       externalId: `fixture:${resolved.request.requestId}`,
       outputs,

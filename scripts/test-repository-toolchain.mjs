@@ -72,7 +72,7 @@ const git = (arguments_, expectedStatus = 0) => {
 };
 
 const reset = () => {
-  rmSync(fixtureRoot, { recursive: true, force: true });
+  rmSync(fixtureRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 75 });
   mkdirSync(fixtureRoot, { recursive: true });
   for (const relativePath of files) {
     const target = path.join(fixtureRoot, relativePath);
@@ -440,5 +440,5 @@ try {
     "- committed lock identity, exact workspace importers, frozen installs, exact Python/Pillow evidence, exact-main receipts and capability drift fail closed",
   );
 } finally {
-  rmSync(temporaryRoot, { recursive: true, force: true });
+  rmSync(temporaryRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 75 });
 }

@@ -298,7 +298,7 @@ input.on("line", (line) => {
   chain = chain.then(async () => {
     let request;
     try { request = JSON.parse(line); } catch {
-      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })\n`);
+      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })}\n`);
       return;
     }
     const response = await dispatch(request);

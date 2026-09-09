@@ -140,7 +140,7 @@ const resolveDirectory = (value, label) => {
 };
 
 const sameIdentity = (left, right) =>
-  left.dev === right.dev &&
+  (process.platform === "win32" || left.dev === right.dev) &&
   left.ino === right.ino &&
   left.size === right.size &&
   left.mtimeMs === right.mtimeMs;

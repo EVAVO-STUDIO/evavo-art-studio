@@ -13,7 +13,7 @@ const files = {
   productionContractTests:
     "scripts/test-foundation-delivery-production-contract.mjs",
   docs: "docs/foundation-kit-media-delivery-manifest.md",
-  workflow: ".github/workflows/foundation-media-delivery-authority.yml",
+  workflow: "ops/github-actions-reference/workflows/foundation-media-delivery-authority.yml",
   package: "package.json",
   deliveryManifest: "packages/delivery-optimizer/dist/manifest.js",
 };
@@ -71,6 +71,10 @@ const run = (label, command, args, options = {}) => {
 };
 
 try {
+  const activeWorkflowFiles = fs.existsSync(path.join(root, ".github", "workflows"))
+    ? fs.readdirSync(path.join(root, ".github", "workflows")).filter((name) => /\.ya?ml$/iu.test(name))
+    : [];
+  if (activeWorkflowFiles.length > 0) errors.push("Foundation delivery authority must remain local; active GitHub workflow YAML is forbidden");
   const source = Object.fromEntries(
     Object.entries(files).map(([name, relative]) => [name, read(relative)]),
   );
@@ -173,7 +177,7 @@ try {
     "EVAVO Development Studio",
   ]);
 
-  requireTokens("Foundation delivery workflow", source.workflow, [
+  requireTokens("Inert Foundation delivery workflow reference", source.workflow, [
     "name: Foundation Media Delivery Authority",
     "scripts/test-foundation-delivery-production-contract.mjs",
     "production-mixed-image-audio-contract-compatibility",
