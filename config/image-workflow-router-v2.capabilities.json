@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2.0",
   "id": "evavo-image-workflow-router-v2",
-  "purpose": "Authoritative read-only image workflow discovery/routing for ChatGPT, Claude, Codex and compatible agents across review, repair, sequences, delivery, finalization, textures, Godot and effects.",
+  "purpose": "Authoritative read-only image workflow discovery/routing for ChatGPT, Claude, Codex and compatible agents across review, repair, sequences, provenance, delivery, finalization, textures, Godot and effects.",
   "entrypoint": "tools/image_workflow_router_v2_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
@@ -42,6 +42,7 @@
     "evavo-image-sequence-finishing",
     "evavo-image-reference-consistency",
     "evavo-image-artifact-triage",
+    "evavo-image-provenance",
     "evavo-image-delivery-integrity",
     "evavo-image-finalization",
     "evavo-image-repair",
