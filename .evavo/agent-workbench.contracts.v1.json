@@ -19,7 +19,10 @@
     "mcp": "scripts/agent-workbench-mcp.mjs",
     "mcpSmoke": "scripts/test-agent-workbench-mcp.mjs",
     "mcpV2": "scripts/agent-workbench-mcp-v2.mjs",
-    "mcpV2Smoke": "scripts/test-agent-workbench-mcp-v2.mjs"
+    "mcpV2Smoke": "scripts/test-agent-workbench-mcp-v2.mjs",
+    "mcpRegistration": "scripts/agent-workbench-mcp-registration.mjs --write",
+    "mcpRegistrationCheck": "scripts/agent-workbench-mcp-registration.mjs --check",
+    "mcpRegistrationTest": "scripts/test-agent-workbench-mcp-registration.mjs"
   },
   "truthBoundary": {
     "discoveryAuthorizesExecution": false,
@@ -32,6 +35,8 @@
     "mcpAuthorizesMutation": false,
     "mcpV2AuthorizesExecution": false,
     "mcpV2AuthorizesMutation": false,
+    "registrationExecutesServer": false,
+    "registrationAuthorizesEffects": false,
     "downstreamAdmissionRequired": true
   },
   "repository": "EVAVO-STUDIO/evavo-art-studio",
