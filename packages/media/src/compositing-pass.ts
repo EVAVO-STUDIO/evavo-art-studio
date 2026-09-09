@@ -1,6 +1,7 @@
 import sharp, {
   type OverlayOptions,
   type ResizeOptions,
+  type Sharp,
 } from "sharp";
 import { applyRasterMatte } from "./raster-matte.js";
 
@@ -216,7 +217,7 @@ export async function composeRasterLayers(
 
   let canvasWidth: number;
   let canvasHeight: number;
-  let composition: sharp.Sharp;
+  let composition: Sharp;
   const operations: string[] = [];
   const overlays: OverlayOptions[] = [];
 

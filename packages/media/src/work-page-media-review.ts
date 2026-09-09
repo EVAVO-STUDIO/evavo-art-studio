@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 import { compareImageSimilarity } from "./image-similarity.js";
 import { reviewExistingImageQuality } from "./existing-image-quality-review.js";
 import { reviewWorkHeaderImage } from "./work-header-quality.js";
@@ -56,7 +56,7 @@ async function stackPanels(panels: readonly Buffer[]): Promise<Buffer> {
   const width = Math.max(...metas.map((meta) => meta.width ?? 1));
   const height = metas.reduce((sum, meta) => sum + (meta.height ?? 0), 0) + gap * Math.max(0, panels.length - 1);
   let top = 0;
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: OverlayOptions[] = [];
   for (let index = 0; index < panels.length; index += 1) {
     composites.push({ input: panels[index], left: 0, top });
     top += (metas[index]?.height ?? 0) + gap;

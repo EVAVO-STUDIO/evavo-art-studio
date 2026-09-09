@@ -120,28 +120,26 @@ export async function orchestrateImageReview(
   });
   const finishingPlan = planExistingImageFinishing(defects.evidence, defectRegions, { profile: inferred.profile });
   const header = context.intendedRole === "work-header"
-    ? (await reviewWorkHeaderImage(encoded, { profile: inferred.profile })).evidence
+    ? (await reviewWorkHeaderImage(encoded)).evidence
     : undefined;
   const similarity = await Promise.all((context.compareAgainst ?? []).slice(0, 32).map(async (reference) => {
     const comparison = await compareImageSimilarity(encoded, reference.image);
     return Object.freeze({ id: reference.id, ...comparison });
   }));
   const blockers = [
-    ...quality.blockers,
-    ...defects.evidence.blockers,
-    ...finishingPlan.blockers,
-    ...artifactSignals.blockers,
-    ...generatedDetailRisk.blockers,
-    ...(header?.blockers ?? []),
+    ...(quality.grade === "fail" ? quality.issues : []),
+    ...(defects.evidence.suggestedAction === "manual-review" ? ["defect-mask-requires-manual-review"] : []),
+    ...(finishingPlan.route === "manual-review" ? finishingPlan.reasonCodes : []),
+    ...(header?.grade === "fail" ? header.issues : []),
     ...similarity.filter((item) => item.recommendation === "reject-duplicate").map((item) => `near-duplicate:${item.id}`),
   ];
   const warnings = [
-    ...quality.warnings,
-    ...defects.evidence.warnings,
-    ...finishingPlan.warnings,
+    ...(quality.grade === "warn" ? quality.issues : []),
+    ...(defects.evidence.defectPixels > 0 && defects.evidence.suggestedAction !== "manual-review" ? [`detected-defect-pixels:${defects.evidence.defectPixels}`] : []),
+    ...(finishingPlan.route !== "no-op" && finishingPlan.route !== "manual-review" ? finishingPlan.reasonCodes : []),
     ...artifactSignals.warnings,
     ...generatedDetailRisk.warnings,
-    ...(header?.warnings ?? []),
+    ...(header?.grade === "warn" ? header.issues : []),
     ...similarity.filter((item) => item.recommendation === "review-similarity").map((item) => `review-similarity:${item.id}`),
   ];
   const decision = blockers.length > 0
@@ -164,7 +162,7 @@ export async function orchestrateImageReview(
     warnings: Object.freeze(warnings),
     visualReviewRequired: true,
     visualChecklist: Object.freeze([
-      ...profile.visualChecklist,
+      ...profile.visualChecks,
       "Confirm the image is compositionally correct and appropriate for its intended role.",
       "Confirm faces, hands, text, logos and repeated structures are semantically correct where present.",
       "Confirm any repair preserves approved content rather than inventing replacement detail.",
