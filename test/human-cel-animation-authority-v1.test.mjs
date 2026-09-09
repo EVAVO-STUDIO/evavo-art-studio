@@ -42,20 +42,35 @@ function request(overrides = {}) {
 
 test("compiles strict human cel authority for cel animation requests", () => {
   const authority = compileHumanCelAnimationAuthority(request());
+  assert.equal(authority.protocolVersion, "2026-09-09.6");
   assert.equal(authority.authority.mode, "human-cel-authored");
+  assert.equal(authority.authority.performanceActing, "strict");
   assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
   assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
   assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
-  assert.equal(authority.authority.requiredApprovalPath, "reviewHumanCelArtefact");
+  assert.equal(authority.authority.canonicalApprovalHelper, "reviewHumanCelArtefact");
+  assert.equal(
+    authority.authority.requiredPersistenceGate,
+    "strict-human-cel-promotion-receipt-gate",
+  );
   assert.equal(authority.authority.requiresExactProductionAuthority, true);
   assert.equal(authority.authority.requiresCandidateEnvelopeProvenance, true);
-  assert.equal(authority.handoff.minimumPackageVersion, "0.35.0");
+  assert.equal(authority.authority.requiresPersistencePromotionGate, true);
+  assert.equal(authority.handoff.minimumPackageVersion, "0.37.0");
+  assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
+  assert.equal(authority.handoff.minimumStorePackageVersion, "0.26.0");
+  assert.equal(
+    authority.handoff.requiredStoreBehavior,
+    "strict-human-cel-promotion-receipt-gate",
+  );
   for (const required of [
     "createHumanCelProductionAuthority",
     "assertHumanCelProductionAuthorityBinding",
     "createStrictHumanCelRenderPrompt",
+    "createHumanCelPerformanceDirective",
     "evaluateHumanCelFinishReview",
     "evaluateHumanCelCinematographyReview",
+    "evaluateHumanCelPerformanceReview",
     "evaluateHumanCelEnvironmentReview",
     "createHumanCelQualityReceipt",
     "assertHumanCelQualityReceiptBinding",
