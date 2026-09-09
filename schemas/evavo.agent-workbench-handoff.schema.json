@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.com/schemas/evavo.agent-workbench-handoff.schema.json",
+  "title": "EVAVO Agent Workbench Handoff v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "createdAt", "from", "to", "objective", "reason", "snapshot", "route", "authority"],
+  "properties": {
+    "contract": {"const": "evavo_agent_workbench_handoff_v1"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "from": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "authority"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "authority": {"type": "string", "minLength": 1}
+      }
+    },
+    "to": {"type": "string", "minLength": 1, "maxLength": 256},
+    "objective": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "sha256", "repository", "generatedAt"],
+      "properties": {
+        "contract": {"const": "evavo_agent_workbench_snapshot_v1"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "generatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "sha256", "evidence"],
+      "properties": {
+        "type": {"enum": ["capability", "script", "tool", "estate-capability"]},
+        "id": {"type": "string", "minLength": 1, "maxLength": 512},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "evidence": {"type": "object"}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executionGranted", "mutationGranted", "publicationGranted", "financialGranted", "requiresDownstreamAdmission"],
+      "properties": {
+        "executionGranted": {"const": false},
+        "mutationGranted": {"const": false},
+        "publicationGranted": {"const": false},
+        "financialGranted": {"const": false},
+        "requiresDownstreamAdmission": {"const": true}
+      }
+    }
+  }
+}
