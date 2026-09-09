@@ -42,9 +42,12 @@ function request(overrides = {}) {
 
 test("compiles strict human cel authority for cel animation requests", () => {
   const authority = compileHumanCelAnimationAuthority(request());
-  assert.equal(authority.protocolVersion, "2026-09-09.7");
+  assert.equal(authority.protocolVersion, "2026-09-09.8");
   assert.equal(authority.authority.mode, "human-cel-authored");
+  assert.equal(authority.authority.cleanupInk, "strict");
+  assert.equal(authority.authority.colourPaint, "strict");
   assert.equal(authority.authority.performanceActing, "strict");
+  assert.equal(authority.authority.opticalCompositing, "strict");
   assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
   assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
   assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
@@ -61,7 +64,7 @@ test("compiles strict human cel authority for cel animation requests", () => {
   assert.equal(authority.authority.requiresCandidateEnvelopeProvenance, true);
   assert.equal(authority.authority.requiresPersistencePromotionGate, true);
   assert.equal(authority.authority.requiresPersistedStateIntegrity, true);
-  assert.equal(authority.handoff.minimumPackageVersion, "0.37.0");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.38.0");
   assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
   assert.equal(authority.handoff.minimumStorePackageVersion, "0.27.0");
   assert.equal(
@@ -76,17 +79,29 @@ test("compiles strict human cel authority for cel animation requests", () => {
     "createHumanCelProductionAuthority",
     "assertHumanCelProductionAuthorityBinding",
     "createStrictHumanCelRenderPrompt",
+    "createHumanCelColourPaintDirective",
+    "createHumanCelCleanupInkDirective",
     "createHumanCelPerformanceDirective",
-    "evaluateHumanCelFinishReview",
-    "evaluateHumanCelCinematographyReview",
+    "createHumanCelCompositingDirective",
     "evaluateHumanCelPerformanceReview",
-    "evaluateHumanCelEnvironmentReview",
     "createHumanCelQualityReceipt",
     "assertHumanCelQualityReceiptBinding",
     "reviewHumanCelArtefact",
   ]) {
     assert.equal(authority.handoff.requiredExports.includes(required), true, required);
   }
+  assert.equal(
+    authority.prohibitedSubstitutions.some((value) => value.includes("blue-night wash")),
+    true,
+  );
+  assert.equal(
+    authority.prohibitedSubstitutions.some((value) => value.includes("auto-traced vector-uniform cleanup")),
+    true,
+  );
+  assert.equal(
+    authority.prohibitedSubstitutions.some((value) => value.includes("blanket bloom")),
+    true,
+  );
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
 });
 
