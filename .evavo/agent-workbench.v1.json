@@ -1,0 +1,88 @@
+{
+  "contractVersion": "evavo_agent_workbench_config_v1",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "authority": "art-studio",
+  "role": "Governed 2D art, image, sprite, animation, provider-routing, mastering, review and delivery preparation authority with explicit creative, runtime and publication boundaries.",
+  "capabilityManifest": "evavo.capabilities.json",
+  "packageManifest": "package.json",
+  "readFirst": [
+    "AGENTS.md",
+    "docs/ARTIST_AUTOMATION_CAPABILITY_MAP.md",
+    "docs/IMAGE_WORKFLOW_ROUTER_V2.md",
+    "docs/AGENT_WORKBENCH.md",
+    "evavo.capabilities.json"
+  ],
+  "phases": [
+    {
+      "id": "source",
+      "purpose": "Admit immutable source/reference evidence and inspect full-resolution visual context before changing or generating anything.",
+      "evidence": ["source SHA-256", "RAW_ART inventory when present", "full-resolution review decision"]
+    },
+    {
+      "id": "route",
+      "purpose": "Choose the narrowest specialist image/art/animation route from declared capabilities instead of memorising individual commands.",
+      "evidence": ["Image Workflow Router v2 or domain route", "matched capability effects and requirements"]
+    },
+    {
+      "id": "plan",
+      "purpose": "Bind exact sources, references, style direction, masks, frame neighbours, outputs and provider/runtime requirements into a bounded work order.",
+      "evidence": ["work order or production plan", "exact reference identities", "output boundary"]
+    },
+    {
+      "id": "candidate",
+      "purpose": "Produce or transform one bounded candidate/layer/frame while preserving immutable inputs and provenance.",
+      "evidence": ["candidate artifact", "provider/execution receipt", "source lineage"]
+    },
+    {
+      "id": "technical-qa",
+      "purpose": "Run deterministic alpha, geometry, colour, continuity, registration, provenance and destination-specific checks.",
+      "evidence": ["technical QA reports", "hostile-background or continuity proofs", "artifact hashes"]
+    },
+    {
+      "id": "creative-review",
+      "purpose": "Require the appropriate human or governed independent review for identity, silhouette, timing, composition and art-direction decisions that metrics cannot authoritatively make.",
+      "evidence": ["review decision", "findings", "targeted repair request when needed"]
+    },
+    {
+      "id": "master-deliver",
+      "purpose": "Master only accepted candidates, package deterministic derivatives and hand exact approved artifacts to the separately governed target/runtime boundary.",
+      "evidence": ["master artifact hashes", "delivery preflight", "finalization evidence", "target handoff"]
+    }
+  ],
+  "automation": {
+    "safeWithoutApproval": [
+      "immutable source inventory and technical inspection",
+      "capability and package-script discovery",
+      "deterministic planning, hashing and evidence compilation",
+      "read-only visual review preparation",
+      "technical QA that does not mutate source assets"
+    ],
+    "gated": [
+      "provider execution",
+      "create-only candidate generation or transformation",
+      "creative approval writes",
+      "target-repository mutation",
+      "Git publication or runtime activation"
+    ],
+    "neverImplied": [
+      "creative approval from technical checks",
+      "native transparency from a provider declaration alone",
+      "runtime suitability from a mastered file alone",
+      "target repository mutation, commit, push or publication authority"
+    ]
+  },
+  "handoffs": [
+    {
+      "to": "EVAVO-STUDIO/evavo-development-studio",
+      "when": "Art Studio itself needs repository engineering changes, validation, commit or push"
+    },
+    {
+      "to": "target repository/runtime authority",
+      "when": "approved art must be integrated, rendered or admitted into a game, site or application"
+    },
+    {
+      "to": "EVAVO-STUDIO/evavo-3d-studio or another specialist",
+      "when": "the task crosses into canonical 3D, CAD, texture, audio, video or other specialist ownership"
+    }
+  ]
+}
