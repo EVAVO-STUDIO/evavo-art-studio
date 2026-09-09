@@ -21,6 +21,18 @@ def test_chroma_gradient_and_white_grid_are_background():
     assert removed["bottom"] == 1
 
 
+def test_antialiased_divider_fringe_does_not_expand_subject_bbox():
+    image = Image.new("RGB", (16, 16), (2, 248, 4))
+    pixels = image.load()
+    for x in range(16):
+        pixels[x, 12] = (255, 255, 255)
+    pixels[0, 11] = (215, 252, 222)
+    pixels[8, 6] = (130, 50, 20)
+    mask, removed = remove_edge_dividers(foreground_mask(image, matte_colour(image), 30), 6)
+    assert removed["bottom"] == 1
+    assert mask.getbbox() == (8, 6, 9, 7)
+
+
 class SpriteSheetSafeMarginTests(unittest.TestCase):
     def test_translates_edge_contact_without_scaling_or_redrawing(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -58,6 +58,7 @@ def remove_edge_dividers(mask: Image.Image, maximum_width: int) -> tuple[Image.I
     cleaned = mask.copy()
     pixels = cleaned.load()
     removed = {"left": 0, "top": 0, "right": 0, "bottom": 0}
+    removed_coordinates: dict[str, list[int]] = {edge: [] for edge in removed}
 
     def column_ratio(x: int) -> float:
         return sum(pixels[x, y] != 0 for y in range(cleaned.height)) / cleaned.height
@@ -75,12 +76,26 @@ def remove_edge_dividers(mask: Image.Image, maximum_width: int) -> tuple[Image.I
             if ratio < 0.80:
                 continue
             removed[edge] += 1
+            removed_coordinates[edge].append(coordinate)
             if vertical:
                 for y in range(cleaned.height):
                     pixels[coordinate, y] = 0
             else:
                 for x in range(cleaned.width):
                     pixels[x, coordinate] = 0
+    # Generated antialiased dividers can have a near-solid white core with one
+    # sparse fringe row or column. Remove only a one-pixel low-occupancy fringe
+    # beside a confirmed divider; this cannot erase a substantive edge-touching
+    # silhouette and prevents isolated pale pixels from expanding the bbox.
+    for edge, coordinates in removed_coordinates.items():
+        for coordinate in coordinates:
+            for neighbour in (coordinate - 1, coordinate + 1):
+                if edge in ("left", "right") and 0 <= neighbour < cleaned.width and column_ratio(neighbour) <= 0.10:
+                    for y in range(cleaned.height):
+                        pixels[neighbour, y] = 0
+                elif edge in ("top", "bottom") and 0 <= neighbour < cleaned.height and row_ratio(neighbour) <= 0.10:
+                    for x in range(cleaned.width):
+                        pixels[x, neighbour] = 0
     return cleaned, removed
 
 
