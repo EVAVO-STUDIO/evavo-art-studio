@@ -64,6 +64,21 @@ A numeric suffix, direction token or shared export timestamp is only grouping ev
 
 Generated or edited work remains an unapproved derivative until it is compared with the selected originals at full resolution and actual runtime scale. Do not use a provider to redesign each animation frame independently. Identity, construction landmarks, palette, lighting, camera, pivot and motion topology must remain continuous across a family.
 
+## Image workflow and provenance
+
+- Use `evavo-image-workflow-router-v2` as the preferred discovery surface for ordinary image work. Keep the older deterministic processor, model-quality router and v1 agent router as compatible underlying contracts rather than bypassing or deleting them.
+- For origin or lineage questions, route `ai-artifact-assessment` through artifact triage, optional approved-reference comparison, `evavo_review_image_provenance`, and human semantic visual review. Artifact heuristics are advisory and never establish AI or human authorship.
+- Provenance is evidence about exact bytes. Bind source, candidate and derivative records to the actual SHA-256; a filename, prompt, model name, provider label or visual appearance is not provenance.
+- The public provenance packet uses `verified`, `unverified`, `absent` and `invalid`. Hash mismatch, malformed evidence or contradictory verified origin claims must fail closed.
+- Art Studio verifies local SHA-256 binding. `evavo-image-provenance` does not itself perform C2PA/provider signature verification. Externally verified evidence must retain the verifier identity and verification-record ID and must remain labelled as delegated verification.
+- Do not expose or reintroduce a caller-controlled `externallyAuthenticated=true` shortcut. The older single-record helper that accepts this field is internal compatibility code only; agents and public package consumers use the strict provenance packet.
+- The public provider execution boundary must emit `evavo.provider-provenance-bundle.v1` for every successful provider run before returning candidates. Candidate hashes, resolved reference hashes, operation, adapter/model and the existing provider evidence artifact must remain bound together.
+- A provider generation record may report provider origin, but that record is not externally authenticated merely because EVAVO created it. Provider edits/inpaints remain machine-assisted derivatives; only a real admitted `base-image` may become canonical `parentSha256`.
+- Provenance never grants creative approval, publication authority, source overwrite authority or permission to skip final visual review.
+- Run delivery preflight and finalization admission on the actual final pixels. `ready-for-approval-review` means only that the candidate may enter the explicit approval gate.
+
+Read `docs/IMAGE_PROVENANCE_EVIDENCE.md` before modifying provenance/origin contracts.
+
 ## Required tools
 
 - `raw_art_folder_mcp.mjs` for immutable inventory, duplicate and sequence evidence, reviewed session plans and source-safe materialisation.
