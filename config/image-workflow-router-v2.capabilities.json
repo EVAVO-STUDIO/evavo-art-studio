@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "2.0",
+  "id": "evavo-image-workflow-router-v2",
+  "purpose": "Authoritative read-only image workflow discovery/routing for ChatGPT, Claude, Codex and compatible agents across review, repair, sequences, delivery, finalization, textures, Godot and effects.",
+  "entrypoint": "tools/image_workflow_router_v2_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "tools": [
+    "evavo_image_workflow_router_v2_capabilities",
+    "evavo_route_image_workflow_v2"
+  ],
+  "goals": [
+    "quality-review",
+    "frame-consistency",
+    "reference-consistency",
+    "fake-transparency",
+    "natural-background-cutout",
+    "local-technical-repair",
+    "semantic-repair",
+    "resize-or-export",
+    "learned-enhancement-review",
+    "texture-review",
+    "runtime-effect",
+    "raster-effect",
+    "ai-artifact-assessment",
+    "delivery-preflight",
+    "finalize-image"
+  ],
+  "privilegeClasses": [
+    "read-only",
+    "write-gated-create-only",
+    "candidate-and-mask-required",
+    "provider-or-human-candidate-required",
+    "execution-gated"
+  ],
+  "integratesExistingContracts": [
+    "config/executable-image-pipeline.v1.json",
+    "config/local-image-quality-routes-v1.json"
+  ],
+  "preferredModernSurfaces": [
+    "evavo-image-finishing-packet",
+    "evavo-image-sequence-finishing",
+    "evavo-image-reference-consistency",
+    "evavo-image-artifact-triage",
+    "evavo-image-delivery-integrity",
+    "evavo-image-finalization",
+    "evavo-image-repair",
+    "evavo-texture-review",
+    "evavo-godot-material-delivery",
+    "evavo-godot-material-validator",
+    "evavo-image-effects"
+  ],
+  "guarantees": {
+    "readsImageBytes": false,
+    "writesFiles": false,
+    "executesProcesses": false,
+    "carriesApprovalAuthority": false,
+    "v1RouterCompatibilityPreserved": true,
+    "explicitPrivilegeSeparation": true,
+    "claimsAiOriginDetection": false
+  }
+}
