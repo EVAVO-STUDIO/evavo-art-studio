@@ -8,105 +8,25 @@ import process from "node:process";
 const HEX64 = /^[a-f0-9]{64}$/u;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
 const TYPES = new Set(["capability", "script", "tool", "estate-capability"]);
-const DISPOSITIONS = new Set(["no-route-match", "read-compute-route", "effect-admission-required", "registered-tool-admission-required", "handoff-registered-tool", "handoff-runtime-unverified", "resolve-script-through-capability"]);
+const DISPOSITIONS = new Set(["no-route-match", "read-compute-route", "effect-admission-required", "registered-tool-admission-required", "mcp-runtime-verification-required", "handoff-registered-tool", "handoff-runtime-unverified", "resolve-script-through-capability"]);
 const record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : null;
 const text = (value) => typeof value === "string" ? value.trim() : "";
 const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
-function readJson(filePath) {
-  const resolved = path.resolve(filePath);
-  const bytes = fs.readFileSync(resolved);
-  return { path: resolved, bytes, sha256: digest(bytes), value: JSON.parse(bytes.toString("utf8")) };
-}
-
-function snapshotCollection(snapshot, type) {
-  const matches = record(snapshot.matches) ?? {};
-  if (type === "capability") return matches.capabilities;
-  if (type === "script") return matches.scripts;
-  if (type === "tool") return matches.tools;
-  if (type === "estate-capability") return matches.estateCapabilities;
-  return null;
-}
-
-function routeIdentity(route, type) {
-  return type === "script" ? text(route.name) : text(route.id);
-}
-
-function verifySnapshot(snapshot) {
-  assert(snapshot?.contract === "evavo_agent_workbench_snapshot_v1", "Snapshot contract is invalid.");
-  assert(REPOSITORY.test(text(snapshot.repository)), "Snapshot repository identity is invalid.");
-  const policy = record(snapshot.policy);
-  assert(policy?.readOnlyCompiler === true && policy?.commandExecutionPerformed === false && policy?.mutationPerformed === false && policy?.routeDoesNotAuthorizeEffects === true && policy?.planDoesNotProveExecution === true && policy?.publicationRequiresSeparateAuthority === true, "Snapshot truth boundary is incomplete or unsafe.");
-}
+function readJson(filePath) { const resolved = path.resolve(filePath); const bytes = fs.readFileSync(resolved); return { path: resolved, bytes, sha256: digest(bytes), value: JSON.parse(bytes.toString("utf8")) }; }
+function snapshotCollection(snapshot, type) { const matches = record(snapshot.matches) ?? {}; if (type === "capability") return matches.capabilities; if (type === "script") return matches.scripts; if (type === "tool") return matches.tools; if (type === "estate-capability") return matches.estateCapabilities; return null; }
+function routeIdentity(route, type) { return type === "script" ? text(route.name) : text(route.id); }
+function verifySnapshot(snapshot) { assert(snapshot?.contract === "evavo_agent_workbench_snapshot_v1", "Snapshot contract is invalid."); assert(REPOSITORY.test(text(snapshot.repository)), "Snapshot repository identity is invalid."); const policy = record(snapshot.policy); assert(policy?.readOnlyCompiler === true && policy?.commandExecutionPerformed === false && policy?.mutationPerformed === false && policy?.routeDoesNotAuthorizeEffects === true && policy?.planDoesNotProveExecution === true && policy?.publicationRequiresSeparateAuthority === true, "Snapshot truth boundary is incomplete or unsafe."); }
 
 export function verifyAgentWorkbenchGuidance(guidanceRead, snapshotRead) {
-  const value = record(guidanceRead?.value);
-  assert(value?.contract === "evavo_agent_workbench_guidance_v1", "Guidance contract is invalid.");
-  assert(REPOSITORY.test(text(value.repository)) && text(value.authority), "Guidance repository/authority identity is invalid.");
-  assert(!Number.isNaN(Date.parse(text(value.generatedAt))), "Guidance generatedAt is invalid.");
-  const snapshotRef = record(value.snapshot);
-  assert(snapshotRef?.contract === "evavo_agent_workbench_snapshot_v1" && HEX64.test(text(snapshotRef.sha256)), "Guidance snapshot reference is invalid.");
-  const guide = record(value.guidance);
-  assert(guide && text(guide.nextPhase) && text(guide.nextPurpose), "Guidance next phase is invalid.");
-  assert(DISPOSITIONS.has(guide.disposition), "Guidance disposition is invalid.");
-  assert(Array.isArray(guide.requiredEvidence) && Array.isArray(guide.phaseSequence) && guide.phaseSequence.length > 0 && Array.isArray(guide.effects) && Array.isArray(guide.requirements) && Array.isArray(guide.blockers), "Guidance evidence/classification arrays are invalid.");
-  assert(text(guide.nextAuthority) && typeof guide.handoffRecommended === "boolean", "Guidance next authority state is invalid.");
-  assert(Array.isArray(value.mustNot), "Guidance mustNot is invalid.");
-  const policy = record(value.policy);
-  assert(policy?.readOnlyCompiler === true && policy?.commandExecutionPerformed === false && policy?.mutationPerformed === false && policy?.selectionDoesNotAuthorizeEffects === true && policy?.guidanceDoesNotProveReadiness === true, "Guidance truth boundary is incomplete or unsafe.");
-
-  const selected = value.selectedRoute === null ? null : record(value.selectedRoute);
-  if (selected) {
-    assert(TYPES.has(selected.type) && text(selected.id) && HEX64.test(text(selected.sha256)) && record(selected.evidence), "Selected route evidence is invalid.");
-    assert(["explicit", "deterministic-top-match"].includes(selected.selection), "Selected route selection mode is invalid.");
-  }
-
-  if (snapshotRead) {
-    verifySnapshot(snapshotRead.value);
-    assert(snapshotRead.sha256 === snapshotRef.sha256, "Guidance snapshot digest does not match supplied snapshot bytes.");
-    assert(snapshotRead.value.repository === value.repository, "Guidance repository does not match supplied snapshot.");
-    if (selected) {
-      const routes = snapshotCollection(snapshotRead.value, selected.type);
-      assert(Array.isArray(routes), "Selected route collection is unavailable in supplied snapshot.");
-      const found = routes.find((item) => record(item) && routeIdentity(item, selected.type) === selected.id);
-      assert(found, "Selected route does not exist in supplied snapshot.");
-      assert(digest(Buffer.from(JSON.stringify(found), "utf8")) === selected.sha256, "Selected route digest does not match supplied snapshot route.");
-    }
-  }
-
-  return Object.freeze({
-    contract: "evavo_agent_workbench_guidance_verification_v1",
-    status: "passed",
-    repository: value.repository,
-    snapshotSha256: snapshotRef.sha256,
-    nextPhase: guide.nextPhase,
-    disposition: guide.disposition,
-    selectedRoute: selected ? { type: selected.type, id: selected.id, sha256: selected.sha256 } : null,
-    truthBoundary: { executionGranted: false, mutationGranted: false, publicationGranted: false },
-  });
+  const value = record(guidanceRead?.value); assert(value?.contract === "evavo_agent_workbench_guidance_v1", "Guidance contract is invalid."); assert(REPOSITORY.test(text(value.repository)) && text(value.authority), "Guidance repository/authority identity is invalid."); assert(!Number.isNaN(Date.parse(text(value.generatedAt))), "Guidance generatedAt is invalid."); const snapshotRef = record(value.snapshot); assert(snapshotRef?.contract === "evavo_agent_workbench_snapshot_v1" && HEX64.test(text(snapshotRef.sha256)), "Guidance snapshot reference is invalid."); const guide = record(value.guidance); assert(guide && text(guide.nextPhase) && text(guide.nextPurpose), "Guidance next phase is invalid."); assert(DISPOSITIONS.has(guide.disposition), "Guidance disposition is invalid."); assert(Array.isArray(guide.requiredEvidence) && Array.isArray(guide.phaseSequence) && guide.phaseSequence.length > 0 && Array.isArray(guide.effects) && Array.isArray(guide.requirements) && Array.isArray(guide.blockers), "Guidance evidence/classification arrays are invalid."); assert(text(guide.nextAuthority) && typeof guide.handoffRecommended === "boolean", "Guidance next authority state is invalid."); assert(Array.isArray(value.mustNot), "Guidance mustNot is invalid."); const policy = record(value.policy); assert(policy?.readOnlyCompiler === true && policy?.commandExecutionPerformed === false && policy?.mutationPerformed === false && policy?.selectionDoesNotAuthorizeEffects === true && policy?.guidanceDoesNotProveReadiness === true, "Guidance truth boundary is incomplete or unsafe.");
+  const selected = value.selectedRoute === null ? null : record(value.selectedRoute); if (selected) { assert(TYPES.has(selected.type) && text(selected.id) && HEX64.test(text(selected.sha256)) && record(selected.evidence), "Selected route evidence is invalid."); assert(["explicit", "deterministic-top-match"].includes(selected.selection), "Selected route selection mode is invalid."); }
+  if (guide.disposition === "mcp-runtime-verification-required") { assert(selected?.type === "tool", "MCP runtime guidance requires a selected tool route."); assert(selected.evidence?.source === "root-mcp-launch-manifest", "MCP runtime guidance requires root MCP launch evidence."); assert(selected.evidence?.runtimeReadiness === "unknown", "MCP runtime guidance must retain runtimeReadiness=unknown."); assert(guide.blockers.some((item) => typeof item === "string" && item.includes("live protocol/discovery receipt")), "MCP runtime guidance must require live protocol/discovery evidence."); }
+  if (snapshotRead) { verifySnapshot(snapshotRead.value); assert(snapshotRead.sha256 === snapshotRef.sha256, "Guidance snapshot digest does not match supplied snapshot bytes."); assert(snapshotRead.value.repository === value.repository, "Guidance repository does not match supplied snapshot."); if (selected) { const routes = snapshotCollection(snapshotRead.value, selected.type); assert(Array.isArray(routes), "Selected route collection is unavailable in supplied snapshot."); const found = routes.find((item) => record(item) && routeIdentity(item, selected.type) === selected.id); assert(found, "Selected route does not exist in supplied snapshot."); assert(digest(Buffer.from(JSON.stringify(found), "utf8")) === selected.sha256, "Selected route digest does not match supplied snapshot route."); } }
+  return Object.freeze({ contract: "evavo_agent_workbench_guidance_verification_v1", status: "passed", repository: value.repository, snapshotSha256: snapshotRef.sha256, nextPhase: guide.nextPhase, disposition: guide.disposition, selectedRoute: selected ? { type: selected.type, id: selected.id, sha256: selected.sha256 } : null, truthBoundary: { executionGranted: false, mutationGranted: false, publicationGranted: false } });
 }
 
-function selfTest() {
-  const route = { id: "test.read", effects: ["read", "compute"], relevance: 2 };
-  const snapshot = { contract: "evavo_agent_workbench_snapshot_v1", repository: "EVAVO-STUDIO/test", matches: { capabilities: [route], scripts: [], tools: [], estateCapabilities: [] }, policy: { readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, routeDoesNotAuthorizeEffects: true, planDoesNotProveExecution: true, publicationRequiresSeparateAuthority: true } };
-  const snapshotBytes = Buffer.from(JSON.stringify(snapshot), "utf8");
-  const snapshotSha256 = digest(snapshotBytes);
-  const guidance = { contract: "evavo_agent_workbench_guidance_v1", generatedAt: new Date(0).toISOString(), repository: "EVAVO-STUDIO/test", authority: "test", snapshot: { contract: "evavo_agent_workbench_snapshot_v1", sha256: snapshotSha256, generatedAt: new Date(0).toISOString() }, selectedRoute: { type: "capability", id: "test.read", selection: "explicit", relevance: 2, sha256: digest(Buffer.from(JSON.stringify(route), "utf8")), evidence: route }, guidance: { currentPhase: null, nextPhase: "orient", nextPurpose: "orient", requiredEvidence: [], phaseSequence: ["orient"], atFinalPhase: false, disposition: "read-compute-route", effects: ["read", "compute"], requirements: [], blockers: [], nextAuthority: "EVAVO-STUDIO/test", handoffRecommended: false }, mustNot: [], policy: { readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, selectionDoesNotAuthorizeEffects: true, guidanceDoesNotProveReadiness: true, downstreamAdmissionRequired: true } };
-  verifyAgentWorkbenchGuidance({ value: guidance }, { value: snapshot, bytes: snapshotBytes, sha256: snapshotSha256 });
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_guidance_verifier_self_test_v1", status: "passed", assertions: 1 }, null, 2)}\n`);
-}
-
-function main() {
-  const args = process.argv.slice(2);
-  if (args[0] === "--self-test") return selfTest();
-  const guidancePath = args[0];
-  assert(guidancePath, "Usage: verify-agent-workbench-guidance.mjs <guidance.json> [--snapshot <snapshot.json>] | --self-test");
-  const guidanceRead = readJson(guidancePath);
-  const snapshotIndex = args.indexOf("--snapshot");
-  const snapshotRead = snapshotIndex >= 0 ? readJson(args[snapshotIndex + 1]) : null;
-  const result = verifyAgentWorkbenchGuidance(guidanceRead, snapshotRead);
-  process.stdout.write(`${JSON.stringify({ ...result, input: { path: guidanceRead.path, sha256: guidanceRead.sha256, bytes: guidanceRead.bytes.length } }, null, 2)}\n`);
-}
-
+function selfTest() { const route = { id: "test.read", effects: ["read", "compute"], relevance: 2 }; const mcpRoute = { id: "mcp:test", source: "root-mcp-launch-manifest", repository: "EVAVO-STUDIO/test", runtimeReadiness: "unknown", relevance: 1 }; const snapshot = { contract: "evavo_agent_workbench_snapshot_v1", repository: "EVAVO-STUDIO/test", matches: { capabilities: [route], scripts: [], tools: [mcpRoute], estateCapabilities: [] }, policy: { readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, routeDoesNotAuthorizeEffects: true, planDoesNotProveExecution: true, publicationRequiresSeparateAuthority: true } }; const snapshotBytes = Buffer.from(JSON.stringify(snapshot), "utf8"); const snapshotSha256 = digest(snapshotBytes); const base = { contract: "evavo_agent_workbench_guidance_v1", generatedAt: new Date(0).toISOString(), repository: "EVAVO-STUDIO/test", authority: "test", snapshot: { contract: "evavo_agent_workbench_snapshot_v1", sha256: snapshotSha256, generatedAt: new Date(0).toISOString() }, mustNot: [], policy: { readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, selectionDoesNotAuthorizeEffects: true, guidanceDoesNotProveReadiness: true, downstreamAdmissionRequired: true } }; const guidance = { ...base, selectedRoute: { type: "capability", id: "test.read", selection: "explicit", relevance: 2, sha256: digest(Buffer.from(JSON.stringify(route), "utf8")), evidence: route }, guidance: { currentPhase: null, nextPhase: "orient", nextPurpose: "orient", requiredEvidence: [], phaseSequence: ["orient"], atFinalPhase: false, disposition: "read-compute-route", effects: ["read", "compute"], requirements: [], blockers: [], nextAuthority: "EVAVO-STUDIO/test", handoffRecommended: false } }; verifyAgentWorkbenchGuidance({ value: guidance }, { value: snapshot, bytes: snapshotBytes, sha256: snapshotSha256 }); const mcpGuidance = { ...base, selectedRoute: { type: "tool", id: "mcp:test", selection: "explicit", relevance: 1, sha256: digest(Buffer.from(JSON.stringify(mcpRoute), "utf8")), evidence: mcpRoute }, guidance: { currentPhase: null, nextPhase: "orient", nextPurpose: "orient", requiredEvidence: [], phaseSequence: ["orient"], atFinalPhase: false, disposition: "mcp-runtime-verification-required", effects: [], requirements: [], blockers: ["Obtain a live protocol/discovery receipt for the exact server before any tool call or effect claim."], nextAuthority: "EVAVO-STUDIO/test", handoffRecommended: false } }; verifyAgentWorkbenchGuidance({ value: mcpGuidance }, { value: snapshot, bytes: snapshotBytes, sha256: snapshotSha256 }); const unsafe = structuredClone(mcpGuidance); unsafe.selectedRoute.evidence.runtimeReadiness = "ready"; let rejected = false; try { verifyAgentWorkbenchGuidance({ value: unsafe }, null); } catch { rejected = true; } assert(rejected, "Guidance verifier must reject ready MCP launch evidence."); process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_guidance_verifier_self_test_v2", status: "passed", assertions: 3 }, null, 2)}\n`); }
+function main() { const args = process.argv.slice(2); if (args[0] === "--self-test") return selfTest(); const guidancePath = args[0]; assert(guidancePath, "Usage: verify-agent-workbench-guidance.mjs <guidance.json> [--snapshot <snapshot.json>] | --self-test"); const guidanceRead = readJson(guidancePath); const snapshotIndex = args.indexOf("--snapshot"); const snapshotRead = snapshotIndex >= 0 ? readJson(args[snapshotIndex + 1]) : null; const result = verifyAgentWorkbenchGuidance(guidanceRead, snapshotRead); process.stdout.write(`${JSON.stringify({ ...result, input: { path: guidanceRead.path, sha256: guidanceRead.sha256, bytes: guidanceRead.bytes.length } }, null, 2)}\n`); }
 try { main(); } catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
