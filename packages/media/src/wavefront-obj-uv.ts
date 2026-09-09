@@ -144,9 +144,7 @@ export function extractWavefrontObjUv(source: string): WavefrontObjUvExtraction 
     }
   }
 
-  if (!triangles.length) {
-    throw new Error(`Wavefront OBJ produced no UV triangles; faces=${faceCount}, skippedWithoutUv=${skippedFacesWithoutUv}.`);
-  }
+  if (!triangles.length) throw new Error(`Wavefront OBJ produced no UV triangles; faces=${faceCount}, skippedWithoutUv=${skippedFacesWithoutUv}.`);
   return Object.freeze({
     contract: WAVEFRONT_OBJ_UV_CONTRACT,
     vertexCount: vertices.length,
@@ -163,10 +161,7 @@ export function extractWavefrontObjUv(source: string): WavefrontObjUvExtraction 
 }
 
 /** Extract and immediately review OBJ UVs without mutating the source. */
-export function reviewWavefrontObjUv(
-  source: string,
-  spec: WavefrontObjUvReviewSpec = {},
-): WavefrontObjUvReviewResult {
+export function reviewWavefrontObjUv(source: string, spec: WavefrontObjUvReviewSpec = {}): WavefrontObjUvReviewResult {
   const extraction = extractWavefrontObjUv(source);
   const triangles = spec.flipVForReview
     ? extraction.triangles.map((triangle) => Object.freeze({
@@ -178,12 +173,14 @@ export function reviewWavefrontObjUv(
     ...(typeof spec.allowTiledCoordinates === "boolean" ? { allowTiledCoordinates: spec.allowTiledCoordinates } : {}),
     ...(spec.overlapPolicy ? { overlapPolicy: spec.overlapPolicy } : {}),
     ...(spec.mirroredPolicy ? { mirroredPolicy: spec.mirroredPolicy } : {}),
+    ...(spec.orientationConvention ? { orientationConvention: spec.orientationConvention } : {}),
     ...(spec.uvAreaEpsilon !== undefined ? { uvAreaEpsilon: spec.uvAreaEpsilon } : {}),
     ...(spec.uvEqualityTolerance !== undefined ? { uvEqualityTolerance: spec.uvEqualityTolerance } : {}),
     ...(spec.textureWidth !== undefined ? { textureWidth: spec.textureWidth } : {}),
     ...(spec.textureHeight !== undefined ? { textureHeight: spec.textureHeight } : {}),
     ...(spec.maximumTexelDensityRatio !== undefined ? { maximumTexelDensityRatio: spec.maximumTexelDensityRatio } : {}),
     ...(spec.minimumAtlasBoundaryPaddingTexels !== undefined ? { minimumAtlasBoundaryPaddingTexels: spec.minimumAtlasBoundaryPaddingTexels } : {}),
+    ...(spec.minimumIslandPaddingTexels !== undefined ? { minimumIslandPaddingTexels: spec.minimumIslandPaddingTexels } : {}),
   });
   return Object.freeze({ extraction, review, sourceModified: false as const });
 }
