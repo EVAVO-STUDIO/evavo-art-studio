@@ -120,6 +120,13 @@ function assertEntrypoints(entry, required) {
   }
 }
 
+function assertRequires(entry, required) {
+  assert.ok(Array.isArray(entry.requires), `${entry.id} requires must be an array`);
+  for (const item of required) {
+    assert.ok(entry.requires.includes(item), `${entry.id} must require ${item}`);
+  }
+}
+
 function syntaxCheck(path) {
   const result = spawnSync(process.execPath, ["--check", path], {
     cwd: ROOT,
@@ -317,10 +324,20 @@ async function main() {
     "node scripts/start-animation-execution-supervisor-mcp-v1.mjs",
     ".mcp.animation-execution-supervisor-v1.json",
   ]);
-  assertEntrypoints(capability(capabilities, "art.animation.human-cel-authority"), [
+  const humanCelCapability = capability(
+    capabilities,
+    "art.animation.human-cel-authority",
+  );
+  assertEntrypoints(humanCelCapability, [
     "node tools/human_cel_animation_authority_v1_mcp.mjs",
     ".mcp.human-cel-animation-authority-v1.json",
     "docs/human-cel-animation-authority-v1.md",
+  ]);
+  assertRequires(humanCelCapability, [
+    "Cel Animation Studio @evavo/cel-core 0.35.0 or newer",
+    "Candidate provenance containing the exact strict-envelope digest",
+    "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces",
+    "Zero-blocker persisted quality receipt for strict approval",
   ]);
 
   const productionIntegration = await readJson("creative-production.integration.json");
@@ -334,6 +351,11 @@ async function main() {
     capabilityText.includes(STALE_SEQUENCE_ENTRY),
     false,
     `Capability registry must not reference stale entrypoint ${STALE_SEQUENCE_ENTRY}`,
+  );
+  assert.equal(
+    capabilityText.includes("@evavo/cel-core 0.34.0"),
+    false,
+    "Capability registry must not advertise stale strict human-cel core 0.34.0",
   );
 
   process.stdout.write(`${JSON.stringify({
