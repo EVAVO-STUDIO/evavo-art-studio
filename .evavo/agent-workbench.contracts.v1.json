@@ -1,6 +1,7 @@
 {
   "contractVersion": "evavo_agent_workbench_contract_bundle_v1",
   "config": ".evavo/agent-workbench.v1.json",
+  "orientationGuide": "WORKBENCH_FIRST.md",
   "mcp": ".evavo/agent-workbench.mcp.v1.json",
   "mcpV2": ".evavo/agent-workbench.mcp.v2.json",
   "schemas": {
