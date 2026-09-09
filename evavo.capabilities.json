@@ -96,6 +96,16 @@
       "requires": ["Explicit --enable-execution for animation execution", "Independent --enable-approval-write only when authorised", "Bounded local workspace/artifact roots", "Sibling Art/Cel repository identity", "No implicit Git publication, target mutation or runtime admission"]
     },
     {
+      "id": "art.animation.human-cel-authority",
+      "title": "Compile strict human-authored cel craft authority",
+      "description": "Compile and verify a digest-bound, side-effect-free authority bridge for limited-cel and full-cel animation that requires Cel Animation Studio's human-cel render compiler, strict draftsmanship/anti-generic review, authored exposure timing, source-based lighting, cinematography and environment gates before promotion.",
+      "interfaces": ["automation", "mcp", "library", "testing"],
+      "effects": ["read", "compute", "execute"],
+      "entrypoints": ["node tools/human_cel_animation_authority_v1_mcp.mjs", ".mcp.human-cel-animation-authority-v1.json", "docs/human-cel-animation-authority-v1.md"],
+      "tags": ["animation", "cel", "human-cel", "draftsmanship", "timing", "cinematography", "anti-generic", "quality-gates"],
+      "requires": ["limited-cel or full-cel motion style", "Cel or video sequence target", "Stable identity/camera/performance/style anchors", "Cel Animation Studio @evavo/cel-core 0.33.0 or newer", "No provider execution, creative approval, repository mutation or publication authority"]
+    },
+    {
       "id": "art.pixel-font.build",
       "title": "Build original deterministic pixel-font families",
       "description": "Author, audit, build, compare and validate independent EVAVO pixel-font masters and deterministic BMFont, PNG, BDF, JSON, grid and convenience derivative outputs.",
@@ -186,6 +196,7 @@
       "camera-aware animation production profiles and dependency-safe drawing batches",
       "event-sourced frame work ledgers and candidate-receipt integrity",
       "independent Cel Animation Studio moving-sequence review",
+      "strict human-cel craft authority, exposure timing and anti-generic review",
       "targeted animation repair without redrawing accepted frames",
       "exact integer exposure timing and accepted runtime clips",
       "path-free Godot, Cel and Video animation sequence delivery",
@@ -198,5 +209,5 @@
       "negative authority, recovery and publication boundaries"
     ]
   },
-  "reviewedAt": "2026-09-08T10:34:00+10:00"
+  "reviewedAt": "2026-09-09T21:00:00+10:00"
 }
