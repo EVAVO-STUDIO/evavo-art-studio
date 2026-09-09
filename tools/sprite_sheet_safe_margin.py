@@ -32,6 +32,42 @@ def foreground_bbox(cell: Image.Image, matte: tuple[int, int, int], threshold: i
     return difference.convert("L").point(lambda value: 255 if value >= threshold else 0).getbbox()
 
 
+def foreground_mask(cell: Image.Image, matte: tuple[int, int, int], threshold: int) -> Image.Image:
+    difference = ImageChops.difference(cell.convert("RGB"), Image.new("RGB", cell.size, matte))
+    return difference.convert("L").point(lambda value: 255 if value >= threshold else 0)
+
+
+def remove_edge_dividers(mask: Image.Image, maximum_width: int) -> tuple[Image.Image, dict[str, int]]:
+    """Remove only near-solid grid lines; retain partial silhouettes touching an edge."""
+    cleaned = mask.copy()
+    pixels = cleaned.load()
+    removed = {"left": 0, "top": 0, "right": 0, "bottom": 0}
+
+    def column_ratio(x: int) -> float:
+        return sum(pixels[x, y] != 0 for y in range(cleaned.height)) / cleaned.height
+
+    def row_ratio(y: int) -> float:
+        return sum(pixels[x, y] != 0 for x in range(cleaned.width)) / cleaned.width
+
+    for offset in range(min(maximum_width, cleaned.width // 2, cleaned.height // 2)):
+        for edge, coordinate, ratio, vertical in (
+            ("left", offset, column_ratio(offset), True),
+            ("right", cleaned.width - 1 - offset, column_ratio(cleaned.width - 1 - offset), True),
+            ("top", offset, row_ratio(offset), False),
+            ("bottom", cleaned.height - 1 - offset, row_ratio(cleaned.height - 1 - offset), False),
+        ):
+            if ratio < 0.80:
+                continue
+            removed[edge] += 1
+            if vertical:
+                for y in range(cleaned.height):
+                    pixels[coordinate, y] = 0
+            else:
+                for x in range(cleaned.width):
+                    pixels[x, coordinate] = 0
+    return cleaned, removed
+
+
 def required_shift(bbox: tuple[int, int, int, int], size: tuple[int, int], margin: int) -> tuple[int, int]:
     left, top, right, bottom = bbox
     width, height = size
@@ -52,23 +88,24 @@ def repair(source: Path, output: Path, columns: int, rows: int, gutter: int, mar
         for column in range(columns):
             outer = (column * cell_width, row * cell_height, (column + 1) * cell_width, (row + 1) * cell_height)
             cell = image.crop(outer)
-            inner_box = (gutter, gutter, cell_width - gutter, cell_height - gutter)
-            inner = cell.crop(inner_box)
-            matte = matte_colour(inner)
-            before = foreground_bbox(inner, matte, threshold)
+            matte = matte_colour(cell)
+            mask, removed_dividers = remove_edge_dividers(foreground_mask(cell, matte, threshold), gutter)
+            before = mask.getbbox()
             if before is None:
                 raise RuntimeError(f"cell {row},{column} has no foreground")
-            dx, dy = required_shift(before, inner.size, margin)
-            shifted = inner.transform(inner.size, Image.Transform.AFFINE, (1, 0, -dx, 0, 1, -dy), fillcolor=matte)
-            after = foreground_bbox(shifted, matte, threshold)
-            if after is None or min(after[0], after[1], inner.width - after[2], inner.height - after[3]) < margin:
+            dx, dy = required_shift(before, cell.size, margin)
+            shifted_pixels = cell.transform(cell.size, Image.Transform.AFFINE, (1, 0, -dx, 0, 1, -dy), fillcolor=matte)
+            shifted_mask = mask.transform(mask.size, Image.Transform.AFFINE, (1, 0, -dx, 0, 1, -dy), fillcolor=0)
+            repaired = Image.new("RGB", cell.size, matte)
+            repaired.paste(shifted_pixels, mask=shifted_mask)
+            after = shifted_mask.getbbox()
+            if after is None or min(after[0], after[1], cell.width - after[2], cell.height - after[3]) < margin:
                 raise RuntimeError(f"cell {row},{column} still violates requested margin: {after}")
-            cell.paste(shifted, (gutter, gutter))
-            result.paste(cell, outer[:2])
-            records.append({"row": row, "column": column, "before_bbox": list(before), "after_bbox": list(after), "translation": [dx, dy], "matte_rgb": list(matte)})
+            result.paste(repaired, outer[:2])
+            records.append({"row": row, "column": column, "before_bbox": list(before), "after_bbox": list(after), "translation": [dx, dy], "matte_rgb": list(matte), "removed_edge_divider_px": removed_dividers})
     output.parent.mkdir(parents=True, exist_ok=True)
     result.save(output)
-    report = {"schema": "evavo.sprite-sheet-safe-margin.v1", "source": str(source), "source_sha256": digest(source), "output": str(output), "output_sha256": digest(output), "grid": [columns, rows], "gutter_px": gutter, "required_inner_margin_px": margin, "foreground_difference_threshold": threshold, "operation": "cell_translation_only_no_scale_no_redraw_no_mirror", "cells": records}
+    report = {"schema": "evavo.sprite-sheet-safe-margin.v2", "source": str(source), "source_sha256": digest(source), "output": str(output), "output_sha256": digest(output), "grid": [columns, rows], "maximum_detected_divider_width_px": gutter, "required_cell_margin_px": margin, "foreground_difference_threshold": threshold, "operation": "full_cell_subject_translation_no_scale_no_redraw_no_mirror", "cells": records}
     output.with_suffix(output.suffix + ".safe-margin.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return report
 

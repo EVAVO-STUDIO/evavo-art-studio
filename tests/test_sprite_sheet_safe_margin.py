@@ -37,6 +37,21 @@ class SpriteSheetSafeMarginTests(unittest.TestCase):
         ImageDraw.Draw(image).line((0, 63, 63, 63), fill=(255, 255, 255))
         self.assertEqual(matte_colour(image), (0, 255, 0))
 
+    def test_retains_and_moves_subject_pixels_touching_cell_boundary(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source, output = Path(folder) / "source.png", Path(folder) / "output.png"
+            image = Image.new("RGB", (64, 64), (0, 255, 0))
+            draw = ImageDraw.Draw(image)
+            draw.line((0, 0, 63, 0), fill=(255, 255, 255), width=2)
+            draw.rectangle((24, 40, 39, 63), fill=(180, 20, 20))
+            image.save(source)
+            report = repair(source, output, 1, 1, 4, 8, 30)
+            self.assertEqual(report["cells"][0]["translation"], [0, -8])
+            self.assertEqual(report["cells"][0]["removed_edge_divider_px"]["top"], 2)
+            repaired = Image.open(output)
+            self.assertEqual(repaired.getpixel((24, 55)), (180, 20, 20))
+            self.assertEqual(repaired.getpixel((24, 63)), (0, 255, 0))
+
 
 if __name__ == "__main__":
     unittest.main()
