@@ -3,7 +3,7 @@
   "contractVersion": "evavo_repository_capabilities_v1",
   "repository": "EVAVO-STUDIO/evavo-art-studio",
   "authority": "art-studio",
-  "summary": "EVAVO's governed art and animation production, source-review, mastering, pixel-font, delivery, provider-routing and runtime-validation authority. Art Studio can prepare, produce, review and package bounded creative assets and animation evidence, including strict human-cel authority handoffs with persisted-state integrity requirements, while automatic creative approval, target-repository mutation, Git publication and downstream runtime admission remain separate authorities.",
+  "summary": "EVAVO's governed art and animation production, source-review, mastering, pixel-font, delivery, provider-routing and runtime-validation authority. Art Studio can prepare, produce, review and package bounded creative assets and animation evidence, including strict human-cel handoffs that require authored cleanup/ink, colour/paint, acting/performance, optical compositing and persisted-state integrity, while automatic creative approval, target-repository mutation, Git publication and downstream runtime admission remain separate authorities.",
   "capabilities": [
     {
       "id": "art.source.review",
@@ -98,12 +98,12 @@
     {
       "id": "art.animation.human-cel-authority",
       "title": "Compile strict human-authored cel craft authority",
-      "description": "Compile and verify a digest-bound, side-effect-free authority bridge for limited-cel and full-cel animation that requires Cel Animation Studio's exact production authority, strict acting/performance grammar, persisted strict authority-bound render prompt envelope, canonical persisted snapshot/render-job integrity, candidate provenance containing that envelope digest, deterministic multi-department quality evidence including performance review, one immutable candidate-byte-bound quality receipt and Store-level receipt enforcement before promotion.",
+      "description": "Compile and verify a digest-bound, side-effect-free authority bridge for limited-cel and full-cel animation that requires Cel Animation Studio Core 0.38 cleanup/ink, colour/paint, acting/performance and optical/compositing grammar, exact production authority, persisted strict envelope, canonical persisted-state integrity, candidate-envelope provenance, immutable candidate-byte quality evidence and Store-level receipt enforcement before promotion.",
       "interfaces": ["automation", "mcp", "library", "testing"],
       "effects": ["read", "compute", "execute"],
       "entrypoints": ["node tools/human_cel_animation_authority_v1_mcp.mjs", ".mcp.human-cel-animation-authority-v1.json", "docs/human-cel-animation-authority-v1.md"],
-      "tags": ["animation", "cel", "human-cel", "draftsmanship", "timing", "performance", "cinematography", "anti-generic", "quality-gates", "quality-receipt", "authority-binding", "promotion-gate", "state-integrity"],
-      "requires": ["limited-cel or full-cel motion style", "Cel or video sequence target", "Stable identity/camera/performance/style anchors", "Cel Animation Studio @evavo/cel-core 0.37.0 or newer", "Cel Animation Studio @evavo/cel-store 0.27.0 or newer", "Exact downstream work-order and direction authority before strict prompt compilation", "Strict human-cel performance grammar and performance review", "createHumanCelPerformanceDirective and evaluateHumanCelPerformanceReview downstream surfaces", "Candidate provenance containing the exact strict-envelope digest", "Canonical persisted snapshot and render-job integrity before strict promotion", "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces", "Zero-blocker persisted quality receipt for strict approval", "Store strict-human-cel-promotion-receipt-gate before approved state is authoritative", "No provider execution, creative approval, repository mutation or publication authority"]
+      "tags": ["animation", "cel", "human-cel", "draftsmanship", "cleanup", "ink", "colour", "paint", "timing", "performance", "compositing", "optical", "cinematography", "anti-generic", "quality-receipt", "authority-binding", "promotion-gate", "state-integrity"],
+      "requires": ["limited-cel or full-cel motion style", "Cel or video sequence target", "Stable identity/camera/performance/style anchors", "Cel Animation Studio @evavo/cel-core 0.38.0 or newer", "Cel Animation Studio @evavo/cel-store 0.27.0 or newer", "Exact downstream work-order and direction authority before strict prompt compilation", "Strict human-cel cleanup/ink, colour/paint, acting/performance and optical/compositing grammar", "createHumanCelColourPaintDirective, createHumanCelCleanupInkDirective, createHumanCelPerformanceDirective and createHumanCelCompositingDirective downstream surfaces", "Candidate provenance containing the exact strict-envelope digest", "Canonical persisted snapshot and render-job integrity before strict promotion", "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces", "Zero-blocker persisted quality receipt for strict approval", "Store strict-human-cel-promotion-receipt-gate before approved state is authoritative", "No provider execution, creative approval, repository mutation or publication authority"]
     },
     {
       "id": "art.pixel-font.build",
@@ -196,7 +196,7 @@
       "camera-aware animation production profiles and dependency-safe drawing batches",
       "event-sourced frame work ledgers and candidate-receipt integrity",
       "independent Cel Animation Studio moving-sequence review",
-      "strict human-cel authority, explicit acting/performance, candidate-envelope provenance, candidate-byte quality receipts, canonical persisted-state integrity and Store-level receipt-backed promotion",
+      "strict human-cel cleanup ink colour paint acting performance and optical compositing with candidate-envelope provenance, quality receipts and persisted-state integrity",
       "targeted animation repair without redrawing accepted frames",
       "exact integer exposure timing and accepted runtime clips",
       "path-free Godot, Cel and Video animation sequence delivery",
