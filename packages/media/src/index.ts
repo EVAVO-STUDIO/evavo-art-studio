@@ -39,6 +39,7 @@ export * from "./image-sequence-finishing-review.js";
 export * from "./image-delivery-integrity.js";
 export * from "./image-finalization-review.js";
 export * from "./image-agent-routing.js";
+export * from "./image-agent-routing-v2.js";
 export * from "./texture-map-review.js";
 export * from "./texture-tile-proof.js";
 export * from "./texture-set-review.js";
