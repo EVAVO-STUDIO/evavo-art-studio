@@ -45,14 +45,24 @@ test("compiles strict human cel authority for cel animation requests", () => {
   assert.equal(authority.authority.mode, "human-cel-authored");
   assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
   assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
+  assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
+  assert.equal(authority.authority.requiredApprovalPath, "reviewHumanCelArtefact");
   assert.equal(authority.authority.requiresExactProductionAuthority, true);
-  assert.equal(authority.handoff.minimumPackageVersion, "0.34.0");
-  assert.equal(authority.handoff.requiredExports.includes("createHumanCelProductionAuthority"), true);
-  assert.equal(authority.handoff.requiredExports.includes("assertHumanCelProductionAuthorityBinding"), true);
-  assert.equal(authority.handoff.requiredExports.includes("createStrictHumanCelRenderPrompt"), true);
-  assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelFinishReview"), true);
-  assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelCinematographyReview"), true);
-  assert.equal(authority.handoff.requiredExports.includes("evaluateHumanCelEnvironmentReview"), true);
+  assert.equal(authority.authority.requiresCandidateEnvelopeProvenance, true);
+  assert.equal(authority.handoff.minimumPackageVersion, "0.35.0");
+  for (const required of [
+    "createHumanCelProductionAuthority",
+    "assertHumanCelProductionAuthorityBinding",
+    "createStrictHumanCelRenderPrompt",
+    "evaluateHumanCelFinishReview",
+    "evaluateHumanCelCinematographyReview",
+    "evaluateHumanCelEnvironmentReview",
+    "createHumanCelQualityReceipt",
+    "assertHumanCelQualityReceiptBinding",
+    "reviewHumanCelArtefact",
+  ]) {
+    assert.equal(authority.handoff.requiredExports.includes(required), true, required);
+  }
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
 });
 
