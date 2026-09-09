@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.3";
+export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.4";
 export const HUMAN_CEL_AUTHORITY_KIND = "evavo.human-cel-animation-authority.v1";
 export const HUMAN_CEL_CRAFT_AUTHORITY_ID = "evavo-human-cel-craft-v1";
 export const HUMAN_CEL_ALLOWED_MOTION_STYLES = Object.freeze([
@@ -129,8 +129,9 @@ export function compileHumanCelAnimationAuthority(request) {
       draftsmanshipPriority: "strict",
       antiGenericEnforcement: "strict",
       timingAuthenticity: "strict-cel",
-      preferredPromptCompiler: "createHumanCelRenderPrompt",
+      preferredPromptCompiler: "createStrictHumanCelRenderPrompt",
       requiredQualityGate: "evaluateHumanCelQualityGate",
+      requiresExactProductionAuthority: true,
     },
     requiredPractices: [
       "lock identity to approved model-sheet anchors before generating or drawing motion",
@@ -142,6 +143,8 @@ export function compileHumanCelAnimationAuthority(request) {
       "review adjacent drawings for anatomy, contact, prop scale, perspective, light and detail topology continuity",
       "reject duplicates, pseudo-text, repeated stamped patterns, temporal detail crawl and fake analogue degradation",
       "require deterministic finish, cinematography and environment review evidence before manual department approval",
+      "create one Cel Animation Studio production authority bound to the exact work-order and direction digests before strict prompt compilation",
+      "invalidate strict prompt authority whenever work order, direction, request, task or stage identity changes",
     ],
     prohibitedSubstitutions: [
       "one-pass anime filtering",
@@ -152,8 +155,11 @@ export function compileHumanCelAnimationAuthority(request) {
       "random film grain or damage used to fake handmade provenance",
       "unmotivated rim light, blanket bloom or generic cyan-magenta grading",
       "generated pseudo-lettering",
+      "using the convenience or base render compiler to satisfy a strict human-cel-authored production claim",
     ],
     qualityGates: [
+      "exact human-cel production authority binding",
+      "strict human-cel render prompt envelope integrity",
       "human cel craft prompt inspection",
       "shot-language and composition inspection",
       "source-based lighting and cel-shadow inspection",
@@ -168,9 +174,12 @@ export function compileHumanCelAnimationAuthority(request) {
     handoff: {
       targetRepository: "EVAVO-STUDIO/cel-animation-studio",
       package: "@evavo/cel-core",
-      minimumPackageVersion: "0.33.0",
+      minimumPackageVersion: "0.34.0",
       requiredExports: [
-        "createHumanCelRenderPrompt",
+        "createHumanCelProductionAuthority",
+        "assertHumanCelProductionAuthorityBinding",
+        "createStrictHumanCelRenderPrompt",
+        "assertStrictHumanCelRenderPromptIntegrity",
         "createHumanCelShotLanguageDirective",
         "createHumanCelLightingDirective",
         "createHumanCelTimingDirective",
@@ -208,13 +217,19 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
     fail("HUMAN_CEL_AUTHORITY_KIND_INVALID");
   }
   safeId(authority.authorityId, "HUMAN_CEL_AUTHORITY_ID_INVALID");
-  if (authority.authority?.craftAuthority !== HUMAN_CEL_CRAFT_AUTHORITY_ID || authority.authority?.mode !== "human-cel-authored") {
+  if (
+    authority.authority?.craftAuthority !== HUMAN_CEL_CRAFT_AUTHORITY_ID ||
+    authority.authority?.mode !== "human-cel-authored" ||
+    authority.authority?.preferredPromptCompiler !== "createStrictHumanCelRenderPrompt" ||
+    authority.authority?.requiredQualityGate !== "evaluateHumanCelQualityGate" ||
+    authority.authority?.requiresExactProductionAuthority !== true
+  ) {
     fail("HUMAN_CEL_AUTHORITY_CRAFT_BINDING_INVALID");
   }
   if (authority.handoff?.targetRepository !== "EVAVO-STUDIO/cel-animation-studio") {
     fail("HUMAN_CEL_AUTHORITY_HANDOFF_INVALID");
   }
-  if (authority.handoff?.minimumPackageVersion !== "0.33.0") {
+  if (authority.handoff?.minimumPackageVersion !== "0.34.0") {
     fail("HUMAN_CEL_AUTHORITY_CORE_VERSION_INVALID");
   }
   if (authority.boundary?.providerExecutionIncluded !== false || authority.boundary?.creativeApprovalIncluded !== false) {
