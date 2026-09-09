@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "1.3",
+  "schemaVersion": "1.4",
   "id": "evavo-texture-review-agent",
-  "purpose": "Map-aware texture/PBR review, coherent material-set validation, UV/OBJ assurance, sampling-aware tile proofs and guarded Godot ORM packing.",
+  "purpose": "Map-aware texture/PBR review, coherent material-set validation, topology-aware UV/OBJ assurance, sampling-aware tile proofs and guarded Godot ORM packing.",
   "entrypoint": "tools/texture_review_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
@@ -42,14 +42,19 @@
     "triangleContract": true,
     "wavefrontObj": true,
     "maximumTriangles": 5000,
+    "orientationConventionDefault": "majority",
+    "meshVertexKeysSupported": true,
+    "objVertexKeysAutomatic": true,
+    "connectivityModes": ["mesh-aware", "uv-only-fallback", "mixed-conservative"],
     "checks": [
       "degenerate-uv-triangles",
       "out-of-range-uv-coordinates",
       "accidental-overlap",
       "explicit-overlap-groups",
-      "mirrored-winding",
-      "uv-islands",
+      "orientation-relative-mirrored-winding",
+      "topology-aware-uv-islands",
       "atlas-boundary-padding",
+      "inter-island-padding-in-output-texels",
       "world-space-texel-density"
     ],
     "sourceMutationAllowed": false,
@@ -84,6 +89,7 @@
     "silentPackedMapRepacking": false,
     "explicitOrmPackingOnly": true,
     "uvReviewReadOnly": true,
+    "topologyPreferredOverCoordinateGuessing": true,
     "claimsAiOriginDetection": false
   }
 }
