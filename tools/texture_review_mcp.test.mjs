@@ -63,7 +63,7 @@ test("reviews a coherent texture set through the MCP without writing", async () 
   assert.equal(response.structuredContent.evidence.godot.preferredMaterial, "StandardMaterial3D");
 });
 
-test("reviews extracted UV triangle data without enabling writes", async () => {
+test("reviews topology-aware UV triangle data without enabling writes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-uv-contract-"));
   const response = await call(root, "evavo_review_uv_layout", {
     triangles: [
@@ -71,22 +71,53 @@ test("reviews extracted UV triangle data without enabling writes", async () => {
         id: "a",
         uv: [{ u: 0.1, v: 0.1 }, { u: 0.9, v: 0.1 }, { u: 0.9, v: 0.9 }],
         position: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 1, y: 1, z: 0 }],
+        vertexKeys: ["v1", "v2", "v3"],
       },
       {
         id: "b",
         uv: [{ u: 0.1, v: 0.1 }, { u: 0.9, v: 0.9 }, { u: 0.1, v: 0.9 }],
         position: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }],
+        vertexKeys: ["v1", "v3", "v4"],
       },
     ],
     textureWidth: 1024,
     textureHeight: 1024,
     minimumAtlasBoundaryPaddingTexels: 32,
+    orientationConvention: "positive",
   }, { writes: false });
 
   assert.equal(response.isError, false);
   assert.equal(response.structuredContent.sourceModified, false);
   assert.equal(response.structuredContent.evidence.grade, "pass");
   assert.equal(response.structuredContent.evidence.islandCount, 1);
+  assert.equal(response.structuredContent.evidence.connectivity.mode, "mesh-aware");
+});
+
+test("raw UV review keeps unrelated coincident topology separate and enforces island padding", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-uv-overlap-"));
+  const response = await call(root, "evavo_review_uv_layout", {
+    triangles: [
+      {
+        id: "a",
+        uv: [{ u: 0.1, v: 0.1 }, { u: 0.4, v: 0.1 }, { u: 0.1, v: 0.4 }],
+        vertexKeys: ["v1", "v2", "v3"],
+      },
+      {
+        id: "b",
+        uv: [{ u: 0.1, v: 0.1 }, { u: 0.4, v: 0.1 }, { u: 0.1, v: 0.4 }],
+        vertexKeys: ["v4", "v5", "v6"],
+      },
+    ],
+    textureWidth: 1024,
+    textureHeight: 1024,
+    minimumIslandPaddingTexels: 4,
+  }, { writes: false });
+
+  assert.equal(response.isError, false);
+  assert.equal(response.structuredContent.evidence.islandCount, 2);
+  assert.equal(response.structuredContent.evidence.grade, "fail");
+  assert.equal(response.structuredContent.evidence.islandSpacing.minimumPaddingTexels, 0);
+  assert.ok(response.structuredContent.evidence.blockers.includes("unapproved-uv-overlaps:1"));
 });
 
 test("reviews a local OBJ directly and reports faces with missing UVs", async () => {
@@ -112,6 +143,7 @@ f 2 5 6
     inputPath: objPath,
     textureWidth: 1024,
     textureHeight: 1024,
+    orientationConvention: "positive",
   }, { writes: false });
 
   assert.equal(response.isError, false);
@@ -119,6 +151,7 @@ f 2 5 6
   assert.equal(response.structuredContent.extraction.faceCount, 2);
   assert.equal(response.structuredContent.extraction.skippedFacesWithoutUv, 1);
   assert.equal(response.structuredContent.extraction.triangleCount, 2);
+  assert.equal(response.structuredContent.evidence.connectivity.mode, "mesh-aware");
   assert.equal("triangles" in response.structuredContent.extraction, false);
 });
 
