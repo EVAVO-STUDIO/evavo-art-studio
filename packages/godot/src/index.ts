@@ -5,5 +5,6 @@ export * from "./animation-acceptance.js";
 export * from "./runtime-expectation.js";
 export * from "./importer-script.js";
 export * from "./material-delivery.js";
+export * from "./material-resource.js";
 export * from "./write.js";
 export * from "./run.js";
