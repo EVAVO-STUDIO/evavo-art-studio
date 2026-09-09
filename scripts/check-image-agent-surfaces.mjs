@@ -9,6 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifests = [
   "config/image-finishing-artist.capabilities.json",
   "config/image-repair-agent.capabilities.json",
+  "config/image-reference-consistency.capabilities.json",
   "config/texture-review-agent.capabilities.json",
   "config/godot-material-delivery-agent.capabilities.json",
   "config/godot-material-validation-agent.capabilities.json",
@@ -44,6 +45,7 @@ const mediaIndex = await readFile(path.join(root, "packages/media/src/index.ts")
 const mediaExports = [
   "image-repair-routing",
   "image-agent-routing",
+  "image-reference-consistency",
   "texture-map-review",
   "texture-tile-proof",
   "texture-set-review",
@@ -61,6 +63,10 @@ for (const requiredExport of mediaExports) {
 const texturePreprocess = await readFile(path.join(root, "packages/media/src/texture-preprocess.ts"), "utf8");
 for (const requiredPrimitive of ["convertTangentNormalYConvention", "composeOpacityIntoAlbedoAlpha", "G=255-G"]) {
   if (!texturePreprocess.includes(requiredPrimitive)) throw new Error(`Texture preprocessing is missing ${requiredPrimitive}.`);
+}
+const referenceConsistency = await readFile(path.join(root, "packages/media/src/image-reference-consistency.ts"), "utf8");
+for (const requiredSignal of ["palette-distribution-drift", "silhouette-or-occupancy-drift", "reference-set-unstable", "aiOriginDetection"]) {
+  if (!referenceConsistency.includes(requiredSignal)) throw new Error(`Reference consistency is missing ${requiredSignal}.`);
 }
 
 const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts"), "utf8");
@@ -92,6 +98,7 @@ if (!spriteEffectsIndex.includes('export * from "./agent-planner.js";')) throw n
 for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
   "packages/media/test/image-agent-routing.test.mjs",
+  "packages/media/test/image-reference-consistency.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
   "packages/media/test/texture-tile-proof.test.mjs",
   "packages/media/test/texture-set-review.test.mjs",
@@ -106,6 +113,7 @@ for (const requiredTest of [
   "packages/godot/test/material-validation-native.test.mjs",
   "packages/godot/test/material-delivery-mcp.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
+  "tools/image_reference_consistency_mcp.test.mjs",
   "tools/texture_review_mcp.test.mjs",
   "tools/texture_preprocess_mcp.test.mjs",
   "tools/godot_material_delivery_mcp.test.mjs",
@@ -118,6 +126,7 @@ process.stdout.write(`${JSON.stringify({
   surfaces: parsed,
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
+  referenceConsistency: ["approved-reference-baseline", "reference-set-coherence", "palette-tone-detail-silhouette-framing", "batch-outlier-ranking", "no-ai-origin-claim"],
   textureProofSampling: ["continuous", "nearest"],
   textureMaterialReview: ["single-map", "material-set", "normal-y-conversion", "opacity-alpha-composition", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
   godotMaterialDelivery: ["StandardMaterial3D", "ORMMaterial3D", "guarded-preprocessing", "format-3-tres", "create-only-resource-write"],
