@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-effects-agent",
+  "purpose": "Governed offline raster effect layers and Godot 4.6.2 runtime sprite shader planning/compilation for ChatGPT, Claude and Codex.",
+  "entrypoint": "tools/image_effects_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build && pnpm --filter @evavo/art-godot-sprite-effects build",
+  "tools": [
+    "evavo_image_effects_capabilities",
+    "evavo_plan_godot_sprite_effect",
+    "evavo_compile_godot_sprite_effect_pack",
+    "evavo_write_godot_sprite_effect_pack",
+    "evavo_create_raster_effect_layer"
+  ],
+  "runtimeEffects": [
+    "sprite_feedback",
+    "sprite_dissolve",
+    "sprite_ghost",
+    "sprite_sway",
+    "sprite_engraved_ink",
+    "sprite_additive_pulse"
+  ],
+  "rasterEffects": [
+    "drop-shadow",
+    "outer-glow"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "createOnlyWrites": true,
+    "explicitWriteConfirmation": true,
+    "runtimeUsesPerInstanceUniforms": true,
+    "runtimeUsesGameOwnedClock": true,
+    "runtimeAtlasSafeSampling": true,
+    "nativeGodotRendererApprovalRequired": true,
+    "screenTextureEffectsAllowed": false
+  }
+}
