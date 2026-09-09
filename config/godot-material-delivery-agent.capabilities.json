@@ -1,15 +1,31 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "evavo-godot-material-delivery-agent",
-  "purpose": "Read-only Godot 4.x material binding planning after texture, PBR and UV assurance.",
+  "purpose": "Godot 4.6 material binding planning plus guarded create-only TRES materialization after texture, PBR and UV assurance.",
   "entrypoint": "tools/godot_material_delivery_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-godot build",
+  "environment": {
+    "EVAVO_GODOT_MATERIAL_ALLOWED_ROOTS": {
+      "requiredForWrites": true,
+      "description": "Platform-delimited canonical roots where new .tres materials and receipts may be created."
+    },
+    "EVAVO_GODOT_MATERIAL_ALLOW_WRITES": {
+      "requiredForWrites": true,
+      "value": "true"
+    }
+  },
   "tools": [
     "evavo_godot_material_delivery_capabilities",
-    "evavo_plan_godot_material_delivery"
+    "evavo_plan_godot_material_delivery",
+    "evavo_write_godot_material_resource"
   ],
   "targetClasses": ["StandardMaterial3D", "ORMMaterial3D"],
+  "resourceFormat": {
+    "extension": ".tres",
+    "format": 3,
+    "deprecatedLoadStepsEmitted": false
+  },
   "directBindings": [
     "albedo_texture",
     "normal_texture",
@@ -24,13 +40,17 @@
     "directxNormals": "Explicit Y/green conversion to Godot OpenGL normal convention is required before normal_texture binding.",
     "opacity": "Standalone opacity maps are not silently bound; compose into albedo alpha or use a reviewed custom shader.",
     "specular": "Standalone per-pixel specular maps are not silently bound; re-author for metallic/roughness or use a reviewed custom shader.",
-    "ormAuthority": "Packed ORM and separate AO/roughness/metallic inputs cannot both be authoritative."
+    "ormAuthority": "Packed ORM and separate AO/roughness/metallic inputs cannot both be authoritative.",
+    "materialWrite": "Only a ready plan can produce a new create-only .tres; existing targets are never overwritten."
   },
   "guarantees": {
     "sourceMutationAllowed": false,
-    "projectWritesAllowed": false,
+    "createOnlyProjectWrites": true,
+    "explicitWriteConfirmation": true,
+    "readyPlanRequiredForWrite": true,
     "automaticShaderGeneration": false,
     "explicitUnsupportedMapRouting": true,
+    "automaticPromotion": false,
     "runtimeVisualReviewRequired": true
   }
 }
