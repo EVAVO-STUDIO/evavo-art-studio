@@ -8,15 +8,13 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 import { compileAgentWorkbench } from "./agent-workbench.mjs";
+import { compileAgentWorkbenchFleet } from "./agent-workbench-fleet.mjs";
 import { compileHandoff } from "./compile-agent-workbench-handoff.mjs";
 import { compileAgentWorkbenchGuidance } from "./agent-workbench-guide.mjs";
 
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(process.env.EVAVO_AGENT_WORKBENCH_ROOT || scriptRoot);
-const STANDARD_MCP_VERSION = "2025-03-26";
-const EVAVO_DISCOVERY_VERSION = "2026-07-28";
-const SUPPORTED_VERSIONS = Object.freeze([STANDARD_MCP_VERSION, EVAVO_DISCOVERY_VERSION]);
-const SERVER_INFO = Object.freeze({ name: "evavo-agent-workbench", version: "2.1.0" });
+const workspaceParent = path.dirname(repositoryRoot);
 const record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : null;
 const text = (value) => typeof value === "string" ? value.trim() : "";
 const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
@@ -65,6 +63,15 @@ function confined(value, label) {
   return candidate;
 }
 
+function workbenchWorkspaceRoot(value) {
+  const candidate = path.resolve(value ? value : workspaceParent);
+  const explicitAllowed = candidate === repositoryRoot || candidate === workspaceParent || allowedRoots.some((entry) => inside(entry.lexical, candidate));
+  if (!explicitAllowed) throw new Error("workspaceRoot is outside the repository workspace or EVAVO_AGENT_WORKBENCH_EVIDENCE_ROOTS.");
+  const metadata = fs.lstatSync(candidate);
+  if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new Error("workspaceRoot must be a regular non-link directory.");
+  return candidate;
+}
+
 function boundedString(value, label, maximum = 4000, required = false) {
   if (value === undefined || value === null || value === "") {
     if (required) throw new Error(`${label} is required.`);
@@ -92,35 +99,22 @@ const tools = Object.freeze([
   {
     name: "evavo_agent_workbench_snapshot",
     description: "Compile a read-only objective-ranked repository capability, package automation and optional live estate/tool orientation snapshot. Discovery never grants execution or publication authority.",
-    inputSchema: objectSchema({
-      objective: { type: "string", maxLength: 4000 },
-      limit: { type: "integer", minimum: 1, maximum: 200 },
-      all: { type: "boolean" },
-      toolRegistryPath: pathField,
-      estateSnapshotPath: pathField,
-    }),
+    inputSchema: objectSchema({ objective: { type: "string", maxLength: 4000 }, limit: { type: "integer", minimum: 1, maximum: 200 }, all: { type: "boolean" }, toolRegistryPath: pathField, estateSnapshotPath: pathField }),
+  },
+  {
+    name: "evavo_agent_workbench_fleet",
+    description: "Compile a read-only ranked view across local workbench-enabled sibling repositories. The local sibling scan never claims provider-estate completeness or absence.",
+    inputSchema: objectSchema({ workspaceRoot: pathField, objective: { type: "string", maxLength: 4000 }, limit: { type: "integer", minimum: 1, maximum: 200 }, perRepositoryLimit: { type: "integer", minimum: 1, maximum: 100 }, repositoryLimit: { type: "integer", minimum: 1, maximum: 512 }, estateSnapshotPath: pathField }),
   },
   {
     name: "evavo_agent_workbench_guide",
     description: "Compile read-only next-phase and route-risk guidance from one exact workbench snapshot. Guidance classifies required admission/handoff evidence but grants no execution authority.",
-    inputSchema: objectSchema({
-      snapshotPath: pathField,
-      routeType: { enum: ["capability", "script", "tool", "estate-capability"] },
-      routeId: { type: "string", minLength: 1, maxLength: 512 },
-      currentPhase: { type: "string", minLength: 1, maxLength: 128 },
-    }, ["snapshotPath"]),
+    inputSchema: objectSchema({ snapshotPath: pathField, routeType: { enum: ["capability", "script", "tool", "estate-capability"] }, routeId: { type: "string", minLength: 1, maxLength: 512 }, currentPhase: { type: "string", minLength: 1, maxLength: 128 } }, ["snapshotPath"]),
   },
   {
     name: "evavo_agent_workbench_handoff",
     description: "Compile an evidence-bound, all-authority-false handoff from one exact workbench snapshot file and selected route. The receiving authority must separately admit execution or mutation.",
-    inputSchema: objectSchema({
-      snapshotPath: pathField,
-      routeType: { enum: ["capability", "script", "tool", "estate-capability"] },
-      routeId: { type: "string", minLength: 1, maxLength: 512 },
-      to: { type: "string", minLength: 1, maxLength: 256 },
-      objective: { type: "string", minLength: 1, maxLength: 4000 },
-      reason: { type: "string", minLength: 1, maxLength: 4000 },
-    }, ["snapshotPath", "routeType", "routeId", "to", "reason"]),
+    inputSchema: objectSchema({ snapshotPath: pathField, routeType: { enum: ["capability", "script", "tool", "estate-capability"] }, routeId: { type: "string", minLength: 1, maxLength: 512 }, to: { type: "string", minLength: 1, maxLength: 256 }, objective: { type: "string", minLength: 1, maxLength: 4000 }, reason: { type: "string", minLength: 1, maxLength: 4000 } }, ["snapshotPath", "routeType", "routeId", "to", "reason"]),
   },
 ]);
 
@@ -133,9 +127,7 @@ function contractBundle() {
 function assertSnapshotBoundary(value) {
   if (value?.contract !== "evavo_agent_workbench_snapshot_v1") throw new Error("Snapshot contract is not evavo_agent_workbench_snapshot_v1.");
   const policy = record(value.policy);
-  if (!policy || policy.readOnlyCompiler !== true || policy.commandExecutionPerformed !== false || policy.mutationPerformed !== false || policy.routeDoesNotAuthorizeEffects !== true || policy.planDoesNotProveExecution !== true || policy.publicationRequiresSeparateAuthority !== true) {
-    throw new Error("Snapshot truth boundary is incomplete or unsafe.");
-  }
+  if (!policy || policy.readOnlyCompiler !== true || policy.commandExecutionPerformed !== false || policy.mutationPerformed !== false || policy.routeDoesNotAuthorizeEffects !== true || policy.planDoesNotProveExecution !== true || policy.publicationRequiresSeparateAuthority !== true) throw new Error("Snapshot truth boundary is incomplete or unsafe.");
 }
 
 function callTool(name, input) {
@@ -143,69 +135,31 @@ function callTool(name, input) {
   if (name === "evavo_agent_workbench_snapshot") {
     const toolRegistryPath = input.toolRegistryPath ? confined(input.toolRegistryPath, "toolRegistryPath") : null;
     const estateSnapshotPath = input.estateSnapshotPath ? confined(input.estateSnapshotPath, "estateSnapshotPath") : null;
-    return compileAgentWorkbench({
-      root: repositoryRoot,
-      objective: boundedString(input.objective, "objective"),
-      limit: boundedInteger(input.limit, "limit", 20, 1, 200),
-      all: input.all === true,
-      ...(toolRegistryPath ? { toolRegistryPath } : {}),
-      ...(estateSnapshotPath ? { estateSnapshotPath } : {}),
-    });
+    return compileAgentWorkbench({ root: repositoryRoot, objective: boundedString(input.objective, "objective"), limit: boundedInteger(input.limit, "limit", 20, 1, 200), all: input.all === true, ...(toolRegistryPath ? { toolRegistryPath } : {}), ...(estateSnapshotPath ? { estateSnapshotPath } : {}) });
+  }
+  if (name === "evavo_agent_workbench_fleet") {
+    const estateSnapshotPath = input.estateSnapshotPath ? confined(input.estateSnapshotPath, "estateSnapshotPath") : null;
+    return compileAgentWorkbenchFleet({ workspaceRoot: workbenchWorkspaceRoot(input.workspaceRoot), objective: boundedString(input.objective, "objective"), limit: boundedInteger(input.limit, "limit", 50, 1, 200), perRepositoryLimit: boundedInteger(input.perRepositoryLimit, "perRepositoryLimit", 20, 1, 100), repositoryLimit: boundedInteger(input.repositoryLimit, "repositoryLimit", 256, 1, 512), ...(estateSnapshotPath ? { estateSnapshotPath } : {}) });
   }
   if (name === "evavo_agent_workbench_guide") {
     const snapshotPath = confined(input.snapshotPath, "snapshotPath");
     const bytes = fs.readFileSync(snapshotPath);
     const value = JSON.parse(bytes.toString("utf8"));
     assertSnapshotBoundary(value);
-    return compileAgentWorkbenchGuidance({
-      snapshotRead: { value, bytes, sha256: digest(bytes) },
-      routeType: input.routeType ? boundedString(input.routeType, "routeType", 32, true) : null,
-      routeId: input.routeId ? boundedString(input.routeId, "routeId", 512, true) : null,
-      currentPhase: input.currentPhase ? boundedString(input.currentPhase, "currentPhase", 128, true) : null,
-    });
+    return compileAgentWorkbenchGuidance({ snapshotRead: { value, bytes, sha256: digest(bytes) }, routeType: input.routeType ? boundedString(input.routeType, "routeType", 32, true) : null, routeId: input.routeId ? boundedString(input.routeId, "routeId", 512, true) : null, currentPhase: input.currentPhase ? boundedString(input.currentPhase, "currentPhase", 128, true) : null });
   }
   if (name === "evavo_agent_workbench_handoff") {
     const snapshotPath = confined(input.snapshotPath, "snapshotPath");
     const bytes = fs.readFileSync(snapshotPath);
     const value = JSON.parse(bytes.toString("utf8"));
     assertSnapshotBoundary(value);
-    return compileHandoff({
-      snapshotRead: { value, bytes, sha256: digest(bytes) },
-      routeType: boundedString(input.routeType, "routeType", 32, true),
-      routeId: boundedString(input.routeId, "routeId", 512, true),
-      to: boundedString(input.to, "to", 256, true),
-      objective: boundedString(input.objective ?? value.objective, "objective", 4000, true),
-      reason: boundedString(input.reason, "reason", 4000, true),
-    });
+    return compileHandoff({ snapshotRead: { value, bytes, sha256: digest(bytes) }, routeType: boundedString(input.routeType, "routeType", 32, true), routeId: boundedString(input.routeId, "routeId", 512, true), to: boundedString(input.to, "to", 256, true), objective: boundedString(input.objective ?? value.objective, "objective", 4000, true), reason: boundedString(input.reason, "reason", 4000, true) });
   }
   throw new Error(`Unknown tool: ${name}`);
 }
 
-function response(id, result) {
-  process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id, result })}\n`);
-}
-
-function errorResponse(id, error) {
-  process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32000, message: error instanceof Error ? error.message : String(error) } })}\n`);
-}
-
-function discoveryResult(requestedVersion) {
-  const requested = text(requestedVersion);
-  return {
-    protocolVersion: SUPPORTED_VERSIONS.includes(requested) ? requested : EVAVO_DISCOVERY_VERSION,
-    supportedVersions: [...SUPPORTED_VERSIONS],
-    serverInfo: SERVER_INFO,
-    capabilities: { tools: { count: tools.length, listChanged: false } },
-    transport: "stdio",
-    readOnly: true,
-    truthBoundary: {
-      executionGranted: false,
-      mutationGranted: false,
-      publicationGranted: false,
-      discoveryProvesRuntimeExecution: false,
-    },
-  };
-}
+function response(id, result) { process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id, result })}\n`); }
+function errorResponse(id, error) { process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32000, message: error instanceof Error ? error.message : String(error) } })}\n`); }
 
 const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
 for await (const line of input) {
@@ -213,10 +167,10 @@ for await (const line of input) {
   let request;
   try {
     request = JSON.parse(line);
-    if (request.method === "initialize") {
-      response(request.id, { protocolVersion: STANDARD_MCP_VERSION, capabilities: { tools: {} }, serverInfo: SERVER_INFO });
-    } else if (request.method === "server/discover") {
-      response(request.id, discoveryResult(request.params?.protocolVersion));
+    if (request.method === "server/discover") {
+      response(request.id, { supportedVersions: ["2026-07-28"], serverInfo: { name: "evavo-agent-workbench", version: "2.0.0" }, capabilities: { tools: tools.map((tool) => tool.name), guidance: true, handoff: true, fleet: true }, truthBoundary: { readOnly: true, executionGranted: false, mutationGranted: false, publicationGranted: false, completionClaimProven: false } });
+    } else if (request.method === "initialize") {
+      response(request.id, { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "evavo-agent-workbench", version: "2.0.0" } });
     } else if (request.method === "notifications/initialized") {
       // Notification: no response.
     } else if (request.method === "tools/list") {
