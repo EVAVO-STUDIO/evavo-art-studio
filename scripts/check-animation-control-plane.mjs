@@ -185,22 +185,37 @@ function humanCelSmokeAuthority() {
     },
   });
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
+  assert.equal(authority.protocolVersion, "2026-09-09.6");
   assert.equal(authority.authority.mode, "human-cel-authored");
+  assert.equal(authority.authority.performanceActing, "strict");
   assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
   assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
   assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
-  assert.equal(authority.authority.requiredApprovalPath, "reviewHumanCelArtefact");
+  assert.equal(authority.authority.canonicalApprovalHelper, "reviewHumanCelArtefact");
+  assert.equal(
+    authority.authority.requiredPersistenceGate,
+    "strict-human-cel-promotion-receipt-gate",
+  );
   assert.equal(authority.authority.requiresExactProductionAuthority, true);
   assert.equal(authority.authority.requiresCandidateEnvelopeProvenance, true);
+  assert.equal(authority.authority.requiresPersistencePromotionGate, true);
   assert.equal(authority.handoff.targetRepository, "EVAVO-STUDIO/cel-animation-studio");
-  assert.equal(authority.handoff.minimumPackageVersion, "0.35.0");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.37.0");
+  assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
+  assert.equal(authority.handoff.minimumStorePackageVersion, "0.26.0");
+  assert.equal(
+    authority.handoff.requiredStoreBehavior,
+    "strict-human-cel-promotion-receipt-gate",
+  );
   for (const required of [
     "createHumanCelProductionAuthority",
     "assertHumanCelProductionAuthorityBinding",
     "createStrictHumanCelRenderPrompt",
+    "createHumanCelPerformanceDirective",
     "evaluateHumanCelQualityGate",
     "evaluateHumanCelFinishReview",
     "evaluateHumanCelCinematographyReview",
+    "evaluateHumanCelPerformanceReview",
     "evaluateHumanCelEnvironmentReview",
     "createHumanCelQualityReceipt",
     "assertHumanCelQualityReceiptBinding",
@@ -334,10 +349,13 @@ async function main() {
     "docs/human-cel-animation-authority-v1.md",
   ]);
   assertRequires(humanCelCapability, [
-    "Cel Animation Studio @evavo/cel-core 0.35.0 or newer",
+    "Cel Animation Studio @evavo/cel-core 0.37.0 or newer",
+    "Cel Animation Studio @evavo/cel-store 0.26.0 or newer",
+    "createHumanCelPerformanceDirective and evaluateHumanCelPerformanceReview downstream surfaces",
     "Candidate provenance containing the exact strict-envelope digest",
     "createHumanCelQualityReceipt and reviewHumanCelArtefact downstream surfaces",
     "Zero-blocker persisted quality receipt for strict approval",
+    "Store strict-human-cel-promotion-receipt-gate before approved state is authoritative",
   ]);
 
   const productionIntegration = await readJson("creative-production.integration.json");
@@ -352,11 +370,17 @@ async function main() {
     false,
     `Capability registry must not reference stale entrypoint ${STALE_SEQUENCE_ENTRY}`,
   );
-  assert.equal(
-    capabilityText.includes("@evavo/cel-core 0.34.0"),
-    false,
-    "Capability registry must not advertise stale strict human-cel core 0.34.0",
-  );
+  for (const stale of [
+    "@evavo/cel-core 0.34.0",
+    "@evavo/cel-core 0.35.0",
+    "@evavo/cel-core 0.36.0",
+  ]) {
+    assert.equal(
+      capabilityText.includes(stale),
+      false,
+      `Capability registry must not advertise stale strict human-cel contract ${stale}`,
+    );
+  }
 
   process.stdout.write(`${JSON.stringify({
     status: "ok",
@@ -366,11 +390,14 @@ async function main() {
     humanCelAuthority: {
       authorityId: humanCelAuthority.authorityId,
       contentDigest: humanCelAuthority.contentDigest,
+      protocolVersion: humanCelAuthority.protocolVersion,
       coreMinimumVersion: humanCelAuthority.handoff.minimumPackageVersion,
+      storeMinimumVersion: humanCelAuthority.handoff.minimumStorePackageVersion,
       strict: true,
+      performanceActingRequired: true,
       candidateEnvelopeProvenanceRequired: true,
       qualityReceiptRequired: true,
-      strictApprovalPathRequired: true,
+      persistencePromotionGateRequired: true,
     },
     verifiedCapabilities: [
       "art.animation.pipeline",
