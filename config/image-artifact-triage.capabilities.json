@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-artifact-triage",
+  "purpose": "Read-only image artifact triage covering established technical artifacts plus advisory repeated-detail and detail-density anomalies without claiming AI origin.",
+  "entrypoint": "tools/image_artifact_triage_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_IMAGE_ARTIFACT_ALLOWED_ROOTS": {
+      "requiredForImageReads": true,
+      "description": "Platform-delimited canonical roots containing images that may be reviewed for artifact risk."
+    }
+  },
+  "tools": [
+    "evavo_image_artifact_triage_capabilities",
+    "evavo_review_image_artifact_risk"
+  ],
+  "signals": [
+    "ringing-or-oversharpen",
+    "posterization",
+    "nearest-neighbour-upscale-fingerprint",
+    "repeated-nontrivial-local-patterns",
+    "local-detail-density-imbalance",
+    "quality-and-defect-context"
+  ],
+  "semanticOnlyChecks": [
+    "anatomy-and-hands",
+    "malformed-text-or-glyphs",
+    "identity-and-costume-consistency",
+    "impossible-reflections-occlusion-or-perspective",
+    "wrong-content-or-object-logic"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "writesFiles": false,
+    "artifactSignalsAdvisoryOnly": true,
+    "semanticVisualReviewRequired": true,
+    "claimsAiOriginDetection": false
+  }
+}
