@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.1";
+export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.2";
 export const HUMAN_CEL_AUTHORITY_KIND = "evavo.human-cel-animation-authority.v1";
 export const HUMAN_CEL_CRAFT_AUTHORITY_ID = "evavo-human-cel-craft-v1";
 export const HUMAN_CEL_ALLOWED_MOTION_STYLES = Object.freeze([
@@ -78,7 +78,7 @@ function validateAnimationRequest(request) {
 
   const camera = object(request.camera, "HUMAN_CEL_AUTHORITY_CAMERA_INVALID");
   safeId(camera.profileId, "HUMAN_CEL_AUTHORITY_CAMERA_PROFILE_INVALID");
-  if (!['locked', 'authored'].includes(camera.motion)) {
+  if (!["locked", "authored"].includes(camera.motion)) {
     fail("HUMAN_CEL_AUTHORITY_CAMERA_MOTION_INVALID");
   }
   nonBlank(camera.framing, "HUMAN_CEL_AUTHORITY_CAMERA_FRAMING_REQUIRED");
@@ -164,7 +164,7 @@ export function compileHumanCelAnimationAuthority(request) {
     handoff: {
       targetRepository: "EVAVO-STUDIO/cel-animation-studio",
       package: "@evavo/cel-core",
-      minimumPackageVersion: "0.31.0",
+      minimumPackageVersion: "0.32.0",
       requiredExports: [
         "createHumanCelRenderPrompt",
         "createHumanCelShotLanguageDirective",
@@ -206,6 +206,9 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
   }
   if (authority.handoff?.targetRepository !== "EVAVO-STUDIO/cel-animation-studio") {
     fail("HUMAN_CEL_AUTHORITY_HANDOFF_INVALID");
+  }
+  if (authority.handoff?.minimumPackageVersion !== "0.32.0") {
+    fail("HUMAN_CEL_AUTHORITY_CORE_VERSION_INVALID");
   }
   if (authority.boundary?.providerExecutionIncluded !== false || authority.boundary?.creativeApprovalIncluded !== false) {
     fail("HUMAN_CEL_AUTHORITY_BOUNDARY_INVALID");
