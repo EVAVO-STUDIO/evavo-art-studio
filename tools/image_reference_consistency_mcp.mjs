@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
-import { readFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import readline from "node:readline";
 
 import {
+  createImageReferenceConsistencyProof,
   reviewImageReferenceConsistency,
   reviewImageReferenceConsistencyBatch,
 } from "../packages/media/dist/index.js";
@@ -13,15 +15,16 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-image-reference-consistency";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_IMAGE_CONSISTENCY_ALLOWED_ROOTS";
+const WRITE_ENV = "EVAVO_IMAGE_CONSISTENCY_ALLOW_WRITES";
 const MAX_REFERENCES = 32;
 const MAX_CANDIDATES = 128;
 
-const assertAllowed = (filePath) => assertAllowedLocalPath(filePath, {
+const assertAllowed = (filePath, { output = false } = {}) => assertAllowedLocalPath(filePath, {
   envName: ALLOWED_ROOTS_ENV,
-  output: false,
+  output,
   label: "image reference consistency",
 });
 
@@ -32,6 +35,16 @@ function consistencySpec(args) {
     ...(Number.isFinite(args.failDistance) ? { failDistance: args.failDistance } : {}),
     ...(Number.isFinite(args.referenceUnstableDistance) ? { referenceUnstableDistance: args.referenceUnstableDistance } : {}),
     ...(Number.isInteger(args.alphaVisibleThreshold) ? { alphaVisibleThreshold: args.alphaVisibleThreshold } : {}),
+  };
+}
+
+function proofSpec(args) {
+  return {
+    ...consistencySpec(args),
+    ...(Number.isInteger(args.tileSize) ? { tileSize: args.tileSize } : {}),
+    ...(Number.isInteger(args.columns) ? { columns: args.columns } : {}),
+    ...(Number.isInteger(args.maximumReferenceCards) ? { maximumReferenceCards: args.maximumReferenceCards } : {}),
+    ...(Number.isInteger(args.maximumCandidateCards) ? { maximumCandidateCards: args.maximumCandidateCards } : {}),
   };
 }
 
@@ -129,6 +142,85 @@ async function reviewBatch(args) {
   });
 }
 
+function requireWriteAdmission(args) {
+  if (process.env[WRITE_ENV] !== "true") {
+    throw new Error(`Image reference consistency writes are disabled. Set ${WRITE_ENV}=true.`);
+  }
+  if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required for this exact proof write.");
+}
+
+function identity(filePath) {
+  const resolved = path.resolve(filePath);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+async function assertCreateOnly(filePaths) {
+  for (const filePath of filePaths) {
+    try {
+      await access(filePath);
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") continue;
+      throw error;
+    }
+    throw new Error(`Create-only consistency proof target already exists: ${filePath}`);
+  }
+}
+
+async function createOnly(filePath, contents) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, contents, { flag: "wx" });
+}
+
+async function createProof(args) {
+  requireWriteAdmission(args);
+  if (typeof args.outputPath !== "string") throw new Error("outputPath is required.");
+  if (path.extname(args.outputPath).toLowerCase() !== ".png") throw new Error("outputPath must end in .png.");
+  const candidates = await loadEntries(args.candidates, "candidates", MAX_CANDIDATES);
+  const references = await loadEntries(args.references, "references", MAX_REFERENCES);
+  const outputPath = await assertAllowed(args.outputPath, { output: true });
+  const receiptPath = await assertAllowed(
+    typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`,
+    { output: true },
+  );
+  const sourcePaths = [...candidates.map((item) => item.path), ...references.map((item) => item.path)];
+  const sourceIds = new Set(sourcePaths.map(identity));
+  if (sourceIds.has(identity(outputPath)) || sourceIds.has(identity(receiptPath))) {
+    throw new Error("Consistency proof outputs must differ from every candidate/reference source path.");
+  }
+  if (identity(outputPath) === identity(receiptPath)) throw new Error("Consistency proof output and receipt paths must be distinct.");
+  await assertCreateOnly([outputPath, receiptPath]);
+
+  const proof = await createImageReferenceConsistencyProof(
+    candidates.map((candidate) => ({ id: candidate.id, encoded: candidate.encoded })),
+    references.map((reference) => ({ id: reference.id, encoded: reference.encoded })),
+    proofSpec(args),
+  );
+  const receipt = Object.freeze({
+    schemaVersion: "1.1",
+    operation: "evavo-image-reference-consistency-proof",
+    approvalState: "diagnostic-only",
+    outputPath,
+    receiptPath,
+    candidatePaths: candidates.map((item) => ({ id: item.id, path: item.path })),
+    referencePaths: references.map((item) => ({ id: item.id, path: item.path })),
+    evidence: proof.evidence,
+    semanticReviewRequired: true,
+    aiOriginDetection: "not-claimed",
+    sourceModified: false,
+  });
+  await createOnly(outputPath, proof.png);
+  await createOnly(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  return Object.freeze({
+    ok: true,
+    outputPath,
+    receiptPath,
+    evidence: proof.evidence,
+    approvalState: "diagnostic-only",
+    sourceModified: false,
+    bytesReturned: false,
+  });
+}
+
 const pathEntrySchema = Object.freeze({
   type: "object",
   properties: {
@@ -150,7 +242,7 @@ const specProperties = Object.freeze({
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_image_reference_consistency_capabilities",
-    description: "Describe read-only approved-reference visual consistency analysis for individual images and batches.",
+    description: "Describe approved-reference visual consistency review and optional guarded diagnostic proof generation.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
@@ -181,13 +273,34 @@ const tools = Object.freeze([
       additionalProperties: false,
     },
   }),
+  Object.freeze({
+    name: "evavo_create_image_reference_consistency_proof",
+    description: "Create a bounded PNG diagnostic proof containing approved references and the strongest candidate visual-drift outliers, plus a JSON receipt. Write-gated, create-only and diagnostic-only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        candidates: { type: "array", minItems: 1, maxItems: MAX_CANDIDATES, items: pathEntrySchema },
+        references: { type: "array", minItems: 1, maxItems: MAX_REFERENCES, items: pathEntrySchema },
+        ...specProperties,
+        tileSize: { type: "integer", minimum: 96, maximum: 384 },
+        columns: { type: "integer", minimum: 1, maximum: 8 },
+        maximumReferenceCards: { type: "integer", minimum: 1, maximum: 16 },
+        maximumCandidateCards: { type: "integer", minimum: 1, maximum: 48 },
+        outputPath: { type: "string", minLength: 1 },
+        receiptPath: { type: "string", minLength: 1 },
+        confirmLocalWrite: { type: "boolean", const: true },
+      },
+      required: ["candidates", "references", "outputPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
 ]);
 
 async function callTool(name, args) {
   if (name === "evavo_image_reference_consistency_capabilities") {
     return Object.freeze({
-      contract: "evavo_image_reference_consistency_agent_v1",
-      mode: "read-only-reference-consistency",
+      contract: "evavo_image_reference_consistency_agent_v1_1",
+      mode: "read-only-review-plus-write-gated-diagnostic-proof",
       tools: tools.map((tool) => tool.name),
       maximumReferences: MAX_REFERENCES,
       maximumCandidates: MAX_CANDIDATES,
@@ -201,12 +314,20 @@ async function callTool(name, args) {
         "aspect-and-canvas-drift",
         "reference-set-coherence",
       ],
+      proof: Object.freeze({
+        format: "png",
+        createsReceipt: true,
+        strongestOutliersFirst: true,
+        diagnosticOnly: true,
+        createOnly: true,
+      }),
       boundaries: [
         "does not prove semantic character or object identity",
         "does not prove artistic correctness",
         "does not detect AI authorship",
         "reference-set instability prevents confident rejection",
       ],
+      writesEnabled: process.env[WRITE_ENV] === "true",
       allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
       sourceMutationAllowed: false,
       bytesReturned: false,
@@ -214,6 +335,7 @@ async function callTool(name, args) {
   }
   if (name === "evavo_review_image_against_references") return reviewOne(args ?? {});
   if (name === "evavo_review_image_batch_against_references") return reviewBatch(args ?? {});
+  if (name === "evavo_create_image_reference_consistency_proof") return createProof(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 
@@ -237,7 +359,7 @@ async function dispatch(request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions: `Read-only approved-reference consistency review. Configure ${ALLOWED_ROOTS_ENV}; image bytes remain local and no source is modified.`,
+        instructions: `Approved-reference reviews are read-only. Configure ${ALLOWED_ROOTS_ENV}; optional diagnostic proof writes additionally require ${WRITE_ENV}=true and confirmLocalWrite=true.`,
       },
     };
   }
