@@ -3,6 +3,7 @@ export const IMAGE_AGENT_ROUTE_CONTRACT = "evavo.image-agent-route.v1" as const;
 export type ImageAgentGoal =
   | "quality-review"
   | "frame-consistency"
+  | "reference-consistency"
   | "fake-transparency"
   | "natural-background-cutout"
   | "local-technical-repair"
@@ -50,7 +51,20 @@ const ROUTES: Readonly<Record<ImageAgentGoal, Omit<ImageAgentRoute, "contract" |
     prerequisites: Object.freeze(["2-128 related frames/images", "correct intended role/profile when known"]),
     stopConditions: Object.freeze(["canvas/aspect mismatch", "alpha-state mismatch", "high-priority continuity outliers", "identity/style uncertainty"]),
     evidenceExpected: Object.freeze(["median technical baseline", "ranked outliers", "sequence timing/pivot/baseline evidence when manifest exists"]),
-    notes: Object.freeze(["Technical continuity does not replace visual identity, anatomy, pose arc or art-direction review."]),
+    notes: Object.freeze(["Technical continuity does not replace visual identity, anatomy, pose arc or art-direction review. Use reference-consistency when approved visual anchors exist."]),
+  }),
+  "reference-consistency": Object.freeze({
+    primarySurface: "evavo-image-reference-consistency",
+    orderedTools: Object.freeze(["evavo_review_image_against_references", "evavo_review_image_batch_against_references"]),
+    writeClass: "read-only",
+    prerequisites: Object.freeze(["1-32 approved reference images", "candidate image or 1-128 candidate batch", "references represent one intended visual target"]),
+    stopConditions: Object.freeze(["reference set is unstable", "strong technical visual drift", "semantic identity/style correctness remains uncertain"]),
+    evidenceExpected: Object.freeze(["reference-set coherence", "palette/tone/detail/silhouette/framing distances", "nearest approved references", "ranked batch outliers"]),
+    notes: Object.freeze([
+      "This is a deterministic visual-style surrogate, not character/object identity recognition.",
+      "Reference-set instability prevents confident rejection because a contradictory baseline is not authoritative.",
+      "It does not detect or prove AI authorship; use provenance plus human semantic review for origin and art-direction judgments.",
+    ]),
   }),
   "fake-transparency": Object.freeze({
     primarySurface: "evavo-raster-finishing",
