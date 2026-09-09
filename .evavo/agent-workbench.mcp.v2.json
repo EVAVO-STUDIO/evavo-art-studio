@@ -24,6 +24,11 @@
     "write": "node scripts/agent-workbench-mcp-registration.mjs --write",
     "test": "node scripts/test-agent-workbench-mcp-registration.mjs"
   },
+  "doctor": {
+    "check": "node scripts/agent-workbench-doctor.mjs",
+    "repairRegistration": "node scripts/agent-workbench-doctor.mjs --repair-registration",
+    "test": "node scripts/test-agent-workbench-doctor.mjs"
+  },
   "evidenceRootsEnvironment": "EVAVO_AGENT_WORKBENCH_EVIDENCE_ROOTS",
   "smokeTest": "node scripts/test-agent-workbench-mcp-v2.mjs",
   "truthBoundary": {
@@ -36,6 +41,8 @@
     "guidanceProvesReadiness": false,
     "registrationExecutesServer": false,
     "registrationGrantsAuthority": false,
+    "doctorAuthorizesEffects": false,
+    "doctorRepairScope": ".mcp.json workbench v2 registration only",
     "downstreamAdmissionRequired": true
   }
 }
