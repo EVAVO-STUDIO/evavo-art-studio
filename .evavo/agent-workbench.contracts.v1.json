@@ -1,6 +1,7 @@
 {
   "contractVersion": "evavo_agent_workbench_contract_bundle_v1",
   "config": ".evavo/agent-workbench.v1.json",
+  "mcp": ".evavo/agent-workbench.mcp.v1.json",
   "schemas": {
     "config": "schemas/evavo.agent-workbench-config.schema.json",
     "snapshot": "schemas/evavo.agent-workbench-snapshot.schema.json",
@@ -9,13 +10,17 @@
   "entrypoints": {
     "compileSnapshot": "scripts/agent-workbench.mjs",
     "verify": "scripts/verify-agent-workbench.mjs",
-    "compileHandoff": "scripts/compile-agent-workbench-handoff.mjs"
+    "compileHandoff": "scripts/compile-agent-workbench-handoff.mjs",
+    "mcp": "scripts/agent-workbench-mcp.mjs",
+    "mcpSmoke": "scripts/test-agent-workbench-mcp.mjs"
   },
   "truthBoundary": {
     "discoveryAuthorizesExecution": false,
     "handoffAuthorizesExecution": false,
     "handoffAuthorizesMutation": false,
     "handoffAuthorizesPublication": false,
+    "mcpAuthorizesExecution": false,
+    "mcpAuthorizesMutation": false,
     "downstreamAdmissionRequired": true
   },
   "repository": "EVAVO-STUDIO/evavo-art-studio",
