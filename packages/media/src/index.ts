@@ -35,6 +35,8 @@ export * from "./image-review-orchestrator.js";
 export * from "./image-repair-routing.js";
 export * from "./image-finishing-review-packet.js";
 export * from "./image-finishing-batch-proof.js";
+export * from "./image-sequence-finishing-review.js";
+export * from "./image-delivery-integrity.js";
 export * from "./image-agent-routing.js";
 export * from "./texture-map-review.js";
 export * from "./texture-tile-proof.js";
