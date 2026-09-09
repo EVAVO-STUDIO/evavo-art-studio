@@ -9,6 +9,8 @@ import {
   packGodotOrmTexture,
   reviewTextureMap,
   reviewTextureSet,
+  reviewUvLayout,
+  reviewWavefrontObjUv,
 } from "../packages/media/dist/index.js";
 import {
   assertAllowedLocalPath,
@@ -16,11 +18,12 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-texture-review";
-const SERVER_VERSION = "1.2.0";
+const SERVER_VERSION = "1.3.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS";
 const WRITE_ENV = "EVAVO_TEXTURE_REVIEW_ALLOW_WRITES";
 const MAX_SET_SIZE = 32;
+const MAX_UV_TRIANGLES = 5000;
 
 const MAP_KINDS = Object.freeze([
   "base-color",
@@ -36,6 +39,7 @@ const MAP_KINDS = Object.freeze([
 ]);
 const PROOF_SAMPLING = Object.freeze(["continuous", "nearest"]);
 const SCALAR_CHANNELS = Object.freeze(["r", "g", "b", "a"]);
+const UV_POLICIES = Object.freeze(["ignore", "warn", "reject"]);
 
 const assertAllowed = (filePath, { output = false } = {}) =>
   assertAllowedLocalPath(filePath, {
@@ -55,6 +59,20 @@ function reviewSpec(args) {
   };
 }
 
+function uvReviewSpec(args) {
+  return {
+    ...(typeof args.allowTiledCoordinates === "boolean" ? { allowTiledCoordinates: args.allowTiledCoordinates } : {}),
+    ...(UV_POLICIES.includes(args.overlapPolicy) ? { overlapPolicy: args.overlapPolicy } : {}),
+    ...(UV_POLICIES.includes(args.mirroredPolicy) ? { mirroredPolicy: args.mirroredPolicy } : {}),
+    ...(Number.isFinite(args.uvAreaEpsilon) ? { uvAreaEpsilon: args.uvAreaEpsilon } : {}),
+    ...(Number.isFinite(args.uvEqualityTolerance) ? { uvEqualityTolerance: args.uvEqualityTolerance } : {}),
+    ...(Number.isFinite(args.textureWidth) ? { textureWidth: args.textureWidth } : {}),
+    ...(Number.isFinite(args.textureHeight) ? { textureHeight: args.textureHeight } : {}),
+    ...(Number.isFinite(args.maximumTexelDensityRatio) ? { maximumTexelDensityRatio: args.maximumTexelDensityRatio } : {}),
+    ...(Number.isFinite(args.minimumAtlasBoundaryPaddingTexels) ? { minimumAtlasBoundaryPaddingTexels: args.minimumAtlasBoundaryPaddingTexels } : {}),
+  };
+}
+
 async function reviewTexture(args) {
   if (typeof args.inputPath !== "string") throw new Error("inputPath is required.");
   if (!MAP_KINDS.includes(args.kind)) throw new Error("A supported texture map kind is required.");
@@ -64,7 +82,7 @@ async function reviewTexture(args) {
     ok: true,
     inputPath,
     evidence,
-    interpretation: "This is deterministic map/data validation. Material appearance, texel density, UV correctness and shader intent still require runtime visual review.",
+    interpretation: "Deterministic map/data validation. Material appearance and mesh/UV fit still require runtime visual review.",
     bytesReturned: false,
     sourceModified: false,
   });
@@ -97,9 +115,42 @@ async function reviewMaterialSet(args) {
   return Object.freeze({
     ok: true,
     evidence,
-    interpretation: "This validates a coherent material set and emits Godot-oriented map usage guidance. UV placement and final surface appearance still require mesh/runtime review.",
+    interpretation: "Validates one coherent material set and Godot import intent; UV placement and final surface appearance remain separate review domains.",
     bytesReturned: false,
     sourcesModified: false,
+  });
+}
+
+function reviewUvTriangles(args) {
+  if (!Array.isArray(args.triangles) || args.triangles.length < 1 || args.triangles.length > MAX_UV_TRIANGLES) {
+    throw new Error(`triangles must contain 1 through ${MAX_UV_TRIANGLES} entries.`);
+  }
+  const evidence = reviewUvLayout(args.triangles, uvReviewSpec(args));
+  return Object.freeze({
+    ok: true,
+    evidence,
+    interpretation: "UV topology/coverage assurance only. A passing result does not prove the texture visually aligns with semantic mesh features.",
+    sourceModified: false,
+  });
+}
+
+async function reviewObjUv(args) {
+  if (typeof args.inputPath !== "string") throw new Error("inputPath is required.");
+  const inputPath = await assertAllowed(args.inputPath);
+  const source = await readFile(inputPath, "utf8");
+  const result = reviewWavefrontObjUv(source, {
+    ...uvReviewSpec(args),
+    ...(typeof args.flipVForReview === "boolean" ? { flipVForReview: args.flipVForReview } : {}),
+  });
+  const { triangles: _triangles, ...extraction } = result.extraction;
+  return Object.freeze({
+    ok: true,
+    inputPath,
+    extraction,
+    evidence: result.review,
+    interpretation: "OBJ faces are triangulated for read-only UV assurance. Faces missing UVs are counted rather than assigned invented coordinates.",
+    bytesReturned: false,
+    sourceModified: false,
   });
 }
 
@@ -109,9 +160,7 @@ function identity(filePath) {
 }
 
 function requireWriteAdmission(args) {
-  if (process.env[WRITE_ENV] !== "true") {
-    throw new Error(`Texture review writes are disabled. Set ${WRITE_ENV}=true.`);
-  }
+  if (process.env[WRITE_ENV] !== "true") throw new Error(`Texture review writes are disabled. Set ${WRITE_ENV}=true.`);
   if (args.confirmLocalWrite !== true) throw new Error("confirmLocalWrite=true is required for this exact write call.");
 }
 
@@ -121,9 +170,7 @@ function assertDistinctPaths(sourcePaths, outputPaths) {
   if (outputs.some((candidate) => sources.has(candidate))) {
     throw new Error("Texture operations are non-destructive: derived outputs must differ from every source path.");
   }
-  if (new Set(outputs).size !== outputs.length) {
-    throw new Error("Texture derived output and receipt paths must be distinct.");
-  }
+  if (new Set(outputs).size !== outputs.length) throw new Error("Texture derived output and receipt paths must be distinct.");
 }
 
 async function assertCreateOnlyTargets(filePaths) {
@@ -145,31 +192,23 @@ async function createOnly(filePath, contents) {
 
 async function createTileProof(args) {
   requireWriteAdmission(args);
-  if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") {
-    throw new Error("inputPath and outputPath are required.");
-  }
+  if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") throw new Error("inputPath and outputPath are required.");
   if (!MAP_KINDS.includes(args.kind)) throw new Error("A supported texture map kind is required.");
-
   const inputPath = await assertAllowed(args.inputPath);
   const outputPath = await assertAllowed(args.outputPath, { output: true });
-  const receiptPath = await assertAllowed(
-    typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`,
-    { output: true },
-  );
+  const receiptPath = await assertAllowed(typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`, { output: true });
   assertDistinctPaths([inputPath], [outputPath, receiptPath]);
 
   const source = await readFile(inputPath);
   const review = await reviewTextureMap(source, reviewSpec(args));
-  const sampling = typeof args.sampling === "string" ? args.sampling : "continuous";
   const proof = await createTextureTileProofWithSampling(
     source,
     Number.isInteger(args.maximumTileDimension) ? args.maximumTileDimension : 512,
-    sampling,
+    typeof args.sampling === "string" ? args.sampling : "continuous",
   );
   await assertCreateOnlyTargets([outputPath, receiptPath]);
-
   const receipt = Object.freeze({
-    schemaVersion: "1.2",
+    schemaVersion: "1.3",
     operation: "evavo-texture-tile-proof",
     approvalState: "diagnostic-only",
     inputPath,
@@ -179,34 +218,19 @@ async function createTileProof(args) {
     proof: proof.evidence,
     sourceModified: false,
   });
-
   await createOnly(outputPath, proof.png);
   await createOnly(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-  return Object.freeze({
-    ok: true,
-    outputPath,
-    receiptPath,
-    evidence: review,
-    proof: proof.evidence,
-    approvalState: "diagnostic-only",
-    bytesReturned: false,
-    sourceModified: false,
-  });
+  return Object.freeze({ ok: true, outputPath, receiptPath, evidence: review, proof: proof.evidence, approvalState: "diagnostic-only", bytesReturned: false, sourceModified: false });
 }
 
 async function readScalarSource(value, label) {
   if (!value) return null;
   if (typeof value.path !== "string") throw new Error(`${label}.path is required.`);
-  if (value.channel !== undefined && !SCALAR_CHANNELS.includes(value.channel)) {
-    throw new Error(`${label}.channel must be r, g, b or a.`);
-  }
+  if (value.channel !== undefined && !SCALAR_CHANNELS.includes(value.channel)) throw new Error(`${label}.channel must be r, g, b or a.`);
   const inputPath = await assertAllowed(value.path);
   return Object.freeze({
     inputPath,
-    source: Object.freeze({
-      encoded: await readFile(inputPath),
-      ...(typeof value.channel === "string" ? { channel: value.channel } : {}),
-    }),
+    source: Object.freeze({ encoded: await readFile(inputPath), ...(typeof value.channel === "string" ? { channel: value.channel } : {}) }),
   });
 }
 
@@ -215,15 +239,10 @@ async function packGodotOrm(args) {
   const ambientOcclusion = await readScalarSource(args.ambientOcclusion, "ambientOcclusion");
   const roughness = await readScalarSource(args.roughness, "roughness");
   const metallic = await readScalarSource(args.metallic, "metallic");
-  if (!ambientOcclusion && !roughness && !metallic) {
-    throw new Error("At least one ambientOcclusion, roughness or metallic source is required.");
-  }
+  if (!ambientOcclusion && !roughness && !metallic) throw new Error("At least one ambientOcclusion, roughness or metallic source is required.");
   if (typeof args.outputPath !== "string") throw new Error("outputPath is required.");
   const outputPath = await assertAllowed(args.outputPath, { output: true });
-  const receiptPath = await assertAllowed(
-    typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`,
-    { output: true },
-  );
+  const receiptPath = await assertAllowed(typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`, { output: true });
   const sourcePaths = [ambientOcclusion?.inputPath, roughness?.inputPath, metallic?.inputPath].filter(Boolean);
   assertDistinctPaths(sourcePaths, [outputPath, receiptPath]);
   await assertCreateOnlyTargets([outputPath, receiptPath]);
@@ -237,16 +256,10 @@ async function packGodotOrm(args) {
     ...(Number.isInteger(args.defaultMetallic) ? { defaultMetallic: args.defaultMetallic } : {}),
     strictScalarValidation: args.strictScalarValidation !== false,
   });
-  const postReview = await reviewTextureMap(packed.png, {
-    kind: "orm-packed",
-    ...(args.expectSeamless === true ? { expectSeamless: true } : {}),
-  });
-  if (postReview.grade === "fail") {
-    throw new Error(`Packed ORM failed post-pack review: ${postReview.blockers.join(", ") || "texture-review-failed"}`);
-  }
-
+  const postReview = await reviewTextureMap(packed.png, { kind: "orm-packed", ...(args.expectSeamless === true ? { expectSeamless: true } : {}) });
+  if (postReview.grade === "fail") throw new Error(`Packed ORM failed post-pack review: ${postReview.blockers.join(", ") || "texture-review-failed"}`);
   const receipt = Object.freeze({
-    schemaVersion: "1.2",
+    schemaVersion: "1.3",
     operation: "evavo-pack-godot-orm-texture",
     approvalState: "unapproved",
     sourcePaths,
@@ -258,16 +271,7 @@ async function packGodotOrm(args) {
   });
   await createOnly(outputPath, packed.png);
   await createOnly(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-  return Object.freeze({
-    ok: true,
-    outputPath,
-    receiptPath,
-    packing: packed.evidence,
-    postReview,
-    approvalState: "unapproved",
-    bytesReturned: false,
-    sourcesModified: false,
-  });
+  return Object.freeze({ ok: true, outputPath, receiptPath, packing: packed.evidence, postReview, approvalState: "unapproved", bytesReturned: false, sourcesModified: false });
 }
 
 const reviewProperties = Object.freeze({
@@ -279,13 +283,32 @@ const reviewProperties = Object.freeze({
   minimumNormalBluePositiveRatio: { type: "number", minimum: 0, maximum: 1 },
   maximumNormalLengthError: { type: "number", minimum: 0, maximum: 1 },
 });
-
+const uvProperties = Object.freeze({
+  allowTiledCoordinates: { type: "boolean" },
+  overlapPolicy: { type: "string", enum: UV_POLICIES },
+  mirroredPolicy: { type: "string", enum: UV_POLICIES },
+  uvAreaEpsilon: { type: "number", exclusiveMinimum: 0 },
+  uvEqualityTolerance: { type: "number", exclusiveMinimum: 0 },
+  textureWidth: { type: "number", exclusiveMinimum: 0 },
+  textureHeight: { type: "number", exclusiveMinimum: 0 },
+  maximumTexelDensityRatio: { type: "number", minimum: 1 },
+  minimumAtlasBoundaryPaddingTexels: { type: "number", minimum: 0 },
+});
+const uvPointSchema = Object.freeze({
+  type: "object",
+  properties: { u: { type: "number" }, v: { type: "number" } },
+  required: ["u", "v"],
+  additionalProperties: false,
+});
+const positionSchema = Object.freeze({
+  type: "object",
+  properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } },
+  required: ["x", "y", "z"],
+  additionalProperties: false,
+});
 const scalarSourceSchema = Object.freeze({
   type: "object",
-  properties: {
-    path: { type: "string", minLength: 1 },
-    channel: { type: "string", enum: SCALAR_CHANNELS },
-  },
+  properties: { path: { type: "string", minLength: 1 }, channel: { type: "string", enum: SCALAR_CHANNELS } },
   required: ["path"],
   additionalProperties: false,
 });
@@ -293,22 +316,17 @@ const scalarSourceSchema = Object.freeze({
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_texture_review_capabilities",
-    description: "Describe map-aware texture review, coherent material-set validation, diagnostic tile proofs and explicit Godot ORM packing.",
+    description: "Describe map-aware texture review, coherent material-set validation, UV/OBJ assurance, diagnostic tile proofs and explicit Godot ORM packing.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
     name: "evavo_review_texture_map",
     description: "Review one local texture/map without changing it. Checks channel semantics, scalar contamination, tangent-normal plausibility and optional seamless edge continuity.",
-    inputSchema: {
-      type: "object",
-      properties: reviewProperties,
-      required: ["inputPath", "kind"],
-      additionalProperties: false,
-    },
+    inputSchema: { type: "object", properties: reviewProperties, required: ["inputPath", "kind"], additionalProperties: false },
   }),
   Object.freeze({
     name: "evavo_review_texture_set",
-    description: "Review a complete PBR material set as one asset. Checks dimensions, required roles, duplicate roles, per-map defects, tileability intent and Godot import/material guidance.",
+    description: "Review a complete PBR material set as one asset, including dimensions, required roles, map defects and Godot import/material guidance.",
     inputSchema: {
       type: "object",
       properties: {
@@ -339,8 +357,46 @@ const tools = Object.freeze([
     },
   }),
   Object.freeze({
+    name: "evavo_review_uv_layout",
+    description: "Read-only UV layout assurance from already-extracted triangle UV/world-position data. Detects degenerates, accidental overlap, mirrored winding, out-of-range UVs, texel-density outliers and atlas boundary padding.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        triangles: {
+          type: "array",
+          minItems: 1,
+          maxItems: MAX_UV_TRIANGLES,
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", minLength: 1 },
+              uv: { type: "array", minItems: 3, maxItems: 3, items: uvPointSchema },
+              position: { type: "array", minItems: 3, maxItems: 3, items: positionSchema },
+              overlapGroup: { type: "string", minLength: 1 },
+            },
+            required: ["id", "uv"],
+            additionalProperties: false,
+          },
+        },
+        ...uvProperties,
+      },
+      required: ["triangles"],
+      additionalProperties: false,
+    },
+  }),
+  Object.freeze({
+    name: "evavo_review_obj_uv_layout",
+    description: "Read a local Wavefront OBJ, triangulate polygon faces, preserve authored UVs and review the resulting layout without modifying the mesh. Faces with missing UVs are counted, not fabricated.",
+    inputSchema: {
+      type: "object",
+      properties: { inputPath: { type: "string", minLength: 1 }, flipVForReview: { type: "boolean" }, ...uvProperties },
+      required: ["inputPath"],
+      additionalProperties: false,
+    },
+  }),
+  Object.freeze({
     name: "evavo_create_texture_tile_proof",
-    description: "Create a diagnostic 3x3 repeated tile proof plus JSON receipt using create-only paths. Continuous textures default to Lanczos3 proof resizing; nearest-neighbour is explicit for pixel/texel inspection.",
+    description: "Create a diagnostic 3x3 tile proof plus receipt using create-only paths. Continuous textures default to Lanczos3 proof resizing; nearest is explicit for texel inspection.",
     inputSchema: {
       type: "object",
       properties: {
@@ -374,11 +430,7 @@ const tools = Object.freeze([
         confirmLocalWrite: { type: "boolean", const: true },
       },
       required: ["outputPath", "confirmLocalWrite"],
-      anyOf: [
-        { required: ["ambientOcclusion"] },
-        { required: ["roughness"] },
-        { required: ["metallic"] },
-      ],
+      anyOf: [{ required: ["ambientOcclusion"] }, { required: ["roughness"] }, { required: ["metallic"] }],
       additionalProperties: false,
     },
   }),
@@ -387,25 +439,24 @@ const tools = Object.freeze([
 async function callTool(name, args) {
   if (name === "evavo_texture_review_capabilities") {
     return Object.freeze({
-      contract: "evavo_texture_review_agent_v1_2",
+      contract: "evavo_texture_review_agent_v1_3",
       mapKinds: MAP_KINDS,
       tools: tools.map((tool) => tool.name),
       proofSampling: {
         default: "continuous",
-        continuous: "Lanczos3 only when the proof tile must be downsized; best default for continuous albedo/PBR previews.",
+        continuous: "Lanczos3 only when a proof tile must be downsized.",
         nearest: "Opt-in for pixel art or exact texel/block inspection.",
       },
       checks: [
         "opposite-edge-seam-error",
         "scalar-rgb-contamination",
-        "per-channel-range-and-clipping",
-        "tangent-normal-blue-positive-ratio",
-        "normal-vector-length-error",
-        "packed-map-alpha-warning",
-        "material-set-dimension-consistency",
-        "required-and-duplicate-map-roles",
+        "tangent-normal-vector-plausibility",
+        "material-set-dimension-and-role-consistency",
         "power-of-two-policy",
         "godot-colour-vs-linear-data-intent",
+        "uv-degenerate-overlap-mirror-range-and-padding",
+        "world-space-texel-density-consistency",
+        "wavefront-obj-uv-extraction",
         "sampling-aware-bounded-3x3-tile-proof",
       ],
       godot: {
@@ -413,7 +464,7 @@ async function callTool(name, args) {
         ormChannels: "R=ambient-occlusion,G=roughness,B=metallic",
         materials: ["StandardMaterial3D", "ORMMaterial3D"],
       },
-      engineNote: "Normal green-channel conversion and ORM packing are explicit operations. The reviewer never silently flips normal channels or repacks arbitrary textures.",
+      engineNote: "Normal channel conversion and ORM packing are explicit. UV review is separate from semantic mesh/material visual review.",
       aiOriginDetection: "not claimed",
       writesEnabled: process.env[WRITE_ENV] === "true",
       allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
@@ -424,23 +475,19 @@ async function callTool(name, args) {
   }
   if (name === "evavo_review_texture_map") return reviewTexture(args ?? {});
   if (name === "evavo_review_texture_set") return reviewMaterialSet(args ?? {});
+  if (name === "evavo_review_uv_layout") return reviewUvTriangles(args ?? {});
+  if (name === "evavo_review_obj_uv_layout") return reviewObjUv(args ?? {});
   if (name === "evavo_create_texture_tile_proof") return createTileProof(args ?? {});
   if (name === "evavo_pack_godot_orm_texture") return packGodotOrm(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
 }
 
 function result(value, isError = false) {
-  return {
-    content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
-    structuredContent: value,
-    isError,
-  };
+  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: value, isError };
 }
 
 async function dispatch(request) {
-  if (request?.jsonrpc !== "2.0") {
-    return { jsonrpc: "2.0", id: request?.id ?? null, error: { code: -32600, message: "Invalid Request" } };
-  }
+  if (request?.jsonrpc !== "2.0") return { jsonrpc: "2.0", id: request?.id ?? null, error: { code: -32600, message: "Invalid Request" } };
   if (request.method === "initialize") {
     return {
       jsonrpc: "2.0",
@@ -449,7 +496,7 @@ async function dispatch(request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions: `Texture review is local-first. Configure ${ALLOWED_ROOTS_ENV}; derived writes additionally require ${WRITE_ENV}=true and confirmLocalWrite=true. Sources are never modified.`,
+        instructions: `Texture/material/UV review is local-first. Configure ${ALLOWED_ROOTS_ENV}; derived writes additionally require ${WRITE_ENV}=true and confirmLocalWrite=true. Sources and meshes are never modified.`,
       },
     };
   }
@@ -457,19 +504,12 @@ async function dispatch(request) {
   if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools } };
   if (request.method === "tools/call") {
     try {
-      return {
-        jsonrpc: "2.0",
-        id: request.id,
-        result: result(await callTool(request.params?.name, request.params?.arguments)),
-      };
+      return { jsonrpc: "2.0", id: request.id, result: result(await callTool(request.params?.name, request.params?.arguments)) };
     } catch (error) {
       return {
         jsonrpc: "2.0",
         id: request.id,
-        result: result(
-          { code: "TEXTURE_REVIEW_FAILED", message: error instanceof Error ? error.message : String(error) },
-          true,
-        ),
+        result: result({ code: "TEXTURE_REVIEW_FAILED", message: error instanceof Error ? error.message : String(error) }, true),
       };
     }
   }
