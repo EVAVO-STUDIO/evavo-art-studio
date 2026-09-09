@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-finalization",
+  "purpose": "Read-only final admission combining finishing/art review with destination/container delivery integrity before explicit approval or promotion.",
+  "entrypoint": "tools/image_finalization_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_IMAGE_FINALIZATION_ALLOWED_ROOTS": {
+      "requiredForImageReads": true,
+      "description": "Platform-delimited canonical roots containing final candidates and optional approved-reference images."
+    }
+  },
+  "tools": [
+    "evavo_image_finalization_capabilities",
+    "evavo_review_image_finalization"
+  ],
+  "decisions": [
+    "blocked",
+    "needs-image-finishing",
+    "needs-delivery-review",
+    "ready-for-approval-review"
+  ],
+  "deliveryTargets": ["web", "game-art", "game-data-map", "print", "archive"],
+  "combines": [
+    "unified-finishing-packet",
+    "artifact-and-generated-detail-triage",
+    "repair-routing",
+    "approved-reference-consistency",
+    "semantic-visual-findings",
+    "format-alpha-colour-orientation-metadata-integrity",
+    "megapixel-and-byte-budget",
+    "optional-effective-print-dpi"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "writesFiles": false,
+    "automaticPromotionAllowed": false,
+    "humanVisualReviewRequired": true,
+    "readyMeansApproved": false,
+    "deliveryFailureBlocksFinalization": true
+  }
+}
