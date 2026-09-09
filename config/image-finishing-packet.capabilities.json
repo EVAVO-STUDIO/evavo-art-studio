@@ -1,7 +1,7 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "id": "evavo-image-finishing-packet",
-  "purpose": "Single read-only finishing decision packet combining technical image review, artifact/generated-detail triage, repair routing, semantic findings and optional approved-reference consistency.",
+  "purpose": "Unified read-only finishing decisions for single images and batches, combining technical review, artifact/generated-detail triage, repair routing, semantic findings and optional approved-reference consistency.",
   "entrypoint": "tools/image_finishing_packet_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
@@ -13,8 +13,19 @@
   },
   "tools": [
     "evavo_image_finishing_packet_capabilities",
-    "evavo_review_image_finishing_packet"
+    "evavo_review_image_finishing_packet",
+    "evavo_review_image_finishing_batch"
   ],
+  "limits": {
+    "approvedReferences": 32,
+    "batchImages": 128
+  },
+  "batch": {
+    "sharedApprovedReferenceModel": true,
+    "compactAgentResponse": true,
+    "perImageSemanticFindings": true,
+    "priorityOrder": "priority, reference drift, technical quality"
+  },
   "dispositions": [
     "ready-for-visual-review",
     "safe-local-repair",
