@@ -11,6 +11,7 @@ const manifests = [
   "config/image-repair-agent.capabilities.json",
   "config/texture-review-agent.capabilities.json",
   "config/image-effects-agent.capabilities.json",
+  "config/image-agent-router.capabilities.json",
 ];
 
 const parsed = [];
@@ -41,6 +42,7 @@ for (const relative of manifests) {
 const mediaIndex = await readFile(path.join(root, "packages/media/src/index.ts"), "utf8");
 const mediaExports = [
   "image-repair-routing",
+  "image-agent-routing",
   "texture-map-review",
   "enhancement-structure-risk",
 ];
@@ -68,6 +70,7 @@ if (!spriteEffectsIndex.includes('export * from "./agent-planner.js";')) {
 
 for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
+  "packages/media/test/image-agent-routing.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
@@ -81,5 +84,6 @@ process.stdout.write(`${JSON.stringify({
   surfaces: parsed,
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
+  unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
