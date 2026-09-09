@@ -3,6 +3,7 @@ import type { ImageReviewProfileName } from "./image-review-profiles.js";
 export const ENHANCEMENT_ART_REVIEW_CONTRACT = "evavo.enhancement-art-review.v1" as const;
 export const ENHANCEMENT_ART_REVIEW_SCHEMA_SHA256 = "dd9e0e25bcde4f82a0e2e34955a4ef520927e0a1a3472f04d8b2867ebba0ad94" as const;
 export const ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT = 0.0025 as const;
+const maximumAspectRatioRelativeDrift = ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT;
 
 const REVIEW_PROFILES = new Set<ImageReviewProfileName>([
   "logo-transparent", "web-hero", "ui-screenshot", "product-cutout", "photo", "cel-animation-frame", "pixel-art", "texture", "illustration",
@@ -118,8 +119,8 @@ export function admitEnhancementStudioReviewManifest(value: EnhancementStudioRev
   const candidateHeight = positiveInteger(value.candidate_height, "candidate_height");
   if (candidateWidth < sourceWidth || candidateHeight < sourceHeight) throw new Error("Enhancement Studio candidate dimensions cannot be smaller than the immutable source dimensions.");
   const candidateAspectRatioRelativeDrift = relativeAspectRatioDrift(sourceWidth, sourceHeight, candidateWidth, candidateHeight);
-  if (candidateAspectRatioRelativeDrift > ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT) {
-    throw new Error(`Enhancement Studio candidate aspect ratio drift ${candidateAspectRatioRelativeDrift.toFixed(6)} exceeds preservation limit ${ENHANCEMENT_MAXIMUM_ASPECT_RATIO_RELATIVE_DRIFT}.`);
+  if (candidateAspectRatioRelativeDrift > maximumAspectRatioRelativeDrift) {
+    throw new Error(`Enhancement Studio candidate aspect ratio drift ${candidateAspectRatioRelativeDrift.toFixed(6)} exceeds preservation limit ${maximumAspectRatioRelativeDrift}.`);
   }
 
   const requiredTools = strings(value.mandatory_art_studio_tools, "mandatory_art_studio_tools");

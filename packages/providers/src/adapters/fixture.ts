@@ -109,9 +109,9 @@ type FixtureBackground = Readonly<{
 function fixtureBackground(
   request: ResolvedProviderCandidateRequest["request"],
 ): FixtureBackground {
-  const strategy = request.background.strategy;
+  const strategy = request.background?.strategy ?? "provider-auto";
   if (strategy === "chroma-key") {
-    const [red, green, blue] = hexColour(request.background.matteColour!);
+    const [red, green, blue] = hexColour(request.background?.matteColour!);
     return { red, green, blue, alpha: 255, mode: "chroma-key" };
   }
   if (strategy === "native-alpha") {
@@ -192,7 +192,11 @@ export const FIXTURE_PROVIDER_DESCRIPTOR: ProviderAdapterDescriptor = Object.fre
   version: "1.2.0",
   priority: -10_000,
   capabilities: FIXTURE_CAPABILITIES,
-  models: Object.freeze(["fixture-background-contract-v3"]),
+  models: Object.freeze([
+    "fixture-background-contract-v3",
+    "fixture-transparent-v1",
+    "fixture-model-v1",
+  ]),
   maximumCandidates: 8,
   maximumReferenceImages: 16,
   maximumSourceBytes: 32 * 1024 * 1024,
@@ -226,8 +230,8 @@ export class FixtureImageProviderAdapter implements ProviderAdapter {
           String(resolved.request.seed ?? 0),
           String(index + 1),
           `${resolved.request.target.width}x${resolved.request.target.height}`,
-          resolved.request.background.strategy,
-          resolved.request.background.matteColour ?? "none",
+          resolved.request.background?.strategy ?? "provider-auto",
+          resolved.request.background?.matteColour ?? "none",
         ].join(":");
         return {
           bytes: fixturePng(
@@ -246,8 +250,8 @@ export class FixtureImageProviderAdapter implements ProviderAdapter {
             targetHeight: resolved.request.target.height,
             referenceCount: resolved.references.length,
             deterministicIdentity: identity,
-            backgroundStrategy: resolved.request.background.strategy,
-            matteColour: resolved.request.background.matteColour ?? null,
+            backgroundStrategy: resolved.request.background?.strategy ?? "provider-auto",
+            matteColour: resolved.request.background?.matteColour ?? null,
             fixtureBackgroundMode: background.mode,
           },
         };

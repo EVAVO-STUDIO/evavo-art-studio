@@ -96,7 +96,6 @@ export async function preparePixelArtProviderCanvas(
       sequentialRead: true,
     })
       .ensureAlpha()
-      .toColourspace("srgb")
       .raw()
       .toBuffer({ resolveWithObject: true }),
     sharp(Buffer.from(maskInput), {
@@ -105,7 +104,6 @@ export async function preparePixelArtProviderCanvas(
       sequentialRead: true,
     })
       .ensureAlpha()
-      .toColourspace("srgb")
       .raw()
       .toBuffer({ resolveWithObject: true }),
   ]);

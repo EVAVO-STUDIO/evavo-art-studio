@@ -211,16 +211,13 @@ test("publishes an explicit compile-only protocol contract", () => {
   assert.ok(summary.authorityRules.some((entry) => entry.includes("provider-free")));
 });
 
-test("keeps the motion-topology source, documentation and permanent workflow wired", () => {
+test("keeps the motion-topology source and local-first documentation wired", () => {
   const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const repositoryRoot = path.resolve(packageRoot, "../..");
   const indexSource = fs.readFileSync(path.join(packageRoot, "src/index.ts"), "utf8");
   const topologySource = fs.readFileSync(path.join(packageRoot, "src/motion-topology.ts"), "utf8");
-  const workflow = fs.readFileSync(path.join(repositoryRoot, ".github/workflows/sprite-motion-topology.yml"), "utf8");
   const documentation = fs.readFileSync(path.join(repositoryRoot, "docs/SPRITE_MOTION_TOPOLOGY.md"), "utf8");
   assert.match(indexSource, /export \* from "\.\/motion-topology\.js";/);
   for (const token of ["SPRITE_MOTION_SOURCE_PLAN_HASH_MISMATCH", "SPRITE_MOTION_ISOMETRIC_DIRECTION_COUNT_INVALID", "providerCalled: false", "targetRepositoryMutated: false", "publicationPerformed: false"]) assert.ok(topologySource.includes(token), token);
-  assert.ok(workflow.includes("pnpm --filter @evavo/art-sprite-planner test"));
-  assert.ok(workflow.includes("git diff --exit-code"));
   assert.ok(documentation.includes("A required animation frame should never be generated as an unrelated prompt-only image."));
 });

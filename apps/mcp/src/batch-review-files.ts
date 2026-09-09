@@ -21,11 +21,11 @@ import {
 
 function statIdentity(value: Awaited<ReturnType<typeof lstat>>): string {
   return [
-    value.dev,
+    process.platform === "win32" ? 0 : value.dev,
     value.ino,
     value.size,
     value.mtimeMs,
-    value.ctimeMs,
+    process.platform === "win32" ? 0 : value.ctimeMs,
     value.mode,
   ].join(":");
 }

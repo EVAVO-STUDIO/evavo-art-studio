@@ -50,11 +50,11 @@ export function brassArtProductionFileIdentity(
   }>,
 ): BrassArtProductionFileIdentity {
   return Object.freeze({
-    dev: state.dev,
+    dev: process.platform === "win32" ? 0 : state.dev,
     ino: state.ino,
     size: state.size,
     mtimeMs: state.mtimeMs,
-    ctimeMs: state.ctimeMs,
+    ctimeMs: process.platform === "win32" ? 0 : state.ctimeMs,
   });
 }
 

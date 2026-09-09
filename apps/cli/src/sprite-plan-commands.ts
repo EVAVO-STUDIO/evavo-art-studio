@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { resolveLocalPath } from "./local-path.js";
+
 import {
   compileSpritePlanJob,
   compileSpriteProductionPlan,
@@ -22,7 +24,7 @@ async function readJson(filePath: string): Promise<unknown> {
 
 function inputPath(values: SpritePlanCommandValues, command: string): string {
   if (!values.input) throw new Error(`--input is required for ${command}.`);
-  return path.resolve(values.input);
+  return resolveLocalPath(values.input);
 }
 
 export async function handleSpritePlanCommand(

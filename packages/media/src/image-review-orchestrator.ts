@@ -33,6 +33,7 @@ export interface ImageReviewOrchestrationResult {
   readonly header?: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"];
   readonly similarity: readonly Readonly<{
     id: string;
+    exactBinaryMatch: boolean;
     perceptualDistance: number;
     perceptualSimilarity: number;
     nearDuplicate: boolean;
@@ -131,7 +132,8 @@ export async function orchestrateImageReview(
     ...(defects.evidence.suggestedAction === "manual-review" ? ["defect-mask-requires-manual-review"] : []),
     ...(finishingPlan.route === "manual-review" ? finishingPlan.reasonCodes : []),
     ...(header?.grade === "fail" ? header.issues : []),
-    ...similarity.filter((item) => item.recommendation === "reject-duplicate").map((item) => `near-duplicate:${item.id}`),
+    ...similarity.filter((item) => item.exactBinaryMatch).map((item) => `exact-duplicate-of:${item.id}`),
+    ...similarity.filter((item) => !item.exactBinaryMatch && item.recommendation === "reject-duplicate").map((item) => `near-duplicate:${item.id}`),
   ];
   const warnings = [
     ...(quality.grade === "warn" ? quality.issues : []),

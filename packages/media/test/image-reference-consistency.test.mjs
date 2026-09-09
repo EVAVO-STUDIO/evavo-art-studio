@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import sharp from "../node_modules/sharp/lib/index.js";
+import sharp from "sharp";
 import {
   reviewImageReferenceConsistency,
   reviewImageReferenceConsistencyBatch,

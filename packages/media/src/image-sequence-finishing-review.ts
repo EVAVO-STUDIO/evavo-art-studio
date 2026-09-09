@@ -207,6 +207,8 @@ export async function createImageSequenceFinishingReview(
     .sort((a, b) => {
       const priorityDifference = priorityRank(b.packet.priority) - priorityRank(a.packet.priority);
       if (priorityDifference !== 0) return priorityDifference;
+      const semanticDifference = Number(b.packet.disposition === "semantic-repair") - Number(a.packet.disposition === "semantic-repair");
+      if (semanticDifference !== 0) return semanticDifference;
       const continuityDifference = (continuityById.get(b.id)?.flags.length ?? 0) - (continuityById.get(a.id)?.flags.length ?? 0);
       if (continuityDifference !== 0) return continuityDifference;
       const duplicateDifference = Number(duplicateFrameIds.has(b.id)) - Number(duplicateFrameIds.has(a.id));

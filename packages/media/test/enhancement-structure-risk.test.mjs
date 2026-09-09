@@ -45,7 +45,7 @@ test("silhouette alpha drift is measured independently from RGB detail", async (
   const candidate = await sharp(source)
     .ensureAlpha()
     .removeAlpha()
-    .joinChannel(await sharp({ create: { width: 64, height: 48, channels: 1, background: 128 } }).png().toBuffer())
+    .joinChannel(await sharp(Buffer.alloc(64 * 48, 128), { raw: { width: 64, height: 48, channels: 1 } }).png().toBuffer())
     .png()
     .toBuffer();
   const risk = await reviewEnhancementStructureRisk(source, candidate, { patchAlphaErrorThreshold: 0.02 });

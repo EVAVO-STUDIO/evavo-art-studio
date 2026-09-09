@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { resolveLocalPath } from "./local-path.js";
+
 import { LocalRuntimeRepository } from "@evavo/art-runtime";
 import {
   automaticSpriteFinalizationProtocolSummary,
@@ -31,7 +33,7 @@ function requiredInput(
 ): string {
   const value = values.input?.trim();
   if (!value) throw new Error(`--input is required for ${command}.`);
-  return path.resolve(value);
+  return resolveLocalPath(value);
 }
 
 function runtimeRoot(values: SpriteSupervisorCommandValues): string {

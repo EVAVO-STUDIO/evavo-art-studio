@@ -18,7 +18,7 @@ async function detailedPng({ alpha = 1 } = {}) {
       raw[i + 3] = Math.round(alpha * 255);
     }
   }
-  return sharp(raw, { raw: { width, height, channels: 4 } }).png().toBuffer();
+  return sharp(raw, { raw: { width, height, channels: 4 } }).blur(0.9).png().toBuffer();
 }
 
 test("clean technical and web-delivery evidence reaches approval review without auto promotion", async () => {

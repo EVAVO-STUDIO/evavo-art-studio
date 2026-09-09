@@ -244,10 +244,10 @@ export async function detectExistingImageDefects(
           y > 0 ? alphaAt(raw, width, x, y - 1) : a,
           y + 1 < height ? alphaAt(raw, width, x, y + 1) : a,
         ];
-        const hardJumps = neighbours.filter((n) => Math.abs(n - a) >= 160).length;
         const lower = neighbours.filter((n) => n <= 24).length;
         const higher = neighbours.filter((n) => n >= 231).length;
-        if (hardJumps >= stairStepMinimumTransitions && lower > 0 && higher > 0) mark(x, y, "hard-alpha-stair-step");
+        const hardJumps = neighbours.filter((n) => Math.abs(n - a) >= 96).length;
+        if (hardJumps >= stairStepMinimumTransitions && lower >= 2 && higher >= 2) mark(x, y, "hard-alpha-stair-step");
       }
     }
   }
@@ -281,7 +281,7 @@ export async function detectExistingImageDefects(
   const severeKinds = counts["alpha-pinhole"] + counts["isolated-alpha-speck"] + counts["hard-alpha-stair-step"];
   const suggestedAction = defectPixels === 0
     ? "none"
-    : maskCoverageRatio > maximumMaskCoverageRatio
+    : maskPixels > Math.max(1, Math.floor(totalPixels * maximumMaskCoverageRatio))
       ? "manual-review"
       : severeKinds > 0
         ? "localized-repair"

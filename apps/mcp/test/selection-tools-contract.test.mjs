@@ -8,7 +8,8 @@ const read = (relativePath) =>
 test("MCP exposes selection and promotion compilers without execution shortcuts", async () => {
   const selection = await read("src/selection-tools.ts");
   const provider = await read("src/provider-tools.ts");
-  const combined = `${selection}\n${provider}`;
+  const index = await read("src/index.ts");
+  const combined = `${selection}\n${provider}\n${index}`;
   for (const token of [
     "candidate_selection_protocol",
     "validate_candidate_selection",

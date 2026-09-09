@@ -44,7 +44,7 @@ test("localized edit changes only the authorized mask area", async () => {
 test("localized edit refuses candidate dimension drift", async () => {
   const source = await sharp({ create: { width: 8, height: 8, channels: 4, background: "#112233ff" } }).png().toBuffer();
   const candidate = await sharp({ create: { width: 7, height: 8, channels: 4, background: "#445566ff" } }).png().toBuffer();
-  const mask = await sharp({ create: { width: 8, height: 8, channels: 1, background: "#ffffff" } }).png().toBuffer();
+  const mask = await pngFromRaw(Buffer.alloc(8 * 8, 255), 8, 8, 1);
   await assert.rejects(() => applyLocalizedRasterEdit(source, candidate, mask), /candidate dimensions/);
 });
 

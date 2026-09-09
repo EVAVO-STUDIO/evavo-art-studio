@@ -4,13 +4,14 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
 const cli = new URL("../dist/cli.js", import.meta.url);
 
 function run(arguments_) {
-  return spawnSync(process.execPath, [cli.pathname, ...arguments_], {
+  return spawnSync(process.execPath, [fileURLToPath(cli), ...arguments_], {
     encoding: "utf8",
     windowsHide: true,
   });

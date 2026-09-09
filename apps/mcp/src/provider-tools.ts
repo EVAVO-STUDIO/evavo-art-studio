@@ -14,7 +14,6 @@ import { registerLayeredGodotTools } from "./layered-godot-tools.js";
 import { registerLocalGenerationTools } from "./local-generation-tools.js";
 import { registerLocalGenerationBatchTools } from "./local-generation-batch-tools.js";
 import { registerLornaLocalAcceptanceTool } from "./lorna-local-acceptance-tool.js";
-import { registerSelectionTools } from "./selection-tools.js";
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -49,7 +48,6 @@ export function registerProviderTools(server: McpServer): void {
   registerLocalGenerationTools(server);
   registerLocalGenerationBatchTools(server);
   registerLornaLocalAcceptanceTool(server);
-  registerSelectionTools(server);
 
   server.registerTool(
     "provider_candidate_protocol",

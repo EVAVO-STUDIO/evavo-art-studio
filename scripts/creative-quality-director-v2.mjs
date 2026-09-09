@@ -121,7 +121,8 @@ function readJson(path, code = "ART_DIRECTOR_JSON") {
     require(opened.size <= BigInt(MAX_JSON_BYTES), `${code}_TOO_LARGE`);
     if (process.platform !== "win32" && info.ino !== 0n && opened.ino !== 0n) {
       require(
-        info.dev === opened.dev && info.ino === opened.ino,
+        info.ino === opened.ino &&
+          (process.platform === "win32" || info.dev === opened.dev),
         `${code}_CHANGED_DURING_OPEN`,
       );
     }

@@ -149,10 +149,11 @@ export async function preflightInpaintMask(
   );
   const baseBytes = bytes(baseInput, maximumInputBytes, "Base image");
   const maskBytes = bytes(maskInput, maximumInputBytes, "Mask image");
-  const [base, mask] = await Promise.all([
-    inspect(baseBytes, maximumPixels, "Base image"),
-    inspect(maskBytes, maximumPixels, "Mask image"),
-  ]);
+  // libvips on Windows can corrupt the interpretation enum when two metadata
+  // probes start concurrently in the same process. These inputs are tiny and
+  // security-sensitive, so decode deterministically in sequence.
+  const base = await inspect(baseBytes, maximumPixels, "Base image");
+  const mask = await inspect(maskBytes, maximumPixels, "Mask image");
 
   if (base.format !== mask.format) {
     throw new RasterPreflightError(
@@ -184,7 +185,6 @@ export async function preflightInpaintMask(
     limitInputPixels: maximumPixels,
     sequentialRead: true,
   })
-    .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   let fullyTransparentPixels = 0;

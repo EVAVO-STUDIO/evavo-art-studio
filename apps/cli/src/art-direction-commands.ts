@@ -14,6 +14,7 @@ import {
   handleSpritePlanCommand,
   type SpritePlanCommandValues,
 } from "./sprite-plan-commands.js";
+import { resolveLocalPath } from "./local-path.js";
 
 export interface ArtDirectionCommandValues {
   readonly input?: string;
@@ -29,7 +30,7 @@ async function readJson(filePath: string): Promise<unknown> {
 
 function inputPath(values: ArtDirectionCommandValues, command: string): string {
   if (!values.input) throw new Error(`--input is required for ${command}.`);
-  return path.resolve(values.input);
+  return resolveLocalPath(values.input);
 }
 
 export async function handleArtDirectionCommand(

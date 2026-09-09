@@ -148,8 +148,8 @@ async function decodeRgba(
     );
   }
   const result = await sharp(bytes, decoderOptions)
-    .ensureAlpha()
     .toColourspace("srgb")
+    .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   if (result.info.channels !== 4) {

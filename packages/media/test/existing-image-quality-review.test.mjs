@@ -36,7 +36,9 @@ test("detects dirty RGB hidden behind transparent pixels", async () => {
     }
   }
 
-  const evidence = await reviewExistingImageQuality(await pngFromRaw(raw, width, height));
+  const evidence = await reviewExistingImageQuality(await pngFromRaw(raw, width, height), {
+    transparentRgbDetectionMode: "all",
+  });
   assert.ok(evidence.transparentRgbContaminationRatio > 0.05);
   assert.ok(evidence.issues.some((issue) => issue.startsWith("dirty-transparent-rgb")));
   assert.notEqual(evidence.grade, "pass");

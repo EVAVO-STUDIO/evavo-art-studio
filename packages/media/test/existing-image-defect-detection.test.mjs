@@ -92,8 +92,8 @@ test("hard alpha discontinuity requires mixed transparent and opaque neighbourho
   pixel(raw, width, 1, 1, [120, 120, 120, 128]);
   pixel(raw, width, 0, 1, [120, 120, 120, 255]);
   pixel(raw, width, 2, 1, [120, 120, 120, 255]);
-  pixel(raw, width, 1, 0, [120, 120, 120, 0]);
-  pixel(raw, width, 1, 2, [120, 120, 120, 0]);
+  pixel(raw, width, 1, 0, [0, 0, 0, 0]);
+  pixel(raw, width, 1, 2, [0, 0, 0, 0]);
 
   const result = await detectExistingImageDefects(await png(raw, width, height), { maskPadding: 0, stairStepMinimumTransitions: 4 });
   assert.ok(result.evidence.defectCounts["hard-alpha-stair-step"] >= 1);

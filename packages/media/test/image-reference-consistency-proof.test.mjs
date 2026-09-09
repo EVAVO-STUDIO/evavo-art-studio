@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import sharp from "../node_modules/sharp/lib/index.js";
+import sharp from "sharp";
 import { createImageReferenceConsistencyProof } from "../dist/index.js";
 
 async function solid(r, g, b) {

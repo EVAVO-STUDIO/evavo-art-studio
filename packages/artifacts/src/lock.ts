@@ -34,6 +34,12 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
+function isLockContention(error: unknown): boolean {
+  const code = errorCode(error);
+  return code === "EEXIST" ||
+    (process.platform === "win32" && (code === "EPERM" || code === "EACCES"));
+}
+
 function lockName(key: string): string {
   return `${createHash("sha256").update(key).digest("hex")}.lock`;
 }
@@ -90,7 +96,10 @@ export async function acquireFileLock(
         },
       };
     } catch (error: unknown) {
-      if (errorCode(error) !== "EEXIST") throw error;
+      // Windows may report EPERM/EACCES, rather than EEXIST, while another
+      // handle is closing or deleting the same lock file. Treat that brief
+      // sharing violation as contention and keep the bounded retry policy.
+      if (!isLockContention(error)) throw error;
       try {
         const details = await stat(filePath);
         if (Date.now() - details.mtimeMs > staleAfterMs) {
@@ -98,7 +107,14 @@ export async function acquireFileLock(
           continue;
         }
       } catch (staleError: unknown) {
-        if (errorCode(staleError) === "ENOENT") continue;
+        if (
+          errorCode(staleError) === "ENOENT" ||
+          (process.platform === "win32" &&
+            (errorCode(staleError) === "EPERM" || errorCode(staleError) === "EACCES"))
+        ) {
+          await wait(retryDelayMs);
+          continue;
+        }
         throw staleError;
       }
       const elapsed = Date.now() - startedAt;

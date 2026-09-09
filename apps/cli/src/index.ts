@@ -35,6 +35,7 @@ import {
   handleMasteringCommand,
   type MasteringCommandValues,
 } from "./mastering-command.js";
+import { resolveLocalPath } from "./local-path.js";
 import {
   handleLocalControlCommand,
   type LocalControlValues,
@@ -282,7 +283,7 @@ async function main(): Promise<void> {
   if (!parsed.values.input) {
     throw new Error(`--input is required for ${command}.`);
   }
-  const input = await readJson(parsed.values.input);
+  const input = await readJson(resolveLocalPath(parsed.values.input));
   if (command === "provider-validate") {
     await emit(
       validateProviderCandidateRequest(input),
