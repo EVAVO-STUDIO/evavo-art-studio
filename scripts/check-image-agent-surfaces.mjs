@@ -14,12 +14,16 @@ const manifests = [
   "config/image-agent-router.capabilities.json",
 ];
 
+function supportedCapabilitySchema(value) {
+  return typeof value === "string" && /^1\.\d+$/u.test(value);
+}
+
 const parsed = [];
 for (const relative of manifests) {
   const filePath = path.join(root, relative);
   const manifest = JSON.parse(await readFile(filePath, "utf8"));
-  if (manifest.schemaVersion !== "1.0" || typeof manifest.entrypoint !== "string") {
-    throw new Error(`${relative} is missing the current capability contract.`);
+  if (!supportedCapabilitySchema(manifest.schemaVersion) || typeof manifest.entrypoint !== "string") {
+    throw new Error(`${relative} is missing a supported 1.x capability contract.`);
   }
   const entrypoint = path.join(root, manifest.entrypoint);
   await access(entrypoint);
@@ -36,7 +40,12 @@ for (const relative of manifests) {
       throw new Error(`${relative} advertises ${tool}, but ${manifest.entrypoint} does not expose it.`);
     }
   }
-  parsed.push({ id: manifest.id, entrypoint: manifest.entrypoint, tools: manifest.tools?.length ?? 0 });
+  parsed.push({
+    id: manifest.id,
+    schemaVersion: manifest.schemaVersion,
+    entrypoint: manifest.entrypoint,
+    tools: manifest.tools?.length ?? 0,
+  });
 }
 
 const mediaIndex = await readFile(path.join(root, "packages/media/src/index.ts"), "utf8");
@@ -44,6 +53,7 @@ const mediaExports = [
   "image-repair-routing",
   "image-agent-routing",
   "texture-map-review",
+  "texture-tile-proof",
   "enhancement-structure-risk",
 ];
 for (const requiredExport of mediaExports) {
@@ -72,6 +82,7 @@ for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
   "packages/media/test/image-agent-routing.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
+  "packages/media/test/texture-tile-proof.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
 ]) {
@@ -84,6 +95,7 @@ process.stdout.write(`${JSON.stringify({
   surfaces: parsed,
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
+  textureProofSampling: ["continuous", "nearest"],
   unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
