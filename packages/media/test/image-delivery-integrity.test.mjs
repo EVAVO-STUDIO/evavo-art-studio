@@ -14,11 +14,27 @@ test("detects alpha/format incompatibility before JPEG delivery", async () => {
     target: "web",
     intendedFormat: "jpeg",
   });
+  assert.equal(result.contract, "evavo.image-delivery-integrity.v1_1");
   assert.equal(result.grade, "fail");
   assert.equal(result.hasAlpha, true);
   assert.ok(result.blockers.includes("jpeg-delivery-cannot-preserve-alpha"));
-  assert.ok(result.warnings.some((warning) => warning.includes("encoded-format-does-not-match-intent")));
+  assert.ok(result.blockers.some((blocker) => blocker.includes("encoded-format-does-not-match-intent")));
   assert.equal(result.sourceMutationAllowed, false);
+});
+
+test("explicit alpha prohibition is an admission blocker rather than a warning", async () => {
+  const image = await png(256, 256, 0.5);
+  const result = await reviewImageDeliveryIntegrity(image, { target: "game-art", forbidAlpha: true });
+  assert.equal(result.grade, "fail");
+  assert.ok(result.blockers.includes("forbidden-alpha-channel-present"));
+});
+
+test("ordinary sRGB web PNG does not require an embedded ICC profile to pass", async () => {
+  const image = await png(256, 256);
+  const result = await reviewImageDeliveryIntegrity(image, { target: "web" });
+  assert.equal(result.colourSpace, "srgb");
+  assert.ok(!result.warnings.some((warning) => warning.includes("icc")));
+  assert.ok(!result.warnings.some((warning) => warning.startsWith("web-colour-space-is-not-explicitly-srgb")));
 });
 
 test("computes effective print DPI from physical dimensions", async () => {
@@ -49,14 +65,21 @@ test("game data-map review preserves the distinction between data and ordinary c
   assert.equal(result.sourceMutationAllowed, false);
 });
 
-test("maximum megapixel budget can fail a delivery before expensive downstream use", async () => {
+test("megapixel and encoded-byte budgets can fail delivery before downstream use", async () => {
   const image = await png(1000, 1000);
-  const result = await reviewImageDeliveryIntegrity(image, {
+  const megapixelResult = await reviewImageDeliveryIntegrity(image, {
     target: "web",
     maximumMegapixels: 0.5,
   });
-  assert.equal(result.grade, "fail");
-  assert.ok(result.blockers.some((blocker) => blocker.startsWith("megapixel-budget-exceeded:")));
+  assert.equal(megapixelResult.grade, "fail");
+  assert.ok(megapixelResult.blockers.some((blocker) => blocker.startsWith("megapixel-budget-exceeded:")));
+
+  const byteResult = await reviewImageDeliveryIntegrity(image, {
+    target: "web",
+    maximumBytes: Math.max(1, image.length - 1),
+  });
+  assert.equal(byteResult.encodedBytes, image.length);
+  assert.ok(byteResult.blockers.some((blocker) => blocker.startsWith("encoded-byte-budget-exceeded:")));
 });
 
 test("rejects contradictory alpha requirements and incomplete physical-size input", async () => {
@@ -68,5 +91,9 @@ test("rejects contradictory alpha requirements and incomplete physical-size inpu
   await assert.rejects(
     reviewImageDeliveryIntegrity(image, { target: "print", outputWidthMm: 100 }),
     /must be supplied together/,
+  );
+  await assert.rejects(
+    reviewImageDeliveryIntegrity(image, { target: "web", maximumBytes: 1.5 }),
+    /positive safe integer/,
   );
 });
