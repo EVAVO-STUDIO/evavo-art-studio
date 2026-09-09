@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
@@ -17,10 +18,12 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-image-repair";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_IMAGE_REPAIR_ALLOWED_ROOTS";
 const WRITE_ENV = "EVAVO_IMAGE_REPAIR_ALLOW_WRITES";
+const REPAIR_RECEIPT_CONTRACT = "evavo.image-repair-receipt.v1";
+const PROVENANCE_RECORD_CONTRACT = "evavo.image-provenance-record.v1";
 
 const ROLE_VALUES = Object.freeze([
   "work-header",
@@ -73,6 +76,21 @@ function requireWriteAdmission(args) {
   if (args.confirmLocalWrite !== true) {
     throw new Error("confirmLocalWrite=true is required for this exact repair call.");
   }
+}
+
+function sha256(buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+function provenanceRecord(operation, sourceBuffer, outputBuffer, recordId) {
+  return Object.freeze({
+    contract: PROVENANCE_RECORD_CONTRACT,
+    subjectSha256: sha256(outputBuffer),
+    evidenceKind: "transformation-receipt",
+    producer: `EVAVO Image Repair:${operation}`,
+    recordId,
+    parentSha256: sha256(sourceBuffer),
+  });
 }
 
 function contextFromArgs(args) {
@@ -157,7 +175,7 @@ async function planRepair(args) {
     repairDecision: plan.repairDecision,
     originAssessment: Object.freeze({
       aiGenerated: "not-determined",
-      reason: "Technical artifact heuristics do not prove authorship. Use trusted provenance/lineage plus visual review.",
+      reason: "Technical artifact heuristics do not prove authorship. Use byte-bound provenance/lineage plus visual review.",
     }),
     bytesReturned: false,
     sourceModified: false,
@@ -238,15 +256,20 @@ async function applyPreservationRepair(args) {
     contextFromArgs({ ...args, filename: args.filename ?? outputSet.outputPath }),
   );
   const postDecision = planImageRepairDecision(postReview, { visualFindings: visualFindings(args) });
+  const provenance = provenanceRecord("preservation-polish", plan.source, polished.buffer, outputSet.receiptPath);
   const receipt = Object.freeze({
-    schemaVersion: "1.0",
+    contract: REPAIR_RECEIPT_CONTRACT,
+    schemaVersion: "1.1",
     operation: "evavo-preservation-image-repair",
     approvalState: "unapproved",
     sourcePath: plan.inputPath,
+    sourceSha256: provenance.parentSha256,
     outputPath: outputSet.outputPath,
+    outputSha256: provenance.subjectSha256,
     proofPath: outputSet.proofPath,
     differenceProofPath: outputSet.differenceProofPath,
     receiptPath: outputSet.receiptPath,
+    provenance,
     sourceDecision: plan.repairDecision,
     preservation: polished.evidence,
     editReview: editReview.evidence,
@@ -262,6 +285,12 @@ async function applyPreservationRepair(args) {
     ...outputSet,
     approvalState: "unapproved",
     promotionReady: receipt.promotionReady,
+    provenance: Object.freeze({
+      contract: provenance.contract,
+      subjectSha256: provenance.subjectSha256,
+      parentSha256: provenance.parentSha256,
+      evidenceKind: provenance.evidenceKind,
+    }),
     repairDecision: postDecision,
     bytesReturned: false,
     sourceModified: false,
@@ -305,6 +334,7 @@ async function applyLocalizedRepair(args) {
 
   const candidate = await readFile(candidatePath);
   const mask = await readFile(maskPath);
+  const reference = referencePath ? await readFile(referencePath) : null;
   const maximumMaskCoverageRatio = finiteRatio(args.maximumMaskCoverageRatio, 0.12, "maximumMaskCoverageRatio");
   const localized = await applyLocalizedRasterEdit(plan.source, candidate, mask, {
     ...(Number.isInteger(args.featherRadius) ? { featherRadius: args.featherRadius } : {}),
@@ -337,18 +367,26 @@ async function applyLocalizedRepair(args) {
     contextFromArgs({ ...args, filename: args.filename ?? outputSet.outputPath }),
   );
   const postDecision = planImageRepairDecision(postReview, { visualFindings: [] });
+  const provenance = provenanceRecord("masked-candidate", plan.source, localized.buffer, outputSet.receiptPath);
   const receipt = Object.freeze({
-    schemaVersion: "1.0",
+    contract: REPAIR_RECEIPT_CONTRACT,
+    schemaVersion: "1.1",
     operation: "evavo-masked-candidate-image-repair",
     approvalState: "unapproved",
     sourcePath: plan.inputPath,
+    sourceSha256: provenance.parentSha256,
     candidatePath,
+    candidateSha256: sha256(candidate),
     maskPath,
+    maskSha256: sha256(mask),
     referencePath,
+    ...(reference ? { referenceSha256: sha256(reference) } : {}),
     outputPath: outputSet.outputPath,
+    outputSha256: provenance.subjectSha256,
     proofPath: outputSet.proofPath,
     differenceProofPath: outputSet.differenceProofPath,
     receiptPath: outputSet.receiptPath,
+    provenance,
     sourceDecision: plan.repairDecision,
     localizedEdit: localized.evidence,
     editReview: editReview.evidence,
@@ -365,6 +403,15 @@ async function applyLocalizedRepair(args) {
     approvalState: "unapproved",
     promotionReady: receipt.promotionReady,
     maskCoverageRatio: localized.evidence.maskCoverageRatio,
+    provenance: Object.freeze({
+      contract: provenance.contract,
+      subjectSha256: provenance.subjectSha256,
+      parentSha256: provenance.parentSha256,
+      evidenceKind: provenance.evidenceKind,
+      candidateSha256: receipt.candidateSha256,
+      maskSha256: receipt.maskSha256,
+      ...(receipt.referenceSha256 ? { referenceSha256: receipt.referenceSha256 } : {}),
+    }),
     repairDecision: postDecision,
     bytesReturned: false,
     sourceModified: false,
@@ -412,7 +459,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_apply_preservation_image_repair",
-    description: "Apply only an admitted preservation-polish repair to an existing alpha image, re-review it before writing, preserve opaque artwork, and emit create-only output plus review/difference proofs and an unapproved receipt.",
+    description: "Apply only an admitted preservation-polish repair to an existing alpha image, re-review it before writing, preserve opaque artwork, and emit create-only output plus review/difference proofs and a SHA-256-bound unapproved provenance receipt.",
     inputSchema: {
       type: "object",
       properties: {
@@ -433,7 +480,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_apply_masked_candidate_image_repair",
-    description: "Composite an explicit candidate only inside an explicit same-size mask, enforce a bounded mask-coverage budget, preserve every pixel outside the mask, re-review before writing, and emit proofs plus an unapproved receipt.",
+    description: "Composite an explicit candidate only inside an explicit same-size mask, enforce a bounded mask-coverage budget, preserve every pixel outside the mask, re-review before writing, and emit proofs plus exact source/candidate/mask/output SHA-256 lineage in an unapproved receipt.",
     inputSchema: {
       type: "object",
       properties: {
@@ -471,6 +518,7 @@ async function callTool(name, args) {
       safeLocalRepair: "Only preservation polish is directly admitted from deterministic review evidence. It preserves fully opaque RGB and is re-reviewed before any file is written.",
       localizedRepair: "Requires an explicit same-size candidate and mask. Pixels outside the mask are source-preserved and the mask coverage is bounded before output is written.",
       semanticRepair: "Never invented by this server. A capable visual reviewer supplies explicit visualFindings; identity/style/content findings also require a reference path.",
+      provenance: "Every successful write emits evavo.image-repair-receipt.v1 with exact output/source SHA-256 and a canonical evavo.image-provenance-record.v1; masked repairs additionally bind candidate, mask and optional reference hashes.",
       publication: "Every repair output remains unapproved. Promotion continues through existing review and approval gates.",
       aiOriginDetection: "not claimed",
       writesEnabled: process.env[WRITE_ENV] === "true",
@@ -505,7 +553,7 @@ async function dispatch(request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions: `Review-first image repair. Configure ${ALLOWED_ROOTS_ENV}; writes also require ${WRITE_ENV}=true and confirmLocalWrite=true. Sources are never overwritten.`,
+        instructions: `Review-first image repair. Configure ${ALLOWED_ROOTS_ENV}; writes also require ${WRITE_ENV}=true and confirmLocalWrite=true. Sources are never overwritten and successful writes emit SHA-256-bound provenance receipts.`,
       },
     };
   }
