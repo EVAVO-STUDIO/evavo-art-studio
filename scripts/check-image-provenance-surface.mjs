@@ -58,6 +58,9 @@ requireIncludes(legacy, [
 
 const mediaIndex = await readFile(path.join(root, "packages/media/src/index.ts"), "utf8");
 requireIncludes(mediaIndex, ['export * from "./image-provenance-packet.js";'], "@evavo/art-media public index");
+if (mediaIndex.includes('export * from "./image-provenance-evidence.js";')) {
+  throw new Error("Legacy caller-authenticated provenance helper must remain internal.");
+}
 
 const mcpPath = path.join(root, manifest.entrypoint);
 await access(mcpPath);
@@ -76,9 +79,38 @@ if (mcp.includes("externallyAuthenticated")) {
 const syntax = spawnSync(process.execPath, ["--check", mcpPath], { cwd: root, encoding: "utf8" });
 if (syntax.status !== 0) throw new Error(`Image provenance MCP failed node --check:\n${syntax.stderr || syntax.stdout}`);
 
+const providerIndex = await readFile(path.join(root, "packages/providers/src/index.ts"), "utf8");
+requireIncludes(providerIndex, ['export * from "./provider-provenance.js";'], "@evavo/art-providers public index");
+if (providerIndex.includes('export * from "./orchestrator.js";')) {
+  throw new Error("Raw provider executor must remain internal; package consumers must use the provenance-enforcing wrapper.");
+}
+
+const providerProvenance = await readFile(path.join(root, "packages/providers/src/provider-provenance.ts"), "utf8");
+requireIncludes(providerProvenance, [
+  "evavo.provider-provenance-bundle.v1",
+  "evavo.image-provenance-record.v1",
+  "executeProviderCandidateRequest as executeProviderCandidateRequestRaw",
+  "createImageProvenancePacket",
+  "provenanceArtifact",
+  "providerOrContentCredentialSignatureVerifiedHere: false",
+  "providerReportedOriginIsExternallyAuthenticated: false",
+  "pixelOriginInferenceUsed: false",
+  "automaticCreativeApproval: false",
+  "publicationAllowed: false",
+  "PROVIDER_PROVENANCE_EMISSION_FAILED",
+], "Provider provenance wrapper");
+if (providerProvenance.includes("externallyAuthenticated")) {
+  throw new Error("Provider provenance wrapper must not use the legacy caller-authenticated provenance shortcut.");
+}
+
+const providerContract = await readFile(path.join(root, "packages/providers/src/contract.ts"), "utf8");
+requireIncludes(providerContract, ["evidence.bundle", "evidence.provenance"], "Provider durable runtime contract");
+
 for (const relative of [
   "packages/media/test/image-provenance-packet.test.mjs",
   "tools/image_provenance_mcp.test.mjs",
+  "packages/providers/test/provider-provenance.test.mjs",
+  "packages/providers/test/compiled-contract.test.mjs",
 ]) await access(path.join(root, relative));
 
 process.stdout.write(`${JSON.stringify({
@@ -92,5 +124,13 @@ process.stdout.write(`${JSON.stringify({
     "no-caller-authenticated-boolean",
     "no-pixel-ai-origin-inference",
     "no-creative-or-publication-authority",
+  ],
+  providerBoundary: [
+    "public-provider-executor-emits-provenance",
+    "raw-provider-executor-is-internal",
+    "candidate-and-reference-hashes-verified",
+    "base-image-only-canonical-parent-binding",
+    "runtime-requires-evidence.provenance",
+    "provider-origin-record-is-not-external-authentication",
   ],
 }, null, 2)}\n`);
