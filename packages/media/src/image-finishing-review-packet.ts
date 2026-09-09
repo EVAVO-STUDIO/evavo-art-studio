@@ -84,6 +84,17 @@ export interface ImageFinishingReviewBatchResult {
   readonly sourcesModified: false;
 }
 
+const ALPHA_RECOVERY_ROLES = new Set<NonNullable<ImageReviewContext["intendedRole"]>>([
+  "title",
+  "logo",
+  "ui",
+  "sprite",
+]);
+
+function paintedCheckerboardAlphaRecoveryEligible(context: ImageReviewContext | undefined): boolean {
+  return context?.intendedRole !== undefined && ALPHA_RECOVERY_ROLES.has(context.intendedRole);
+}
+
 function unique(values: readonly string[]): readonly string[] {
   return Object.freeze([...new Set(values.filter(Boolean))]);
 }
@@ -193,6 +204,7 @@ export async function createImageFinishingReviewPacket(
   const technicalReview = await orchestrateImageReview(candidate, spec.reviewContext ?? {});
   const repairDecision = planImageRepairDecision(technicalReview, {
     ...(spec.visualFindings?.length ? { visualFindings: spec.visualFindings } : {}),
+    paintedCheckerboardAlphaRecoveryEligible: paintedCheckerboardAlphaRecoveryEligible(spec.reviewContext),
   });
   const referenceConsistency = spec.approvedReferences?.length
     ? await reviewImageReferenceConsistency(candidate, spec.approvedReferences)
@@ -228,12 +240,11 @@ export async function createImageFinishingReviewBatch(
     )
     : Promise.resolve(null);
   const technicalItemsPromise = Promise.all(inputs.map(async (input) => {
-    const technicalReview = await orchestrateImageReview(
-      input.encoded,
-      mergedContext(spec.defaultReviewContext, input.reviewContext),
-    );
+    const reviewContext = mergedContext(spec.defaultReviewContext, input.reviewContext);
+    const technicalReview = await orchestrateImageReview(input.encoded, reviewContext);
     const repairDecision = planImageRepairDecision(technicalReview, {
       ...(input.visualFindings?.length ? { visualFindings: input.visualFindings } : {}),
+      paintedCheckerboardAlphaRecoveryEligible: paintedCheckerboardAlphaRecoveryEligible(reviewContext),
     });
     return Object.freeze({ id: input.id, technicalReview, repairDecision });
   }));
