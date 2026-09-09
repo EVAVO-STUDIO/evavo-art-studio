@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-agent-router",
+  "purpose": "Single read-only discovery and routing surface for Art Studio image review, repair, transparency, enhancement, texture, effects and finalization workflows.",
+  "entrypoint": "tools/image_agent_router_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "tools": [
+    "evavo_image_agent_router_capabilities",
+    "evavo_route_image_task"
+  ],
+  "goals": [
+    "quality-review",
+    "frame-consistency",
+    "fake-transparency",
+    "natural-background-cutout",
+    "local-technical-repair",
+    "semantic-repair",
+    "resize-or-export",
+    "learned-enhancement-review",
+    "texture-review",
+    "runtime-effect",
+    "raster-effect",
+    "ai-artifact-assessment",
+    "finalize-image"
+  ],
+  "guarantees": {
+    "readsImageBytes": false,
+    "writesFiles": false,
+    "carriesApprovalAuthority": false,
+    "routesToGovernedExistingTools": true,
+    "distinguishesTechnicalFromSemanticRepair": true,
+    "claimsAiOriginDetection": false
+  }
+}
