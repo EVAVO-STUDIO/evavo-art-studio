@@ -1,0 +1,26 @@
+{
+  "contractVersion": "evavo_agent_workbench_mcp_v1",
+  "repository": "EVAVO-STUDIO/evavo-art-studio",
+  "authority": "art-studio",
+  "transport": "stdio",
+  "protocolVersion": "2025-03-26",
+  "command": "node",
+  "args": ["scripts/agent-workbench-mcp.mjs"],
+  "readOnly": true,
+  "tools": [
+    "evavo_agent_workbench_capabilities",
+    "evavo_agent_workbench_snapshot",
+    "evavo_agent_workbench_handoff"
+  ],
+  "evidenceRootsEnvironment": "EVAVO_AGENT_WORKBENCH_EVIDENCE_ROOTS",
+  "smokeTest": "node scripts/test-agent-workbench-mcp.mjs",
+  "truthBoundary": {
+    "executesCandidateCommands": false,
+    "mutatesRepository": false,
+    "mutatesProviders": false,
+    "grantsExecutionAuthority": false,
+    "grantsMutationAuthority": false,
+    "grantsPublicationAuthority": false,
+    "downstreamAdmissionRequired": true
+  }
+}
