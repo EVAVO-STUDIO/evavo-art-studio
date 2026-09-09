@@ -1,98 +1,152 @@
-# EVAVO Texture Material Agent
+# EVAVO Texture Material Workflow
 
-The texture material workflow extends the canonical texture review agent from individual map checks into governed material-set validation, UV assurance and Godot-ready derived assets for walls, floors, furniture, doors, props and environment surfaces.
+The texture material workflow turns texture generation/finishing into a governed game-asset pipeline for walls, floors, furniture, doors, props and environment surfaces. It treats texture pixels, material-map semantics, mesh UVs and Godot material bindings as separate evidence domains so one failure is not misdiagnosed as another.
 
-## Canonical entrypoint
+## Agent surfaces
 
-Use `tools/texture_review_mcp.mjs` with the v1.3 contract in `config/texture-review-agent.capabilities.json`.
+### Texture review — v1.4
 
-It exposes:
+Canonical entrypoint: `tools/texture_review_mcp.mjs`  
+Capability contract: `config/texture-review-agent.capabilities.json`
 
-- `evavo_review_texture_map` — read-only map-aware review for base colour, tangent-space normal, roughness, metallic, ambient occlusion, height, emissive, opacity, specular and packed ORM maps.
-- `evavo_review_texture_set` — read-only validation of a complete material set, including dimensions, expected map roles, map-specific blockers/warnings, tileability intent and Godot guidance.
-- `evavo_review_uv_layout` — read-only UV assurance from triangle UV/world-position data supplied by a 3D pipeline.
-- `evavo_review_obj_uv_layout` — read-only Wavefront OBJ ingestion plus UV assurance, including polygon triangulation and missing-UV accounting.
-- `evavo_create_texture_tile_proof` — create-only 3x3 diagnostic proof for visually checking repeats and seams.
-- `evavo_pack_godot_orm_texture` — create-only lossless channel packing using `R=ambient occlusion`, `G=roughness`, `B=metallic` and `A=255`.
+Tools:
 
-There is intentionally one texture agent surface rather than separate review, material and UV servers. Existing map-review callers keep their original tool names and environment configuration.
+- `evavo_review_texture_map` — read-only semantic review for base colour, tangent normal, roughness, metallic, AO, height, emissive, opacity, specular and packed ORM maps.
+- `evavo_review_texture_set` — read-only validation of a coherent material set, including dimensions, expected roles, duplicate authority and Godot import intent.
+- `evavo_review_uv_layout` — read-only UV assurance from triangles supplied by an upstream 3D pipeline.
+- `evavo_review_obj_uv_layout` — read-only Wavefront OBJ ingestion, topology extraction and UV assurance.
+- `evavo_create_texture_tile_proof` — create-only 3x3 diagnostic proof for repeat/seam inspection.
+- `evavo_pack_godot_orm_texture` — create-only lossless packing using `R=ambient occlusion`, `G=roughness`, `B=metallic`, `A=255`.
+
+### Godot material delivery — v1
+
+Entrypoint: `tools/godot_material_delivery_mcp.mjs`  
+Capability contract: `config/godot-material-delivery-agent.capabilities.json`
+
+Tools:
+
+- `evavo_godot_material_delivery_capabilities`
+- `evavo_plan_godot_material_delivery`
+
+This surface is read-only. It turns admitted map metadata into an explicit `StandardMaterial3D` or `ORMMaterial3D` binding recipe. It does not write `.tres`, `.res`, `.tscn` or project import files and does not silently invent custom shaders.
 
 ## Safety model
 
-Source textures and mesh files are never overwritten. All derived writes are create-only and must remain inside `EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS`.
+Texture and mesh source files are never overwritten.
 
-Writes require both:
+Texture-derived writes are create-only and must stay inside `EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS`. They require both:
 
 1. `EVAVO_TEXTURE_REVIEW_ALLOW_WRITES=true`
 2. `confirmLocalWrite=true` on that exact MCP call
 
-An existing output path is an error. Output and receipt paths must be distinct from source paths.
+Map review, material-set review, UV review, OBJ review and Godot material delivery planning are read-only.
 
-Map, material-set, triangle UV and OBJ UV review are read-only and work without enabling writes.
+## Texture-map semantics
 
-## Godot material contract
-
-The material-set reviewer emits explicit import intent instead of treating every PNG as ordinary colour artwork:
+The workflow does not treat every PNG as display colour:
 
 - base colour and emissive: colour/sRGB intent
-- tangent normal: linear data; OpenGL-style `X+, Y+, Z+`
-- roughness, metallic, AO, height, opacity and specular: linear scalar data
+- tangent normal: normal-map data, Godot target convention `X+, Y+, Z+`
+- roughness, metallic, AO, height, opacity and specular: scalar/data intent
 - packed ORM: linear data with `R=AO`, `G=roughness`, `B=metallic`
 
-When a packed ORM texture is present, the reviewer recommends `ORMMaterial3D`; otherwise it recommends `StandardMaterial3D` with separate maps.
-
-The reviewer does not silently invert normal-map channels. A confirmed DirectX-style normal source should be converted deliberately, including through Godot's normal-map Y-invert import option where appropriate, so the authored convention remains auditable.
+A confirmed DirectX-style normal is not silently flipped. It is routed to an explicit Y/green conversion step before normal binding.
 
 ## Material-set rules
 
-By default, maps in one material set must have matching dimensions. Duplicate roles are rejected because they make the authoritative source ambiguous. Callers can declare `expectedKinds` when a material recipe requires specific maps.
+By default, all maps in one set must have matching dimensions. Duplicate semantic roles are rejected because they make the authoritative source ambiguous. Callers can declare required map kinds with `expectedKinds`.
 
-Power-of-two validation is configurable as `ignore`, `warn` or `require`; the default is `warn` rather than rejecting modern engine-valid non-power-of-two textures.
+Power-of-two policy is configurable as `ignore`, `warn` or `require`; the default is `warn`.
 
-For tileable assets, set `expectSeamless=true`. Numeric opposite-edge checks are useful triage, but a 3x3 tile proof should still be visually inspected for obvious repetition, phase discontinuities and authored pattern breaks.
+For repeatable assets, use `expectSeamless=true` and still inspect a 3x3 proof. Numeric edge continuity cannot detect every repeated motif or artistic phase problem.
 
-## UV assurance
+## Topology-aware UV assurance
 
-`evavo_review_uv_layout` accepts 1–5000 triangles. Every triangle has an ID and exactly three UV points; optional world-space positions enable texel-density analysis. Deliberately stacked or mirrored geometry can declare a shared `overlapGroup` so intentional reuse is distinguishable from accidental overlap.
+`evavo_review_uv_layout` accepts 1–5000 triangles. Each triangle has an ID and exactly three UV points. Optional world positions enable texel-density analysis. Optional `vertexKeys` identify the real mesh vertices behind those UVs.
+
+When `vertexKeys` are present, UV islands are **mesh-aware**: triangles join an island only when they share both the same mesh edge and the same UV edge. This prevents unrelated geometry that happens to occupy identical UV coordinates from being falsely merged into one island.
+
+Connectivity evidence reports one of:
+
+- `mesh-aware` — every triangle supplied topology keys.
+- `uv-only-fallback` — no topology keys were supplied; connectivity can only be inferred from UV coordinates.
+- `mixed-conservative` — only part of the set has topology keys; the reviewer prefers false separation over falsely merging unrelated mesh topology.
 
 The UV reviewer checks:
 
-- zero/near-zero UV triangle area
-- world-space degenerates when positions are provided
-- coordinates outside the 0–1 unit square unless tiled coordinates are explicitly allowed
-- overlapping UV triangles, with configurable warn/reject policy
-- mirrored UV winding, with configurable warn/reject policy
-- connected UV islands
-- boundary padding in real output texels when texture dimensions are supplied
-- texel-density outliers relative to the material median when world positions and texture dimensions are supplied
+- degenerate UV triangles
+- degenerate world-space triangles when positions are supplied
+- coordinates outside 0–1 unless tiled coordinates are explicitly allowed
+- accidental triangle overlap
+- explicitly admitted stacked/mirrored reuse via `overlapGroup`
+- winding orientation relative to `majority`, `positive` or `negative` convention
+- topology-aware UV islands
+- atlas-boundary padding in output texels
+- **true inter-island spacing** in output texels using triangle-edge distance, not only bounding boxes
+- world-space texel-density outliers
 
-`evavo_review_obj_uv_layout` parses Wavefront OBJ `v`, `vt`, `f`, `o`, `g` and `usemtl` records, supports positive and negative OBJ indices and triangulates polygon faces with a deterministic fan. A face that has no usable UV coordinate is counted as skipped rather than assigned invented UVs. `flipVForReview=true` can apply `v := 1-v` to the review domain without changing the source OBJ or the extracted authored coordinates.
+`orientationConvention=majority` is the default so a globally V-flipped coordinate convention is not misreported as thousands of mirrored triangles. Use an explicit positive/negative convention when a pipeline contract demands one orientation.
 
-A numeric UV pass is not a visual mesh/material pass. Final inspection still needs representative geometry and lighting to catch wrong semantic placement, visible tangent seams, wrong physical texture scale and artistic repetition.
+For intentionally tiled UV coordinates, atlas-boundary padding is not treated as a meaningful blocker; the reviewer reports that the boundary check was skipped.
+
+## Wavefront OBJ adapter
+
+`evavo_review_obj_uv_layout` parses `v`, `vt`, `f`, `o`, `g` and `usemtl`, resolves positive and negative indices and triangulates polygon faces with a deterministic fan.
+
+OBJ mesh vertex indices are carried into UV review as stable topology keys automatically. Faces without usable UVs are counted instead of receiving invented coordinates. `flipVForReview=true` applies `v := 1-v` only to the review copy; authored OBJ UV data is not changed.
 
 ## ORM packing
 
-`evavo_pack_godot_orm_texture` accepts any combination of AO, roughness and metallic scalar sources. Missing channels use deterministic neutral defaults:
+`evavo_pack_godot_orm_texture` accepts AO, roughness and metallic scalar sources. Missing inputs use deterministic neutral defaults:
 
 - AO: `255`
 - roughness: `255`
 - metallic: `0`
 
-By default, scalar inputs are validated before packing. Chromatic contamination is rejected rather than silently converted. A specific source channel (`r`, `g`, `b` or `a`) can be selected when the source is intentionally channel-packed; disabling strict scalar validation must be explicit.
+Strict scalar validation is on by default. Source dimensions must match exactly. No resizing occurs. Selected source bytes are copied directly into destination channels and the packed output is reviewed before it is written.
 
-The packer performs no resizing and refuses mismatched source dimensions. Selected byte values are copied directly into the destination ORM channels. The packed output is reviewed as `orm-packed` before it is written.
+## Godot material delivery contract
 
-## Recommended agent sequence
+`planGodotMaterialDelivery()` lives in `@evavo/art-godot` and is surfaced through `evavo_plan_godot_material_delivery`.
+
+The planner can bind these standard Godot properties directly:
+
+- base colour → `albedo_texture`
+- tangent normal → `normal_texture` plus `normal_enabled=true`
+- roughness → `roughness_texture` + explicit channel + `roughness=1`
+- metallic → `metallic_texture` + explicit channel + `metallic=1`
+- ambient occlusion → `ao_texture` + explicit channel + `ao_enabled=true`
+- height → `heightmap_texture` + `heightmap_enabled=true`
+- emissive → `emission_texture` + `emission_enabled=true`
+- packed ORM → `orm_texture` on `ORMMaterial3D`
+
+`metallic=1` is deliberately emitted when a metallic texture or ORM map is authoritative so the texture is not suppressed by the material scalar.
+
+The planner also emits an explicit transparency mode. Transparency is expected to come from **albedo alpha**. A separate opacity image is therefore not pretended to be a direct `BaseMaterial3D` texture property.
+
+Unsupported/ambiguous workflows are routed instead of guessed:
+
+- DirectX normal → convert Y/green to Godot/OpenGL convention first.
+- standalone opacity → compose into albedo alpha or deliberately use a reviewed custom shader.
+- standalone per-pixel specular map → re-author for metallic/roughness or deliberately use a reviewed custom shader.
+- packed ORM plus separate AO/roughness/metallic → reject ambiguous authority.
+- `ORMMaterial3D` requested with only separate scalar maps → pack ORM first.
+- `StandardMaterial3D` requested with only packed ORM → unpack/switch material class explicitly.
+
+The delivery decision is `ready`, `needs-preprocess` or `reject`.
+
+## Recommended automated sequence
 
 For a new or repaired material:
 
-1. Review the mesh UV layout first from extracted triangles or a local OBJ export.
-2. Resolve degenerates, accidental overlap, invalid range, inadequate padding or major texel-density inconsistency before blaming the textures.
-3. Review each texture with its real semantic map kind.
-4. Review the complete material set with the roles it is expected to contain.
-5. Resolve blockers rather than applying generic colour/sharpen filters to data maps.
-6. For repeatable materials, create and visually inspect a 3x3 tile proof.
-7. Pack AO/roughness/metallic to ORM only after scalar sources are admitted.
-8. Import/test the result in the target Godot material on representative geometry under representative lighting.
+1. Review the mesh UV layout from the upstream triangle contract or a local OBJ export.
+2. Resolve degenerates, accidental overlaps, invalid range, insufficient island padding and major texel-density inconsistency.
+3. Review every texture using its real semantic kind.
+4. Review the complete material set and resolve role/dimension conflicts.
+5. For repeatable materials, create and visually inspect a 3x3 tile proof.
+6. If using the packed workflow, pack admitted AO/roughness/metallic data to ORM.
+7. Run `evavo_plan_godot_material_delivery` to obtain the exact Godot material class, property bindings, preprocessing needs and runtime checklist.
+8. Bind/test on representative geometry in Godot under representative lighting and camera distances.
+9. Inspect tangent seams, physical texture scale, lower-mip bleed, transparency behavior and artistic repetition before promotion.
 
-This agent is a technical finishing and delivery surface. It does not claim that a numerically valid texture or UV layout is artistically correct, historically accurate, semantically aligned to a mesh, or visually convincing in the final scene. Those remain explicit runtime/visual review requirements.
+A technical pass is not a final visual approval. The workflow deliberately separates deterministic evidence from scene-aware art direction and runtime inspection.
