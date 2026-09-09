@@ -36,6 +36,7 @@ const REQUIRED_FILES = Object.freeze([
   "tools/human_cel_animation_authority_v1.mjs",
   "tools/human_cel_animation_authority_v1_mcp.mjs",
   "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
+  "scripts/check-game-production-contract.mjs",
   ".mcp.animation-pipeline-v1.json",
   ".mcp.animation-frame-ledger-v1.json",
   ".mcp.animation-production-canonical-v1.json",
@@ -43,6 +44,7 @@ const REQUIRED_FILES = Object.freeze([
   ".mcp.animation-execution-supervisor-v1.json",
   ".mcp.human-cel-animation-authority-v1.json",
   "evavo.capabilities.json",
+  "creative-production.integration.json",
   "docs/ANIMATION_CONTROL_PLANE.md",
   "docs/human-cel-animation-authority-v1.md",
 ]);
@@ -58,6 +60,7 @@ const SYNTAX_FILES = Object.freeze([
   "tools/human_cel_animation_authority_v1.mjs",
   "tools/human_cel_animation_authority_v1_mcp.mjs",
   "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
+  "scripts/check-game-production-contract.mjs",
 ]);
 
 function fail(code, detail) {
@@ -131,6 +134,18 @@ function syntaxCheck(path) {
   }
 }
 
+function runNodeCheck(path, code) {
+  const result = spawnSync(process.execPath, [path], {
+    cwd: ROOT,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (result.status !== 0) {
+    fail(code, String(result.stderr || result.stdout || `${path} failed`).trim());
+  }
+  return String(result.stdout || "").trim();
+}
+
 function humanCelSmokeAuthority() {
   const authority = compileHumanCelAnimationAuthority({
     id: "animation_control_human_cel_smoke",
@@ -184,6 +199,10 @@ async function main() {
 
   const doctor = await verifyAnimationPipelineV1({ role: "art-studio", root: ROOT });
   assert.notEqual(doctor.status, "blocked", "Animation pipeline doctor must not be blocked");
+  const gameProductionDoctor = runNodeCheck(
+    "scripts/check-game-production-contract.mjs",
+    "ANIMATION_CONTROL_CHECK_GAME_PRODUCTION_CONTRACT_FAILED",
+  );
 
   const pipelineConfig = await readJson(".mcp.animation-pipeline-v1.json");
   const pipeline = exactServer(
@@ -293,6 +312,12 @@ async function main() {
     "docs/human-cel-animation-authority-v1.md",
   ]);
 
+  const productionIntegration = await readJson("creative-production.integration.json");
+  assert.equal(productionIntegration.artifactManifestSchemaVersion, "1.1.0");
+  assert.equal(productionIntegration.requirements?.artifactManifestDeterministicDeliveryRoot, true);
+  assert.equal(productionIntegration.requirements?.humanCreativeApprovalRemainsSeparate, true);
+  assert.equal(productionIntegration.authority?.grantsCreativeApproval, false);
+
   const capabilityText = JSON.stringify(capabilities);
   assert.equal(
     capabilityText.includes(STALE_SEQUENCE_ENTRY),
@@ -304,6 +329,7 @@ async function main() {
     status: "ok",
     check: "animation-control",
     doctorStatus: doctor.status,
+    gameProductionDoctor: gameProductionDoctor || "passed",
     humanCelAuthority: {
       authorityId: humanCelAuthority.authorityId,
       contentDigest: humanCelAuthority.contentDigest,
