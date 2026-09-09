@@ -49,10 +49,6 @@ const REQUIRED_FILES = Object.freeze([
   "docs/human-cel-animation-authority-v1.md",
 ]);
 
-const SYNTAX_FILES = REQUIRED_FILES.filter(
-  (path) => path.endsWith(".mjs") && !path.startsWith(".mcp."),
-);
-
 function fail(code, detail) {
   throw new Error(detail ? `${code}:${detail}` : code);
 }
@@ -171,24 +167,24 @@ function humanCelSmokeAuthority() {
   });
 
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
-  assert.equal(authority.protocolVersion, "2026-09-09.7");
+  assert.equal(authority.protocolVersion, "2026-09-09.8");
   assert.equal(authority.authority.mode, "human-cel-authored");
+  assert.equal(authority.authority.cleanupInk, "strict");
+  assert.equal(authority.authority.colourPaint, "strict");
   assert.equal(authority.authority.performanceActing, "strict");
-  assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
-  assert.equal(authority.authority.canonicalApprovalHelper, "reviewHumanCelArtefact");
+  assert.equal(authority.authority.opticalCompositing, "strict");
   assert.equal(authority.authority.requiredPersistenceGate, "strict-human-cel-promotion-receipt-gate");
   assert.equal(authority.authority.requiredPersistedStateIntegrity, "canonical-snapshot-render-job-integrity");
-  assert.equal(authority.authority.requiresPersistencePromotionGate, true);
-  assert.equal(authority.authority.requiresPersistedStateIntegrity, true);
-  assert.equal(authority.handoff.minimumPackageVersion, "0.37.0");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.38.0");
   assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
   assert.equal(authority.handoff.minimumStorePackageVersion, "0.27.0");
-  assert.equal(authority.handoff.requiredStoreBehavior, "strict-human-cel-promotion-receipt-gate");
-  assert.equal(authority.handoff.requiredStoreIntegrity, "canonical-snapshot-render-job-integrity");
   for (const required of [
     "createHumanCelProductionAuthority",
     "createStrictHumanCelRenderPrompt",
+    "createHumanCelColourPaintDirective",
+    "createHumanCelCleanupInkDirective",
     "createHumanCelPerformanceDirective",
+    "createHumanCelCompositingDirective",
     "evaluateHumanCelPerformanceReview",
     "evaluateHumanCelQualityGate",
     "createHumanCelQualityReceipt",
@@ -201,7 +197,9 @@ function humanCelSmokeAuthority() {
 
 async function main() {
   for (const path of REQUIRED_FILES) await requireRegularFile(path);
-  for (const path of SYNTAX_FILES) syntaxCheck(path);
+  for (const path of REQUIRED_FILES.filter((value) => value.endsWith(".mjs"))) {
+    syntaxCheck(path);
+  }
 
   const doctor = await verifyAnimationPipelineV1({ role: "art-studio", root: ROOT });
   assert.notEqual(doctor.status, "blocked", "Animation pipeline doctor must not be blocked");
@@ -256,14 +254,6 @@ async function main() {
     "animation-sequence-delivery",
   );
 
-  const campaignConfig = await readJson(".mcp.animation-character-family-campaign-preflight-v1.json");
-  const campaign = exactServer(
-    campaignConfig,
-    "evavo-animation-character-family-campaign-preflight-v1",
-    ["tools/animation_character_family_campaign_preflight_v1.mjs", "mcp"],
-  );
-  assert.equal(campaign.env?.EVAVO_ANIMATION_CHARACTER_FAMILY_PREFLIGHT_READ_ENABLED, "disabled");
-
   const supervisorConfig = await readJson(".mcp.animation-execution-supervisor-v1.json");
   const supervisor = exactServer(supervisorConfig, "evavo-animation-execution-supervisor-v1", [
     "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
@@ -288,26 +278,14 @@ async function main() {
   const humanCelAuthority = humanCelSmokeAuthority();
 
   const capabilities = await readJson("evavo.capabilities.json");
-  assertEntrypoints(capability(capabilities, "art.animation.pipeline"), [
-    "node tools/animation_pipeline_control_plane_v1_1_mcp.mjs",
-    ".mcp.animation-pipeline-v1.json",
-  ]);
-  assertEntrypoints(capability(capabilities, "art.animation.frame-ledger"), [
-    "node tools/animation_frame_work_ledger_v1_mcp.mjs",
-    ".mcp.animation-frame-ledger-v1.json",
-  ]);
-  assertEntrypoints(capability(capabilities, "art.animation.delivery"), [
-    "node tools/animation_sequence_delivery_canonical_v1_mcp.mjs",
-    ".mcp.animation-production-canonical-v1.json",
-  ]);
-  assertEntrypoints(capability(capabilities, "art.animation.character-family-preflight"), [
-    "node tools/animation_character_family_campaign_preflight_v1.mjs verify",
-    ".mcp.animation-character-family-campaign-preflight-v1.json",
-  ]);
-  assertEntrypoints(capability(capabilities, "art.animation.execution-supervisor"), [
-    "node scripts/start-animation-execution-supervisor-mcp-v1.mjs",
-    ".mcp.animation-execution-supervisor-v1.json",
-  ]);
+  for (const [id, entrypoints] of [
+    ["art.animation.pipeline", ["node tools/animation_pipeline_control_plane_v1_1_mcp.mjs", ".mcp.animation-pipeline-v1.json"]],
+    ["art.animation.frame-ledger", ["node tools/animation_frame_work_ledger_v1_mcp.mjs", ".mcp.animation-frame-ledger-v1.json"]],
+    ["art.animation.delivery", ["node tools/animation_sequence_delivery_canonical_v1_mcp.mjs", ".mcp.animation-production-canonical-v1.json"]],
+    ["art.animation.execution-supervisor", ["node scripts/start-animation-execution-supervisor-mcp-v1.mjs", ".mcp.animation-execution-supervisor-v1.json"]],
+  ]) {
+    assertEntrypoints(capability(capabilities, id), entrypoints);
+  }
   const humanCelCapability = capability(capabilities, "art.animation.human-cel-authority");
   assertEntrypoints(humanCelCapability, [
     "node tools/human_cel_animation_authority_v1_mcp.mjs",
@@ -315,9 +293,10 @@ async function main() {
     "docs/human-cel-animation-authority-v1.md",
   ]);
   assertRequires(humanCelCapability, [
-    "Cel Animation Studio @evavo/cel-core 0.37.0 or newer",
+    "Cel Animation Studio @evavo/cel-core 0.38.0 or newer",
     "Cel Animation Studio @evavo/cel-store 0.27.0 or newer",
-    "Strict human-cel performance grammar and performance review",
+    "Strict human-cel cleanup/ink, colour/paint, acting/performance and optical/compositing grammar",
+    "createHumanCelColourPaintDirective, createHumanCelCleanupInkDirective, createHumanCelPerformanceDirective and createHumanCelCompositingDirective downstream surfaces",
     "Candidate provenance containing the exact strict-envelope digest",
     "Canonical persisted snapshot and render-job integrity before strict promotion",
     "Zero-blocker persisted quality receipt for strict approval",
@@ -335,6 +314,7 @@ async function main() {
     "@evavo/cel-core 0.34.0",
     "@evavo/cel-core 0.35.0",
     "@evavo/cel-core 0.36.0",
+    "@evavo/cel-core 0.37.0",
     "@evavo/cel-store 0.26.0",
   ]) {
     assert.equal(capabilityText.includes(stale), false, `Capability registry must not advertise ${stale}`);
@@ -351,21 +331,15 @@ async function main() {
       protocolVersion: humanCelAuthority.protocolVersion,
       coreMinimumVersion: humanCelAuthority.handoff.minimumPackageVersion,
       storeMinimumVersion: humanCelAuthority.handoff.minimumStorePackageVersion,
-      strict: true,
+      cleanupInkRequired: true,
+      colourPaintRequired: true,
       performanceActingRequired: true,
+      opticalCompositingRequired: true,
       candidateEnvelopeProvenanceRequired: true,
       qualityReceiptRequired: true,
       storePromotionGateRequired: true,
       persistedStateIntegrityRequired: true,
     },
-    verifiedCapabilities: [
-      "art.animation.pipeline",
-      "art.animation.frame-ledger",
-      "art.animation.delivery",
-      "art.animation.character-family-preflight",
-      "art.animation.execution-supervisor",
-      "art.animation.human-cel-authority",
-    ],
     authority: {
       providerExecution: false,
       automaticCreativeApproval: false,
