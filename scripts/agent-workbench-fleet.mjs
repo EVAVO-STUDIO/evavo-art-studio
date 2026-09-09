@@ -10,6 +10,7 @@ const CONTRACT = "evavo_agent_workbench_fleet_snapshot_v1";
 const record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : null;
 const text = (value) => typeof value === "string" ? value.trim() : "";
 const strings = (value) => Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+const uniqueStrings = (values) => [...new Set(values.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim()))].sort();
 const fail = (message) => { throw new Error(message); };
 
 function parse(argv) {
@@ -78,16 +79,32 @@ function routeId(type, item) {
   return type === "script" ? text(item.name) : text(item.id);
 }
 
+function routeOwner(type, item, snapshot) {
+  if (type === "estate-capability") return text(item.repository) || snapshot.repository;
+  if (type === "tool") return text(item.repository) || snapshot.repository;
+  return snapshot.repository;
+}
+
+function routeAuthority(type, item, snapshot, owner) {
+  const declared = text(item.authority);
+  if (declared) return declared;
+  if (owner === snapshot.repository) return snapshot.authority;
+  if (owner === "EVAVO-STUDIO/evavo-development-studio") return "development-studio";
+  return "unknown";
+}
+
 function routesFromSnapshot(snapshot) {
   const output = [];
   for (const [type, items] of Object.entries({ capability: snapshot.matches.capabilities, tool: snapshot.matches.tools, "estate-capability": snapshot.matches.estateCapabilities, script: snapshot.matches.scripts })) {
     for (const item of Array.isArray(items) ? items : []) {
       if (!record(item) || !routeId(type, item)) continue;
+      const owner = routeOwner(type, item, snapshot);
       output.push(Object.freeze({
         type,
         id: routeId(type, item),
-        repository: snapshot.repository,
-        authority: snapshot.authority,
+        repository: owner,
+        authority: routeAuthority(type, item, snapshot, owner),
+        observedFromRepository: snapshot.repository,
         relevance: Number.isFinite(item.relevance) ? item.relevance : 0,
         priority: routePriority(type, item),
         source: text(item.source) || (type === "capability" ? "repository-capability-manifest" : type),
@@ -100,12 +117,54 @@ function routesFromSnapshot(snapshot) {
   return output;
 }
 
+function routeKey(route) {
+  return `${route.type}\u0000${route.repository}\u0000${route.id}`;
+}
+
+function compareRoutes(a, b) {
+  return b.priority - a.priority
+    || b.relevance - a.relevance
+    || a.source.localeCompare(b.source)
+    || a.repository.localeCompare(b.repository)
+    || a.id.localeCompare(b.id)
+    || a.observedFromRepository.localeCompare(b.observedFromRepository);
+}
+
+function deduplicateRoutes(routes) {
+  const groups = new Map();
+  for (const route of routes) {
+    const key = routeKey(route);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(route);
+  }
+  const output = [];
+  for (const group of groups.values()) {
+    const ordered = [...group].sort(compareRoutes);
+    const winner = ordered[0];
+    const effects = uniqueStrings(ordered.flatMap((route) => route.effects));
+    const requires = uniqueStrings(ordered.flatMap((route) => route.requires));
+    const observedFromRepositories = uniqueStrings(ordered.map((route) => route.observedFromRepository));
+    output.push(Object.freeze({
+      ...winner,
+      effects,
+      requires,
+      observedFromRepositories,
+    }));
+  }
+  return output.sort(compareRoutes);
+}
+
+function publicRoute(route) {
+  const { priority, observedFromRepository, ...output } = route;
+  return Object.freeze(output);
+}
+
 export function compileAgentWorkbenchFleet({ workspaceRoot, objective = "", limit = 50, perRepositoryLimit = 20, repositoryLimit = 256, estateSnapshotPath = null } = {}) {
   const resolvedRoot = safeDirectory(workspaceRoot, "workspaceRoot");
   const roots = discoverRoots(resolvedRoot, repositoryLimit);
   const repositories = [];
   const errors = [];
-  const routes = [];
+  const rawRoutes = [];
   for (const root of roots) {
     try {
       const snapshot = compileAgentWorkbench({ root, objective, limit: perRepositoryLimit, ...(estateSnapshotPath ? { estateSnapshotPath } : {}) });
@@ -116,26 +175,54 @@ export function compileAgentWorkbenchFleet({ workspaceRoot, objective = "", limi
         mode: snapshot.mode,
         inventory: snapshot.inventory,
         discovery: snapshot.discovery,
-        policy: Object.freeze({ sourceCapabilityDoesNotImplyRuntimeReadiness: snapshot.policy.sourceCapabilityDoesNotImplyRuntimeReadiness, mcpRegistrationDoesNotImplyRuntimeReadiness: snapshot.policy.mcpRegistrationDoesNotImplyRuntimeReadiness, mcpEnvironmentValuesRetained: snapshot.policy.mcpEnvironmentValuesRetained, mcpArgumentValuesRetained: snapshot.policy.mcpArgumentValuesRetained }),
+        policy: Object.freeze({
+          sourceCapabilityDoesNotImplyRuntimeReadiness: snapshot.policy.sourceCapabilityDoesNotImplyRuntimeReadiness,
+          mcpRegistrationDoesNotImplyRuntimeReadiness: snapshot.policy.mcpRegistrationDoesNotImplyRuntimeReadiness,
+          mcpEnvironmentValuesRetained: snapshot.policy.mcpEnvironmentValuesRetained,
+          mcpArgumentValuesRetained: snapshot.policy.mcpArgumentValuesRetained,
+          incompleteEstateCannotProveAbsence: snapshot.policy.incompleteEstateCannotProveAbsence,
+          estateAutoDiscoveryRunsProviderQueries: snapshot.policy.estateAutoDiscoveryRunsProviderQueries,
+        }),
       }));
-      routes.push(...routesFromSnapshot(snapshot));
+      rawRoutes.push(...routesFromSnapshot(snapshot));
     } catch (error) {
       errors.push(Object.freeze({ directoryName: path.basename(root), error: error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000) }));
     }
   }
-  routes.sort((a, b) => b.relevance - a.relevance || b.priority - a.priority || a.repository.localeCompare(b.repository) || a.id.localeCompare(b.id));
-  const bestRoutes = routes.slice(0, limit).map(({ priority, ...route }) => Object.freeze(route));
+  rawRoutes.sort(compareRoutes);
+  const routes = deduplicateRoutes(rawRoutes);
+  const bestRoutes = routes.slice(0, limit).map(publicRoute);
   return Object.freeze({
     contract: CONTRACT,
     generatedAt: new Date().toISOString(),
     objective,
     scope: "local-workbench-enabled-siblings",
     workspaceRoot: resolvedRoot,
-    counts: Object.freeze({ repositoryRootsObserved: roots.length, repositoriesCompiled: repositories.length, compileErrors: errors.length, routeCandidates: routes.length, bestRoutes: bestRoutes.length }),
+    counts: Object.freeze({
+      repositoryRootsObserved: roots.length,
+      repositoriesCompiled: repositories.length,
+      compileErrors: errors.length,
+      routeCandidatesRaw: rawRoutes.length,
+      routeCandidates: routes.length,
+      duplicateRoutesCollapsed: rawRoutes.length - routes.length,
+      bestRoutes: bestRoutes.length,
+    }),
     repositories: Object.freeze(repositories),
     bestRoutes: Object.freeze(bestRoutes),
     errors: Object.freeze(errors),
-    policy: Object.freeze({ readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, localSiblingDiscoveryOnly: true, providerEstateCompletenessClaimed: false, absenceClaimsAllowed: false, mcpRegistrationDoesNotImplyRuntimeReadiness: true, rawMcpEnvironmentValuesRetained: false, rawMcpArgumentValuesRetained: false }),
+    policy: Object.freeze({
+      readOnlyCompiler: true,
+      commandExecutionPerformed: false,
+      mutationPerformed: false,
+      localSiblingDiscoveryOnly: true,
+      providerEstateCompletenessClaimed: false,
+      absenceClaimsAllowed: false,
+      canonicalRouteOwnershipApplied: true,
+      duplicateRoutesCollapsed: true,
+      mcpRegistrationDoesNotImplyRuntimeReadiness: true,
+      rawMcpEnvironmentValuesRetained: false,
+      rawMcpArgumentValuesRetained: false,
+    }),
   });
 }
 
@@ -143,7 +230,12 @@ function selfTest() {
   const semantic = routePriority("tool", { source: "development-tool-registry" });
   const launcher = routePriority("tool", { source: "root-mcp-launch-manifest" });
   if (!(semantic > launcher) || routePriority("capability", {}) <= semantic) fail("fleet priority self-test failed");
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_fleet_self_test_v1", status: "passed", assertions: 2 }, null, 2)}\n`);
+  const snapshot = { repository: "EVAVO-STUDIO/brain", authority: "brain", matches: { capabilities: [], tools: [], scripts: [], estateCapabilities: [{ id: "art.test", repository: "EVAVO-STUDIO/art", authority: "art-studio", relevance: 1, runtimeReadiness: "unknown" }] } };
+  const route = routesFromSnapshot(snapshot)[0];
+  if (route.repository !== "EVAVO-STUDIO/art" || route.authority !== "art-studio") fail("fleet canonical ownership self-test failed");
+  const duplicate = deduplicateRoutes([route, { ...route, observedFromRepository: "EVAVO-STUDIO/dev" }]);
+  if (duplicate.length !== 1 || duplicate[0].observedFromRepositories.length !== 2) fail("fleet deduplication self-test failed");
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_fleet_self_test_v2", status: "passed", assertions: 4 }, null, 2)}\n`);
 }
 
 function main() {
