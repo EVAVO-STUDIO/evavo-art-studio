@@ -23,7 +23,15 @@ When `expectSeamless=true`, left/right and top/bottom edge error is measured. Th
 
 ## 3x3 tile proof
 
-`createTextureTileProof` produces a bounded 3x3 repeat for fast visual inspection. The MCP tool `evavo_create_texture_tile_proof` writes that proof and a diagnostic receipt using create-only paths. It never edits the source.
+`evavo_create_texture_tile_proof` writes a bounded 3x3 repeat plus a diagnostic receipt using create-only paths. It never edits the source.
+
+Proof resizing now has an explicit sampling contract:
+
+- `continuous` is the default. If the proof tile must be reduced, Lanczos3 is used so albedo, photos and continuous PBR maps are not made artificially blocky by the diagnostic itself.
+- `nearest` is opt-in for pixel art or exact texel/block inspection.
+- if the source already fits the preview bound, the tile is not resampled at all.
+
+The lower-level `createTextureTileProofWithSampling` exposes the same behavior to library callers. The older `createTextureTileProof` remains available for compatibility with existing callers.
 
 ```powershell
 pnpm --filter @evavo/art-media build
