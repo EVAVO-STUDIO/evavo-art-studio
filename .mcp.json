@@ -23,6 +23,63 @@
       "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_EXISTING_IMAGE_POLISH_ALLOW_WRITES": "true"}
     },
     "evavo-image-quality-pipeline-doctor-v1": {"command": "node", "args": ["tools/image_quality_pipeline_doctor_mcp.mjs"], "env": {}},
+    "evavo-image-workflow-router-v2": {"command": "node", "args": ["tools/image_workflow_router_v2_mcp.mjs"], "env": {}},
+    "evavo-image-finishing-artist-v1": {
+      "command": "node", "args": ["tools/image_finishing_artist_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
+    },
+    "evavo-image-finishing-packet-v1": {
+      "command": "node", "args": ["tools/image_finishing_packet_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_FINISHING_PACKET_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
+    },
+    "evavo-image-repair-agent-v1": {
+      "command": "node", "args": ["tools/image_repair_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_REPAIR_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_IMAGE_REPAIR_ALLOW_WRITES": "true"}
+    },
+    "evavo-image-reference-consistency-v1": {
+      "command": "node", "args": ["tools/image_reference_consistency_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_CONSISTENCY_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_IMAGE_CONSISTENCY_ALLOW_WRITES": "true"}
+    },
+    "evavo-image-artifact-triage-v1": {
+      "command": "node", "args": ["tools/image_artifact_triage_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_ARTIFACT_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
+    },
+    "evavo-image-provenance-v1": {
+      "command": "node", "args": ["tools/image_provenance_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_PROVENANCE_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
+    },
+    "evavo-image-sequence-finishing-v1": {
+      "command": "node", "args": ["tools/image_sequence_finishing_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_SEQUENCE_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
+    },
+    "evavo-image-delivery-integrity-v1": {
+      "command": "node", "args": ["tools/image_delivery_integrity_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_DELIVERY_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
+    },
+    "evavo-image-finalization-v1": {
+      "command": "node", "args": ["tools/image_finalization_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_FINALIZATION_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
+    },
+    "evavo-raster-finishing-v1": {
+      "command": "node", "args": ["tools/raster_finishing_mcp.mjs"],
+      "env": {"EVAVO_RASTER_FINISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_RASTER_FINISH_ALLOW_WRITES": "true"}
+    },
+    "evavo-texture-review-agent-v1": {
+      "command": "node", "args": ["tools/texture_review_mcp.mjs"],
+      "env": {"EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_TEXTURE_REVIEW_ALLOW_WRITES": "true"}
+    },
+    "evavo-godot-material-delivery-v1": {
+      "command": "node", "args": ["tools/godot_material_delivery_mcp.mjs"],
+      "env": {"EVAVO_GODOT_MATERIAL_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_GODOT_MATERIAL_ALLOW_WRITES": "true"}
+    },
+    "evavo-godot-material-validation-v1": {
+      "command": "node", "args": ["tools/godot_material_validation_mcp.mjs"],
+      "env": {"EVAVO_GODOT_MATERIAL_VALIDATION_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_GODOT_MATERIAL_ALLOW_EXECUTION": "true"}
+    },
+    "evavo-image-effects-v1": {
+      "command": "node", "args": ["tools/image_effects_mcp.mjs"],
+      "env": {"EVAVO_IMAGE_EFFECTS_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO", "EVAVO_IMAGE_EFFECTS_ALLOW_WRITES": "true"}
+    },
     "evavo-enhancement-review-bridge-v1": {
       "command": "node", "args": ["tools/enhancement_review_bridge_mcp.mjs"],
       "env": {"EVAVO_EXISTING_IMAGE_POLISH_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO"}
