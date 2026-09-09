@@ -56,6 +56,7 @@ const mediaExports = [
   "texture-tile-proof",
   "texture-set-review",
   "texture-channel-pack",
+  "uv-layout-review",
   "enhancement-structure-risk",
 ];
 for (const requiredExport of mediaExports) {
@@ -87,6 +88,7 @@ for (const requiredTest of [
   "packages/media/test/texture-tile-proof.test.mjs",
   "packages/media/test/texture-set-review.test.mjs",
   "packages/media/test/texture-channel-pack.test.mjs",
+  "packages/media/test/uv-layout-review.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/texture_review_mcp.test.mjs",
@@ -101,7 +103,7 @@ process.stdout.write(`${JSON.stringify({
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   textureProofSampling: ["continuous", "nearest"],
-  textureMaterialReview: ["single-map", "material-set", "godot-orm-pack"],
+  textureMaterialReview: ["single-map", "material-set", "godot-orm-pack", "uv-layout"],
   unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
