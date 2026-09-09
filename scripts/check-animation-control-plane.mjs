@@ -282,6 +282,11 @@ async function main() {
     "node scripts/start-animation-execution-supervisor-mcp-v1.mjs",
     ".mcp.animation-execution-supervisor-v1.json",
   ]);
+  assertEntrypoints(capability(capabilities, "art.animation.human-cel-authority"), [
+    "node tools/human_cel_animation_authority_v1_mcp.mjs",
+    ".mcp.human-cel-animation-authority-v1.json",
+    "docs/human-cel-animation-authority-v1.md",
+  ]);
 
   const capabilityText = JSON.stringify(capabilities);
   assert.equal(
@@ -306,6 +311,7 @@ async function main() {
       "art.animation.delivery",
       "art.animation.character-family-preflight",
       "art.animation.execution-supervisor",
+      "art.animation.human-cel-authority",
     ],
     authority: {
       providerExecution: false,
