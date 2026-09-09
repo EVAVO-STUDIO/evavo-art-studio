@@ -11,64 +11,10 @@
     "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
     "authority": {"type": "string", "minLength": 1},
     "objective": {"type": "string"},
-    "snapshot": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["contract", "sha256", "generatedAt"],
-      "properties": {
-        "contract": {"const": "evavo_agent_workbench_snapshot_v1"},
-        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-        "generatedAt": {"type": "string", "format": "date-time"}
-      }
-    },
-    "selectedRoute": {
-      "oneOf": [
-        {"type": "null"},
-        {
-          "type": "object",
-          "required": ["type", "id", "selection", "relevance", "sha256", "evidence"],
-          "properties": {
-            "type": {"enum": ["capability", "script", "tool", "estate-capability"]},
-            "id": {"type": "string", "minLength": 1},
-            "selection": {"enum": ["explicit", "deterministic-top-match"]},
-            "relevance": {"type": "number"},
-            "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-            "evidence": {"type": "object"}
-          }
-        }
-      ]
-    },
-    "guidance": {
-      "type": "object",
-      "required": ["currentPhase", "nextPhase", "nextPurpose", "requiredEvidence", "phaseSequence", "atFinalPhase", "disposition", "effects", "requirements", "blockers", "nextAuthority", "handoffRecommended"],
-      "properties": {
-        "currentPhase": {"type": ["string", "null"]},
-        "nextPhase": {"type": "string", "minLength": 1},
-        "nextPurpose": {"type": "string", "minLength": 1},
-        "requiredEvidence": {"type": "array", "items": {"type": "string"}},
-        "phaseSequence": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "atFinalPhase": {"type": "boolean"},
-        "disposition": {"enum": ["no-route-match", "read-compute-route", "effect-admission-required", "registered-tool-admission-required", "handoff-registered-tool", "handoff-runtime-unverified", "resolve-script-through-capability"]},
-        "effects": {"type": "array", "items": {"type": "string"}},
-        "requirements": {"type": "array", "items": {"type": "string"}},
-        "blockers": {"type": "array", "items": {"type": "string"}},
-        "nextAuthority": {"type": "string", "minLength": 1},
-        "handoffRecommended": {"type": "boolean"}
-      }
-    },
+    "snapshot": {"type": "object", "additionalProperties": false, "required": ["contract", "sha256", "generatedAt"], "properties": {"contract": {"const": "evavo_agent_workbench_snapshot_v1"}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "generatedAt": {"type": "string", "format": "date-time"}}},
+    "selectedRoute": {"oneOf": [{"type": "null"}, {"type": "object", "required": ["type", "id", "selection", "relevance", "sha256", "evidence"], "properties": {"type": {"enum": ["capability", "script", "tool", "estate-capability"]}, "id": {"type": "string", "minLength": 1}, "selection": {"enum": ["explicit", "deterministic-top-match"]}, "relevance": {"type": "number"}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "evidence": {"type": "object"}}}]},
+    "guidance": {"type": "object", "required": ["currentPhase", "nextPhase", "nextPurpose", "requiredEvidence", "phaseSequence", "atFinalPhase", "disposition", "effects", "requirements", "blockers", "nextAuthority", "handoffRecommended"], "properties": {"currentPhase": {"type": ["string", "null"]}, "nextPhase": {"type": "string", "minLength": 1}, "nextPurpose": {"type": "string", "minLength": 1}, "requiredEvidence": {"type": "array", "items": {"type": "string"}}, "phaseSequence": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "atFinalPhase": {"type": "boolean"}, "disposition": {"enum": ["no-route-match", "read-compute-route", "effect-admission-required", "registered-tool-admission-required", "mcp-runtime-verification-required", "handoff-registered-tool", "handoff-runtime-unverified", "resolve-script-through-capability"]}, "effects": {"type": "array", "items": {"type": "string"}}, "requirements": {"type": "array", "items": {"type": "string"}}, "blockers": {"type": "array", "items": {"type": "string"}}, "nextAuthority": {"type": "string", "minLength": 1}, "handoffRecommended": {"type": "boolean"}}},
     "mustNot": {"type": "array", "items": {"type": "string"}},
-    "policy": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["readOnlyCompiler", "commandExecutionPerformed", "mutationPerformed", "selectionDoesNotAuthorizeEffects", "guidanceDoesNotProveReadiness", "downstreamAdmissionRequired"],
-      "properties": {
-        "readOnlyCompiler": {"const": true},
-        "commandExecutionPerformed": {"const": false},
-        "mutationPerformed": {"const": false},
-        "selectionDoesNotAuthorizeEffects": {"const": true},
-        "guidanceDoesNotProveReadiness": {"const": true},
-        "downstreamAdmissionRequired": {"type": "boolean"}
-      }
-    }
+    "policy": {"type": "object", "additionalProperties": false, "required": ["readOnlyCompiler", "commandExecutionPerformed", "mutationPerformed", "selectionDoesNotAuthorizeEffects", "guidanceDoesNotProveReadiness", "downstreamAdmissionRequired"], "properties": {"readOnlyCompiler": {"const": true}, "commandExecutionPerformed": {"const": false}, "mutationPerformed": {"const": false}, "selectionDoesNotAuthorizeEffects": {"const": true}, "guidanceDoesNotProveReadiness": {"const": true}, "downstreamAdmissionRequired": {"type": "boolean"}}}
   }
 }
