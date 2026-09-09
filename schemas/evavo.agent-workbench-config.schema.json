@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.com/schemas/evavo.agent-workbench-config.schema.json",
+  "title": "EVAVO Agent Workbench Config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "repository", "authority", "role", "capabilityManifest", "packageManifest", "readFirst", "phases", "automation", "handoffs"],
+  "properties": {
+    "$schema": {"type": "string", "minLength": 1, "maxLength": 500},
+    "contractVersion": {"const": "evavo_agent_workbench_config_v1"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "authority": {"type": "string", "minLength": 1, "maxLength": 160},
+    "role": {"type": "string", "minLength": 1, "maxLength": 1200},
+    "capabilityManifest": {"type": "string", "minLength": 1, "maxLength": 256},
+    "packageManifest": {"type": "string", "minLength": 1, "maxLength": 256},
+    "defaultToolRegistry": {"type": "string", "minLength": 1, "maxLength": 256},
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configSchema", "snapshotSchema", "handoffSchema", "verifier", "handoffCompiler"],
+      "properties": {
+        "configSchema": {"type": "string", "minLength": 1, "maxLength": 256},
+        "snapshotSchema": {"type": "string", "minLength": 1, "maxLength": 256},
+        "handoffSchema": {"type": "string", "minLength": 1, "maxLength": 256},
+        "verifier": {"type": "string", "minLength": 1, "maxLength": 256},
+        "handoffCompiler": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "readFirst": {"$ref": "#/$defs/stringList"},
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "purpose", "evidence"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+          "purpose": {"type": "string", "minLength": 1, "maxLength": 1200},
+          "evidence": {"$ref": "#/$defs/stringList"}
+        }
+      }
+    },
+    "automation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["safeWithoutApproval", "gated", "neverImplied"],
+      "properties": {
+        "safeWithoutApproval": {"$ref": "#/$defs/stringList"},
+        "gated": {"$ref": "#/$defs/stringList"},
+        "neverImplied": {"$ref": "#/$defs/stringList"}
+      }
+    },
+    "handoffs": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["to", "when"],
+        "properties": {
+          "to": {"type": "string", "minLength": 1, "maxLength": 256},
+          "when": {"type": "string", "minLength": 1, "maxLength": 1200}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "maxItems": 200,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 1200}
+    }
+  }
+}
