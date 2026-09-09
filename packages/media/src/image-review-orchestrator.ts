@@ -13,7 +13,7 @@ import {
 } from "./image-review-profiles.js";
 
 export interface ImageReviewContext {
-  readonly intendedRole?: "work-header" | "support-image" | "tile" | "logo" | "ui" | "photo" | "sprite" | "illustration" | "texture";
+  readonly intendedRole?: "work-header" | "support-image" | "tile" | "title" | "logo" | "ui" | "photo" | "sprite" | "illustration" | "texture";
   readonly declaredProfile?: ImageReviewProfileName;
   readonly filename?: string;
   readonly compareAgainst?: readonly Readonly<{ id: string; image: Buffer }>[];
@@ -48,6 +48,7 @@ export interface ImageReviewOrchestrationResult {
 function classifyByRole(role: ImageReviewContext["intendedRole"]): ImageReviewProfileName | undefined {
   switch (role) {
     case "work-header": return "web-hero";
+    case "title":
     case "logo": return "logo-transparent";
     case "ui": return "ui-screenshot";
     case "photo": return "photo";
@@ -118,67 +119,36 @@ export async function orchestrateImageReview(
     mergeGap: 1,
   });
   const finishingPlan = planExistingImageFinishing(defects.evidence, defectRegions, { profile: inferred.profile });
-
-  const blockers: string[] = [];
-  const warnings: string[] = [...quality.issues, ...artifactSignals.warnings, ...generatedDetailRisk.warnings];
-
-  if (quality.grade === "fail") blockers.push("technical image-quality review failed");
-  if (quality.transparentRgbContaminationRatio > profile.maximumTransparentRgbContaminationRatio) blockers.push("transparent RGB contamination exceeds profile limit");
-  if (quality.edgeHaloRiskRatio > profile.maximumEdgeHaloRiskRatio) blockers.push("edge halo risk exceeds profile limit");
-  if (quality.alphaPinholeRatio > profile.maximumPinholeRatio) blockers.push("alpha pinholes exceed profile limit");
-
-  if (finishingPlan.route === "manual-review") blockers.push("defect proposal exceeds safe automatic finishing scope");
-  if (defects.evidence.defectPixels > 0) {
-    warnings.push(`defect-regions:${defectRegions.retainedComponentCount}`);
-    warnings.push(`defect-mask-coverage:${(defects.evidence.maskCoverageRatio * 100).toFixed(3)}%`);
-    warnings.push(`finishing-route:${finishingPlan.route}`);
-  }
-
-  if (artifactSignals.nearestNeighbourUpscaleRisk && inferred.profile !== "pixel-art") blockers.push("probable-nearest-neighbour-upscale-of-non-pixel-art");
-  if (artifactSignals.posterizationRisk) warnings.push("tonal-posterization-needs-visual-review");
-  if (artifactSignals.ringingRiskRatio > 0.02 && inferred.profile !== "pixel-art") warnings.push("strong-ringing-or-oversharpen-signal");
-  if (generatedDetailRisk.repeatedDetailRisk) warnings.push("repeated-generated-or-cloned-detail-needs-visual-review");
-  if (generatedDetailRisk.detailImbalanceRisk) warnings.push("local-detail-density-imbalance-needs-visual-review");
-
-  let header: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"] | undefined;
-  if (context.intendedRole === "work-header") {
-    const headerResult = await reviewWorkHeaderImage(encoded);
-    header = headerResult.evidence;
-    if (header.grade === "fail") blockers.push("work-header crop/resolution/quality review failed");
-    warnings.push(...header.issues.map((issue) => `header:${issue}`));
-  }
-
-  const similarity: Array<{
-    id: string;
-    perceptualDistance: number;
-    perceptualSimilarity: number;
-    nearDuplicate: boolean;
-    recommendation: "distinct" | "review-similarity" | "reject-duplicate";
-  }> = [];
-  for (const candidate of context.compareAgainst ?? []) {
-    const compared = await compareImageSimilarity(encoded, candidate.image);
-    similarity.push({
-      id: candidate.id,
-      perceptualDistance: compared.perceptualDistance,
-      perceptualSimilarity: compared.perceptualSimilarity,
-      nearDuplicate: compared.nearDuplicate,
-      recommendation: compared.recommendation,
-    });
-    if (compared.recommendation === "reject-duplicate") blockers.push(`exact-duplicate-of:${candidate.id}`);
-    else if (compared.nearDuplicate) warnings.push(`near-duplicate-of:${candidate.id}:${compared.perceptualSimilarity.toFixed(3)}`);
-  }
-
-  const finishSignal = finishingPlan.route === "preservation-polish"
-    || finishingPlan.route === "localized-repair"
-    || artifactSignals.warnings.length > 0
-    || generatedDetailRisk.warnings.length > 0
-    || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur|ring|posterization|repeated|detail-density/u.test(warning));
-  const decision: ImageReviewOrchestrationResult["decision"] = blockers.length
+  const header = context.intendedRole === "work-header"
+    ? (await reviewWorkHeaderImage(encoded, { profile: inferred.profile })).evidence
+    : undefined;
+  const similarity = await Promise.all((context.compareAgainst ?? []).slice(0, 32).map(async (reference) => {
+    const comparison = await compareImageSimilarity(encoded, reference.image);
+    return Object.freeze({ id: reference.id, ...comparison });
+  }));
+  const blockers = [
+    ...quality.blockers,
+    ...defects.evidence.blockers,
+    ...finishingPlan.blockers,
+    ...artifactSignals.blockers,
+    ...generatedDetailRisk.blockers,
+    ...(header?.blockers ?? []),
+    ...similarity.filter((item) => item.recommendation === "reject-duplicate").map((item) => `near-duplicate:${item.id}`),
+  ];
+  const warnings = [
+    ...quality.warnings,
+    ...defects.evidence.warnings,
+    ...finishingPlan.warnings,
+    ...artifactSignals.warnings,
+    ...generatedDetailRisk.warnings,
+    ...(header?.warnings ?? []),
+    ...similarity.filter((item) => item.recommendation === "review-similarity").map((item) => `review-similarity:${item.id}`),
+  ];
+  const decision = blockers.length > 0
     ? "reject"
-    : finishSignal
-      ? "needs-finishing"
-      : "pass-to-visual-review";
-
+    : finishingPlan.route === "no-op" && warnings.length === 0
+      ? "pass-to-visual-review"
+      : "needs-finishing";
   return Object.freeze({
     profile: inferred.profile,
     profileReason: Object.freeze(inferred.reasons),
@@ -190,19 +160,14 @@ export async function orchestrateImageReview(
     ...(header ? { header } : {}),
     similarity: Object.freeze(similarity),
     decision,
-    blockers: Object.freeze([...new Set(blockers)]),
-    warnings: Object.freeze([...new Set(warnings)]),
+    blockers: Object.freeze(blockers),
+    warnings: Object.freeze(warnings),
     visualReviewRequired: true,
     visualChecklist: Object.freeze([
-      ...profile.visualChecks,
-      "Inspect the highest-ranked connected defect regions and confirm the preservation-first finishing route before authorising any repair.",
-      "Check ringing/oversharpen, tonal posterization and suspicious resampling signals against the actual image before accepting them as defects.",
-      "Inspect repeated-detail and local-detail-density warnings for cloned motifs, doubled structures, nonsensical micro-detail or inconsistent rendering; intentional patterns and focal detail can produce the same numeric signals.",
-      "Judge the image at intended runtime size, not only at 100% zoom.",
-      "Reject imagery that is technically valid but looks cheap, generic, repetitive, semantically weak or badly art-directed.",
-      "For page media, compare against adjacent imagery and avoid near-duplicate storytelling.",
-      "Do not infer AI authorship from artifact signals; use trusted provenance and source lineage when origin matters.",
-      "Do not publish automatically from numeric scores or finishing-plan output; the reviewer must inspect the actual proof/crop.",
+      ...profile.visualChecklist,
+      "Confirm the image is compositionally correct and appropriate for its intended role.",
+      "Confirm faces, hands, text, logos and repeated structures are semantically correct where present.",
+      "Confirm any repair preserves approved content rather than inventing replacement detail.",
     ]),
   });
 }
