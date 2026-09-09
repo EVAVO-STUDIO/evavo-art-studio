@@ -52,9 +52,15 @@ test("texture route keeps native Godot validation behind an execution privilege"
   assert.ok(route.steps.some((item) => item.tool === "evavo_write_godot_material_resource" && item.privilege === "write-gated-create-only"));
 });
 
-test("artifact assessment refuses authorship inference", () => {
+test("artifact assessment combines advisory pixels with exact-byte provenance", () => {
   const route = routeImageAgentTaskV2("ai-artifact-assessment");
   assert.equal(route.steps[0].tool, "evavo_review_image_artifact_risk");
+  const provenance = route.steps.find((item) => item.tool === "evavo_review_image_provenance");
+  assert.ok(provenance);
+  assert.equal(provenance.surface, "evavo-image-provenance");
+  assert.equal(provenance.privilege, "read-only");
   assert.match(route.stopConditions.join(" "), /do not infer authorship/);
+  assert.match(route.stopConditions.join(" "), /invalid or contradictory provenance/);
   assert.match(route.invariants.join(" "), /must not be presented as proof of AI authorship/);
+  assert.match(route.invariants.join(" "), /exact image SHA-256/);
 });
