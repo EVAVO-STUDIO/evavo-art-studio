@@ -35,6 +35,19 @@ test("learned enhancement explicitly checks micro detail and macro redraw risk",
   assert.match(route.evidenceExpected.join(" "), /macro structure risk/);
 });
 
+test("texture route spans map, material, UV, ORM and Godot delivery planning", () => {
+  const route = routeImageAgentTask("texture-review");
+  assert.match(route.primarySurface, /evavo-texture-review/);
+  assert.match(route.primarySurface, /evavo-godot-material-delivery/);
+  assert.ok(route.orderedTools.includes("evavo_review_texture_set"));
+  assert.ok(route.orderedTools.includes("evavo_review_obj_uv_layout"));
+  assert.ok(route.orderedTools.includes("evavo_pack_godot_orm_texture"));
+  assert.ok(route.orderedTools.includes("evavo_plan_godot_material_delivery"));
+  assert.equal(route.writeClass, "write-gated-create-only");
+  assert.match(route.stopConditions.join(" "), /UV overlap/);
+  assert.match(route.evidenceExpected.join(" "), /StandardMaterial3D or ORMMaterial3D/);
+});
+
 test("AI artifact assessment never claims pixel-origin detection", () => {
   const route = routeImageAgentTask("ai-artifact-assessment");
   assert.match(route.stopConditions.join(" "), /do not infer authorship/);
