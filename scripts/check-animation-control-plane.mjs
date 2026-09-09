@@ -7,6 +7,10 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 
 import { verifyAnimationPipelineV1 } from "../tools/animation_pipeline_doctor_v1.mjs";
+import {
+  assertHumanCelAnimationAuthorityIntegrity,
+  compileHumanCelAnimationAuthority,
+} from "../tools/human_cel_animation_authority_v1.mjs";
 
 const ROOT = process.cwd();
 const STALE_SEQUENCE_ENTRY = "tools/canonical_animation_sequence_delivery_v1_mcp.mjs";
@@ -29,14 +33,18 @@ const REQUIRED_FILES = Object.freeze([
   "tools/animation_sequence_delivery_canonical_v1_mcp.mjs",
   "tools/animation_character_family_campaign_preflight_v1.mjs",
   "tools/animation_execution_supervisor_v1_mcp.mjs",
+  "tools/human_cel_animation_authority_v1.mjs",
+  "tools/human_cel_animation_authority_v1_mcp.mjs",
   "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
   ".mcp.animation-pipeline-v1.json",
   ".mcp.animation-frame-ledger-v1.json",
   ".mcp.animation-production-canonical-v1.json",
   ".mcp.animation-character-family-campaign-preflight-v1.json",
   ".mcp.animation-execution-supervisor-v1.json",
+  ".mcp.human-cel-animation-authority-v1.json",
   "evavo.capabilities.json",
   "docs/ANIMATION_CONTROL_PLANE.md",
+  "docs/human-cel-animation-authority-v1.md",
 ]);
 
 const SYNTAX_FILES = Object.freeze([
@@ -47,6 +55,8 @@ const SYNTAX_FILES = Object.freeze([
   "tools/animation_sequence_delivery_canonical_v1_mcp.mjs",
   "tools/animation_character_family_campaign_preflight_v1.mjs",
   "tools/animation_execution_supervisor_v1_mcp.mjs",
+  "tools/human_cel_animation_authority_v1.mjs",
+  "tools/human_cel_animation_authority_v1_mcp.mjs",
   "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
 ]);
 
@@ -119,6 +129,48 @@ function syntaxCheck(path) {
       `${path}:${String(result.stderr || result.stdout || "node --check failed").trim()}`,
     );
   }
+}
+
+function humanCelSmokeAuthority() {
+  const authority = compileHumanCelAnimationAuthority({
+    id: "animation_control_human_cel_smoke",
+    revision: 1,
+    targets: ["cel-sequence"],
+    subject: {
+      subjectId: "subject",
+      identityLockId: "subject_identity_v1",
+      silhouetteAnchors: ["head silhouette", "shoulder silhouette"],
+      costumeAnchors: ["collar construction"],
+      anatomyRule: "Preserve approved proportions, joint count and contact construction.",
+    },
+    camera: {
+      profileId: "camera_profile",
+      motion: "locked",
+      framing: "stable three-quarter medium shot with fixed horizon",
+    },
+    performance: {
+      intent: "Held attentive acting with deliberate substitutions only.",
+      weight: "Grounded balance with explicit contact.",
+      tempo: "Cel timing with authored holds and selective movement.",
+      continuityAnchors: ["head registration", "shoulder registration"],
+    },
+    style: {
+      motionStyle: "limited-cel",
+      lineTreatment: "economical cleanup with controlled contour hierarchy",
+      shapeLanguage: ["specific silhouette", "restrained interior construction"],
+      antiGenericTraits: ["stable identity", "authored holds", "source-based lighting"],
+      exclusions: ["pseudo-text", "random line boil", "generic rim light"],
+    },
+  });
+  assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
+  assert.equal(authority.authority.mode, "human-cel-authored");
+  assert.equal(authority.handoff.targetRepository, "EVAVO-STUDIO/cel-animation-studio");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.33.0");
+  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelQualityGate"));
+  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelFinishReview"));
+  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelCinematographyReview"));
+  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelEnvironmentReview"));
+  return authority;
 }
 
 async function main() {
@@ -195,6 +247,20 @@ async function main() {
   assert.equal(supervisor.env?.EVAVO_ANIMATION_EXECUTION_ENABLED, "disabled");
   assert.equal(supervisor.env?.EVAVO_ANIMATION_CREATIVE_APPROVAL_WRITE_ENABLED, "disabled");
 
+  const humanCelConfig = await readJson(".mcp.human-cel-animation-authority-v1.json");
+  const humanCel = exactServer(
+    humanCelConfig,
+    "evavo-human-cel-animation-authority-v1",
+    ["tools/human_cel_animation_authority_v1_mcp.mjs"],
+  );
+  assertDisabled(humanCel.env, [
+    "EVAVO_HUMAN_CEL_PROVIDER_EXECUTION",
+    "EVAVO_HUMAN_CEL_CREATIVE_APPROVAL",
+    "EVAVO_HUMAN_CEL_REPOSITORY_MUTATION",
+    "EVAVO_HUMAN_CEL_PUBLICATION",
+  ], "human-cel-animation-authority");
+  const humanCelAuthority = humanCelSmokeAuthority();
+
   const capabilities = await readJson("evavo.capabilities.json");
   assertEntrypoints(capability(capabilities, "art.animation.pipeline"), [
     "node tools/animation_pipeline_control_plane_v1_1_mcp.mjs",
@@ -228,6 +294,12 @@ async function main() {
     status: "ok",
     check: "animation-control",
     doctorStatus: doctor.status,
+    humanCelAuthority: {
+      authorityId: humanCelAuthority.authorityId,
+      contentDigest: humanCelAuthority.contentDigest,
+      coreMinimumVersion: humanCelAuthority.handoff.minimumPackageVersion,
+      strict: true,
+    },
     verifiedCapabilities: [
       "art.animation.pipeline",
       "art.animation.frame-ledger",
