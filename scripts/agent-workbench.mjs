@@ -1,0 +1,177 @@
+#!/usr/bin/env node
+
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const CONFIG_CONTRACT = "evavo_agent_workbench_config_v1";
+const SNAPSHOT_CONTRACT = "evavo_agent_workbench_snapshot_v1";
+const TOKEN_PATTERN = /[\p{L}\p{N}][\p{L}\p{N}._:-]{1,}/gu;
+const STOP_WORDS = new Set(["about", "and", "are", "can", "evavo", "for", "from", "have", "our", "repo", "repository", "that", "the", "this", "tool", "tools", "what", "which", "with"]);
+
+const record = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : null;
+const text = (value) => typeof value === "string" ? value.trim() : "";
+const strings = (value) => Array.isArray(value) ? [...new Set(value.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean))] : [];
+const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
+
+function parseArguments(argv) {
+  const options = { root: null, objective: "", limit: 20, all: false, compact: false, toolRegistry: null, estateSnapshot: null, selfTest: false };
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--root") options.root = argv[++index] ?? null;
+    else if (token === "--objective") options.objective = argv[++index] ?? "";
+    else if (token === "--limit") options.limit = Number(argv[++index] ?? 20);
+    else if (token === "--all") options.all = true;
+    else if (token === "--compact") options.compact = true;
+    else if (token === "--tool-registry") options.toolRegistry = argv[++index] ?? null;
+    else if (token === "--estate-snapshot") options.estateSnapshot = argv[++index] ?? null;
+    else if (token === "--self-test") options.selfTest = true;
+    else if (token === "--help" || token === "-h") {
+      process.stdout.write("Usage: node scripts/agent-workbench.mjs [--objective <text>] [--all] [--limit 1..200] [--tool-registry <json>] [--estate-snapshot <json>] [--root <dir>] [--compact] [--self-test]\n");
+      process.exit(0);
+    } else throw new Error(`Unknown argument: ${token}`);
+  }
+  if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 200) throw new Error("--limit must be an integer from 1 to 200.");
+  return options;
+}
+
+function readJson(filePath) {
+  const bytes = fs.readFileSync(filePath);
+  return { value: JSON.parse(bytes.toString("utf8")), evidence: Object.freeze({ path: filePath, sha256: digest(bytes), bytes: bytes.length }) };
+}
+
+function inside(root, relativePath, label) {
+  if (!text(relativePath) || path.isAbsolute(relativePath)) throw new Error(`${label} must be repository-relative.`);
+  const base = path.resolve(root);
+  const resolved = path.resolve(base, relativePath);
+  const relative = path.relative(base, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error(`${label} escapes the repository root.`);
+  return resolved;
+}
+
+function broadObjective(objective) {
+  return !objective.trim() || /\b(?:all|every|complete|everything|portfolio|estate|tools|capabilities|automation|automate)\b/iu.test(objective);
+}
+
+function queryTokens(objective) {
+  return [...new Set((objective.toLowerCase().match(TOKEN_PATTERN) ?? []).filter((token) => token.length > 2 && !STOP_WORDS.has(token)))];
+}
+
+function rank(items, objective, all, limit, searchable) {
+  const tokens = all || broadObjective(objective) ? [] : queryTokens(objective);
+  const ranked = items.map((item) => {
+    const haystack = searchable(item).toLowerCase();
+    return { item, relevance: tokens.length ? tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0) : 1 };
+  }).filter(({ relevance }) => tokens.length === 0 || relevance > 0)
+    .sort((left, right) => right.relevance - left.relevance || JSON.stringify(left.item).localeCompare(JSON.stringify(right.item)));
+  return (all ? ranked : ranked.slice(0, limit)).map(({ item, relevance }) => Object.freeze({ ...item, relevance }));
+}
+
+function capabilitiesFrom(manifest) {
+  if (!record(manifest) || manifest.contractVersion !== "evavo_repository_capabilities_v1" || !Array.isArray(manifest.capabilities)) throw new Error("Invalid standard capability manifest.");
+  return manifest.capabilities.map((item) => {
+    if (!record(item) || !text(item.id)) throw new Error("Capability id is required.");
+    return Object.freeze({ id: text(item.id), title: text(item.title), description: text(item.description), interfaces: strings(item.interfaces), effects: strings(item.effects), entrypoints: strings(item.entrypoints), tags: strings(item.tags), requires: strings(item.requires) });
+  });
+}
+
+function scriptsFrom(packageDocument) {
+  const scripts = record(packageDocument)?.scripts;
+  if (!record(scripts)) return [];
+  return Object.entries(scripts).filter(([, command]) => typeof command === "string").map(([name, command]) => Object.freeze({ name, command: command.trim() })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function toolsFrom(toolRegistry) {
+  if (!toolRegistry) return [];
+  if (!record(toolRegistry) || !Array.isArray(toolRegistry.tools)) throw new Error("Tool registry must contain a tools array.");
+  return toolRegistry.tools.map((item) => {
+    if (!record(item) || !text(item.id)) throw new Error("Tool registry id is required.");
+    return Object.freeze({ id: text(item.id), repository: text(item.repository) || null, purpose: text(item.purpose), useWhen: strings(item.useWhen), entrypoints: strings(item.entrypoints), truthBoundary: text(item.truthBoundary) });
+  });
+}
+
+function estateCapabilitiesFrom(snapshot) {
+  const repositories = record(snapshot)?.capabilities?.repositories;
+  if (!Array.isArray(repositories)) return [];
+  const output = [];
+  for (const item of repositories) {
+    if (!record(item) || !text(item.repository)) continue;
+    for (const id of strings(item.capabilityIds)) output.push(Object.freeze({ id, repository: text(item.repository), authority: text(item.authority) || null, manifestStatus: text(item.manifestStatus) || "unknown", evidenceState: item.manifestStatus === "valid" ? "validated-standard-manifest" : "manifest-evidence", runtimeReadiness: "unknown" }));
+  }
+  return output.sort((a, b) => a.id.localeCompare(b.id) || a.repository.localeCompare(b.repository));
+}
+
+function estateSummary(snapshot) {
+  if (!snapshot) return null;
+  const repositories = record(snapshot.repositoryEstate)?.repositories;
+  const capabilityRepositories = record(snapshot.capabilities)?.repositories;
+  return Object.freeze({ contract: text(snapshot.contract) || text(snapshot.contractVersion) || "unknown", generatedAt: text(snapshot.generatedAt) || null, owner: text(snapshot.owner) || null, evidenceComplete: snapshot.evidenceComplete === true, repositoryCount: Array.isArray(repositories) ? repositories.length : null, capabilityRepositoryCount: Array.isArray(capabilityRepositories) ? capabilityRepositories.length : null, absenceClaimsAllowed: snapshot.evidenceComplete === true });
+}
+
+export function compileAgentWorkbench({ root, objective = "", limit = 20, all = false, toolRegistryPath = null, estateSnapshotPath = null } = {}) {
+  const repositoryRoot = path.resolve(root ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
+  const configRead = readJson(inside(repositoryRoot, ".evavo/agent-workbench.v1.json", "workbench config"));
+  const config = record(configRead.value);
+  if (!config || config.contractVersion !== CONFIG_CONTRACT || !text(config.repository) || !text(config.authority) || !Array.isArray(config.phases) || config.phases.length === 0) throw new Error(`Invalid ${CONFIG_CONTRACT}.`);
+  const repository = text(config.repository);
+
+  const capabilityRead = readJson(inside(repositoryRoot, text(config.capabilityManifest) || "evavo.capabilities.json", "capability manifest"));
+  if (text(capabilityRead.value.repository) !== repository) throw new Error("Capability manifest repository identity does not match workbench config.");
+  const capabilities = capabilitiesFrom(capabilityRead.value);
+
+  const packageRead = readJson(inside(repositoryRoot, text(config.packageManifest) || "package.json", "package manifest"));
+  const scripts = scriptsFrom(packageRead.value);
+
+  const configuredRegistry = text(config.defaultToolRegistry);
+  const registryPath = toolRegistryPath ? path.resolve(toolRegistryPath) : configuredRegistry ? inside(repositoryRoot, configuredRegistry, "default tool registry") : null;
+  const registryRead = registryPath ? readJson(registryPath) : null;
+  const tools = toolsFrom(registryRead?.value ?? null);
+
+  const estateRead = estateSnapshotPath ? readJson(path.resolve(estateSnapshotPath)) : null;
+  const estateDocument = estateRead?.value ?? null;
+  const estateCapabilities = estateCapabilitiesFrom(estateDocument);
+  const automation = record(config.automation) ?? {};
+
+  return Object.freeze({
+    contract: SNAPSHOT_CONTRACT,
+    generatedAt: new Date().toISOString(),
+    repository,
+    authority: text(config.authority),
+    role: text(config.role),
+    objective,
+    mode: all ? "complete-local-inventory" : broadObjective(objective) ? "broad-orientation" : "objective-ranked-orientation",
+    sourceEvidence: Object.freeze({ workbenchConfig: configRead.evidence, capabilityManifest: capabilityRead.evidence, packageManifest: packageRead.evidence, ...(registryRead ? { toolRegistry: registryRead.evidence } : {}), ...(estateRead ? { estateSnapshot: estateRead.evidence } : {}) }),
+    inventory: Object.freeze({ capabilityCount: capabilities.length, packageScriptCount: scripts.length, toolCount: tools.length, estateCapabilityCount: estateCapabilities.length, estate: estateSummary(estateDocument) }),
+    orientation: Object.freeze({ readFirst: strings(config.readFirst), phases: config.phases.filter(record).map((item) => Object.freeze({ id: text(item.id), purpose: text(item.purpose), evidence: strings(item.evidence) })), handoffs: Array.isArray(config.handoffs) ? config.handoffs.filter(record) : [] }),
+    matches: Object.freeze({
+      capabilities: rank(capabilities, objective, all, limit, (item) => [item.id, item.title, item.description, ...item.interfaces, ...item.effects, ...item.entrypoints, ...item.tags, ...item.requires].join(" ")),
+      scripts: rank(scripts, objective, all, limit, (item) => `${item.name} ${item.command}`),
+      tools: rank(tools, objective, all, limit, (item) => [item.id, item.repository ?? "", item.purpose, ...item.useWhen, ...item.entrypoints, item.truthBoundary].join(" ")),
+      estateCapabilities: rank(estateCapabilities, objective, all, limit, (item) => `${item.id} ${item.repository} ${item.authority ?? ""} ${item.manifestStatus}`),
+    }),
+    automation: Object.freeze({ safeWithoutApproval: strings(automation.safeWithoutApproval), gated: strings(automation.gated), neverImplied: strings(automation.neverImplied) }),
+    policy: Object.freeze({ readOnlyCompiler: true, commandExecutionPerformed: false, mutationPerformed: false, sourceCapabilityDoesNotImplyRuntimeReadiness: true, routeDoesNotAuthorizeEffects: true, planDoesNotProveExecution: true, incompleteEstateCannotProveAbsence: estateDocument ? estateDocument.evidenceComplete !== true : true, publicationRequiresSeparateAuthority: true }),
+  });
+}
+
+function selfTest() {
+  const ranked = rank([{ id: "art.alpha" }, { id: "dev.publish" }], "repair alpha", false, 5, (item) => item.id);
+  if (ranked[0]?.id !== "art.alpha") throw new Error("ranking self-test failed");
+  const estate = estateCapabilitiesFrom({ capabilities: { repositories: [{ repository: "EVAVO-STUDIO/art", authority: "art", manifestStatus: "valid", capabilityIds: ["art.alpha"] }] } });
+  if (estate[0]?.runtimeReadiness !== "unknown" || estate[0]?.evidenceState !== "validated-standard-manifest") throw new Error("estate self-test failed");
+  if (!broadObjective("all tools") || broadObjective("repair alpha sprite")) throw new Error("objective self-test failed");
+  if (strings(["a", "a", " b "]).join(",") !== "a,b") throw new Error("normalization self-test failed");
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_self_test_v1", status: "passed", assertions: 6 }, null, 2)}\n`);
+}
+
+async function cli() {
+  const options = parseArguments(process.argv.slice(2));
+  if (options.selfTest) return selfTest();
+  const result = compileAgentWorkbench({ ...(options.root ? { root: options.root } : {}), objective: options.objective, limit: options.limit, all: options.all, ...(options.toolRegistry ? { toolRegistryPath: options.toolRegistry } : {}), ...(options.estateSnapshot ? { estateSnapshotPath: options.estateSnapshot } : {}) });
+  process.stdout.write(`${JSON.stringify(result, null, options.compact ? 0 : 2)}\n`);
+}
+
+const direct = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+if (direct) cli().catch((error) => { console.error(error instanceof Error ? error.stack : String(error)); process.exitCode = 1; });
