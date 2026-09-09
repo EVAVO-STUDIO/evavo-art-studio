@@ -164,8 +164,13 @@ function humanCelSmokeAuthority() {
   });
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
   assert.equal(authority.authority.mode, "human-cel-authored");
+  assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
+  assert.equal(authority.authority.requiresExactProductionAuthority, true);
   assert.equal(authority.handoff.targetRepository, "EVAVO-STUDIO/cel-animation-studio");
-  assert.equal(authority.handoff.minimumPackageVersion, "0.33.0");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.34.0");
+  assert.ok(authority.handoff.requiredExports.includes("createHumanCelProductionAuthority"));
+  assert.ok(authority.handoff.requiredExports.includes("assertHumanCelProductionAuthorityBinding"));
+  assert.ok(authority.handoff.requiredExports.includes("createStrictHumanCelRenderPrompt"));
   assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelQualityGate"));
   assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelFinishReview"));
   assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelCinematographyReview"));
