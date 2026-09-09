@@ -10,6 +10,7 @@ const manifests = [
   "config/image-finishing-artist.capabilities.json",
   "config/image-repair-agent.capabilities.json",
   "config/image-reference-consistency.capabilities.json",
+  "config/image-artifact-triage.capabilities.json",
   "config/texture-review-agent.capabilities.json",
   "config/godot-material-delivery-agent.capabilities.json",
   "config/godot-material-validation-agent.capabilities.json",
@@ -47,6 +48,7 @@ const mediaExports = [
   "image-agent-routing",
   "image-reference-consistency",
   "image-reference-consistency-proof",
+  "image-generated-detail-risk",
   "texture-map-review",
   "texture-tile-proof",
   "texture-set-review",
@@ -60,6 +62,10 @@ for (const requiredExport of mediaExports) {
   if (!mediaIndex.includes(`export * from "./${requiredExport}.js";`)) {
     throw new Error(`packages/media/src/index.ts does not export ${requiredExport}.`);
   }
+}
+const generatedDetailRisk = await readFile(path.join(root, "packages/media/src/image-generated-detail-risk.ts"), "utf8");
+for (const requiredSignal of ["repeated-nontrivial-local-pattern-risk", "local-detail-density-imbalance", "advisoryOnly", "aiOriginDetection"]) {
+  if (!generatedDetailRisk.includes(requiredSignal)) throw new Error(`Generated-detail triage is missing ${requiredSignal}.`);
 }
 const texturePreprocess = await readFile(path.join(root, "packages/media/src/texture-preprocess.ts"), "utf8");
 for (const requiredPrimitive of ["convertTangentNormalYConvention", "composeOpacityIntoAlbedoAlpha", "G=255-G"]) {
@@ -105,6 +111,7 @@ for (const requiredTest of [
   "packages/media/test/image-agent-routing.test.mjs",
   "packages/media/test/image-reference-consistency.test.mjs",
   "packages/media/test/image-reference-consistency-proof.test.mjs",
+  "packages/media/test/image-generated-detail-risk.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
   "packages/media/test/texture-tile-proof.test.mjs",
   "packages/media/test/texture-set-review.test.mjs",
@@ -120,6 +127,7 @@ for (const requiredTest of [
   "packages/godot/test/material-delivery-mcp.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/image_reference_consistency_mcp.test.mjs",
+  "tools/image_artifact_triage_mcp.test.mjs",
   "tools/texture_review_mcp.test.mjs",
   "tools/texture_preprocess_mcp.test.mjs",
   "tools/godot_material_delivery_mcp.test.mjs",
@@ -132,6 +140,7 @@ process.stdout.write(`${JSON.stringify({
   surfaces: parsed,
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
+  artifactTriage: ["ringing", "posterization", "resampling", "repeated-detail", "detail-density-imbalance", "advisory-only", "no-ai-origin-claim"],
   referenceConsistency: ["approved-reference-baseline", "reference-set-coherence", "palette-tone-detail-silhouette-framing", "batch-outlier-ranking", "guarded-visual-proof", "no-ai-origin-claim"],
   textureProofSampling: ["continuous", "nearest"],
   textureMaterialReview: ["single-map", "material-set", "normal-y-conversion", "opacity-alpha-composition", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
