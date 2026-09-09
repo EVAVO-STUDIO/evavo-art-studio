@@ -13,6 +13,11 @@ function requireIncludes(source, values, label) {
   }
 }
 
+function runDoctor(relative, label) {
+  const result = spawnSync(process.execPath, [path.join(root, relative)], { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`${label} failed:\n${result.stderr || result.stdout}`);
+}
+
 const manifestPath = path.join(root, "config/image-provenance.capabilities.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 if (!/^1\.\d+$/u.test(manifest.schemaVersion) || manifest.id !== "evavo-image-provenance") {
@@ -113,6 +118,8 @@ for (const relative of [
   "packages/providers/test/compiled-contract.test.mjs",
 ]) await access(path.join(root, relative));
 
+runDoctor("scripts/check-modern-image-mcp-registration.mjs", "Modern image MCP registration doctor");
+
 process.stdout.write(`${JSON.stringify({
   contract: "evavo.image-provenance-surface.check.v1",
   ok: true,
@@ -133,4 +140,5 @@ process.stdout.write(`${JSON.stringify({
     "runtime-requires-evidence.provenance",
     "provider-origin-record-is-not-external-authentication",
   ],
+  mcpRegistration: "scripts/check-modern-image-mcp-registration.mjs",
 }, null, 2)}\n`);
