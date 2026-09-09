@@ -35,6 +35,7 @@ const REQUIRED_FILES = Object.freeze([
   "tools/animation_execution_supervisor_v1_mcp.mjs",
   "tools/human_cel_animation_authority_v1.mjs",
   "tools/human_cel_animation_authority_v1_mcp.mjs",
+  "tools/human_cel_animation_authority_v1.test.mjs",
   "scripts/start-animation-execution-supervisor-mcp-v1.mjs",
   "scripts/check-game-production-contract.mjs",
   ".mcp.animation-pipeline-v1.json",
@@ -167,7 +168,7 @@ function humanCelSmokeAuthority() {
   });
 
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
-  assert.equal(authority.protocolVersion, "2026-09-09.9");
+  assert.equal(authority.protocolVersion, "2026-09-09.10");
   assert.equal(authority.authority.mode, "human-cel-authored");
   assert.equal(authority.authority.cleanupInk, "strict");
   assert.equal(authority.authority.colourPaint, "strict");
@@ -177,11 +178,22 @@ function humanCelSmokeAuthority() {
   assert.equal(authority.authority.compositeReview, "strict");
   assert.equal(authority.authority.requiredPersistenceGate, "strict-human-cel-promotion-receipt-gate");
   assert.equal(authority.authority.requiredPersistedStateIntegrity, "canonical-snapshot-render-job-integrity");
+  assert.equal(
+    authority.authority.requiredStandaloneEvidenceStoreIntegrity,
+    "integrity-aware-strict-envelope-and-quality-receipt-defaults",
+  );
+  assert.equal(authority.authority.requiresPersistedStateIntegrity, true);
+  assert.equal(authority.authority.requiresStandaloneEvidenceStoreIntegrity, true);
   assert.equal(authority.handoff.minimumPackageVersion, "0.39.0");
   assert.equal(authority.handoff.contractsPackage, "@evavo/cel-contracts");
   assert.equal(authority.handoff.minimumContractsPackageVersion, "0.15.0");
   assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
-  assert.equal(authority.handoff.minimumStorePackageVersion, "0.27.0");
+  assert.equal(authority.handoff.minimumStorePackageVersion, "0.28.0");
+  assert.equal(authority.handoff.requiredStoreIntegrity, "canonical-snapshot-render-job-integrity");
+  assert.equal(
+    authority.handoff.requiredStandaloneEvidenceStoreIntegrity,
+    "integrity-aware-strict-envelope-and-quality-receipt-defaults",
+  );
   for (const required of [
     "createHumanCelProductionAuthority",
     "createStrictHumanCelRenderPrompt",
@@ -194,6 +206,7 @@ function humanCelSmokeAuthority() {
     "evaluateHumanCelPerformanceReview",
     "evaluateHumanCelQualityGate",
     "createHumanCelQualityReceipt",
+    "assertHumanCelQualityReceiptBinding",
     "reviewHumanCelArtefact",
   ]) {
     assert.ok(authority.handoff.requiredExports.includes(required), required);
@@ -212,6 +225,10 @@ async function main() {
   const gameProductionDoctor = runNodeCheck(
     "scripts/check-game-production-contract.mjs",
     "ANIMATION_CONTROL_CHECK_GAME_PRODUCTION_CONTRACT_FAILED",
+  );
+  const humanCelAuthorityRegression = runNodeCheck(
+    "tools/human_cel_animation_authority_v1.test.mjs",
+    "ANIMATION_CONTROL_CHECK_HUMAN_CEL_AUTHORITY_REGRESSION_FAILED",
   );
 
   const pipelineConfig = await readJson(".mcp.animation-pipeline-v1.json");
@@ -281,6 +298,22 @@ async function main() {
     ],
     "human-cel-animation-authority",
   );
+  const humanCelMcpSource = await readFile(
+    await requireRegularFile("tools/human_cel_animation_authority_v1_mcp.mjs"),
+    "utf8",
+  );
+  for (const required of [
+    "protocol .10",
+    "Store 0.28",
+    "2026-09-09.10",
+    "standaloneEvidenceStoreIntegrityRequired",
+    "requiredStandaloneEvidenceStoreIntegrity",
+  ]) {
+    assert.ok(humanCelMcpSource.includes(required), `Human-cel MCP must advertise ${required}`);
+  }
+  for (const stale of ["protocol .9", "Store 0.27", "2026-09-09.9"]) {
+    assert.equal(humanCelMcpSource.includes(stale), false, `Human-cel MCP must not advertise ${stale}`);
+  }
   const humanCelAuthority = humanCelSmokeAuthority();
 
   const capabilities = await readJson("evavo.capabilities.json");
@@ -301,11 +334,12 @@ async function main() {
   assertRequires(humanCelCapability, [
     "Cel Animation Studio @evavo/cel-core 0.39.0 or newer",
     "Cel Animation Studio @evavo/cel-contracts 0.15.0 or newer",
-    "Cel Animation Studio @evavo/cel-store 0.27.0 or newer",
+    "Cel Animation Studio @evavo/cel-store 0.28.0 or newer",
     "Strict human-cel cleanup/ink, colour/paint, acting/performance and optical/compositing grammar",
     "Dedicated human-cel colour-script and optical-composite review downstream surfaces",
     "Candidate provenance containing the exact strict-envelope digest",
     "Canonical persisted snapshot and render-job integrity before strict promotion",
+    "Integrity-aware standalone strict-envelope and quality-receipt Store defaults",
     "Zero-blocker persisted quality receipt for strict approval",
   ]);
 
@@ -325,6 +359,7 @@ async function main() {
     "@evavo/cel-core 0.38.0",
     "@evavo/cel-contracts 0.14.0",
     "@evavo/cel-store 0.26.0",
+    "@evavo/cel-store 0.27.0",
   ]) {
     assert.equal(capabilityText.includes(stale), false, `Capability registry must not advertise ${stale}`);
   }
@@ -334,6 +369,7 @@ async function main() {
     check: "animation-control",
     doctorStatus: doctor.status,
     gameProductionDoctor: gameProductionDoctor || "passed",
+    humanCelAuthorityRegression: humanCelAuthorityRegression || "passed",
     humanCelAuthority: {
       authorityId: humanCelAuthority.authorityId,
       contentDigest: humanCelAuthority.contentDigest,
@@ -351,6 +387,7 @@ async function main() {
       qualityReceiptRequired: true,
       storePromotionGateRequired: true,
       persistedStateIntegrityRequired: true,
+      standaloneEvidenceStoreIntegrityRequired: true,
     },
     authority: {
       providerExecution: false,
