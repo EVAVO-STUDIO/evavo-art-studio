@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.2";
+export const HUMAN_CEL_AUTHORITY_PROTOCOL_VERSION = "2026-09-09.3";
 export const HUMAN_CEL_AUTHORITY_KIND = "evavo.human-cel-animation-authority.v1";
 export const HUMAN_CEL_CRAFT_AUTHORITY_ID = "evavo-human-cel-craft-v1";
 export const HUMAN_CEL_ALLOWED_MOTION_STYLES = Object.freeze([
@@ -141,6 +141,7 @@ export function compileHumanCelAnimationAuthority(request) {
       "derive shadows, highlights and reflections from named light sources and material response",
       "review adjacent drawings for anatomy, contact, prop scale, perspective, light and detail topology continuity",
       "reject duplicates, pseudo-text, repeated stamped patterns, temporal detail crawl and fake analogue degradation",
+      "require deterministic finish, cinematography and environment review evidence before manual department approval",
     ],
     prohibitedSubstitutions: [
       "one-pass anime filtering",
@@ -159,12 +160,15 @@ export function compileHumanCelAnimationAuthority(request) {
       "X-sheet exposure and hold inspection",
       "frame-pair drawing continuity inspection",
       "anti-generic artifact inspection",
+      "line paint lighting and matte finish inspection",
+      "cinematography geography and camera inspection",
+      "functional environment and detail hierarchy inspection",
       "manual department approval before promotion",
     ],
     handoff: {
       targetRepository: "EVAVO-STUDIO/cel-animation-studio",
       package: "@evavo/cel-core",
-      minimumPackageVersion: "0.32.0",
+      minimumPackageVersion: "0.33.0",
       requiredExports: [
         "createHumanCelRenderPrompt",
         "createHumanCelShotLanguageDirective",
@@ -173,6 +177,9 @@ export function compileHumanCelAnimationAuthority(request) {
         "createHumanCelEnvironmentStagingDirective",
         "evaluateHumanCelDrawingContinuity",
         "evaluateHumanCelAntiGenericReview",
+        "evaluateHumanCelFinishReview",
+        "evaluateHumanCelCinematographyReview",
+        "evaluateHumanCelEnvironmentReview",
         "evaluateHumanCelQualityGate",
       ],
     },
@@ -207,7 +214,7 @@ export function assertHumanCelAnimationAuthorityIntegrity(authority) {
   if (authority.handoff?.targetRepository !== "EVAVO-STUDIO/cel-animation-studio") {
     fail("HUMAN_CEL_AUTHORITY_HANDOFF_INVALID");
   }
-  if (authority.handoff?.minimumPackageVersion !== "0.32.0") {
+  if (authority.handoff?.minimumPackageVersion !== "0.33.0") {
     fail("HUMAN_CEL_AUTHORITY_CORE_VERSION_INVALID");
   }
   if (authority.boundary?.providerExecutionIncluded !== false || authority.boundary?.creativeApprovalIncluded !== false) {
