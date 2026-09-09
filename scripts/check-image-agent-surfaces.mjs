@@ -71,6 +71,21 @@ const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts")
 if (!godotIndex.includes('export * from "./material-delivery.js";')) {
   throw new Error("packages/godot/src/index.ts does not export material-delivery.");
 }
+const godotMaterialDelivery = await readFile(path.join(root, "packages/godot/src/material-delivery.ts"), "utf8");
+for (const requiredBinding of [
+  "albedo_texture",
+  "normal_texture",
+  "roughness_texture",
+  "metallic_texture",
+  "ao_texture",
+  "heightmap_texture",
+  "emission_texture",
+  "orm_texture",
+]) {
+  if (!godotMaterialDelivery.includes(requiredBinding)) {
+    throw new Error(`Godot material delivery planner is missing ${requiredBinding}.`);
+  }
+}
 
 const enhancementSession = await readFile(
   path.join(root, "packages/media/src/enhancement-review-session.ts"),
@@ -99,6 +114,7 @@ for (const requiredTest of [
   "packages/media/test/wavefront-obj-uv.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot/test/material-delivery.test.mjs",
+  "packages/godot/test/material-delivery-mcp.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/texture_review_mcp.test.mjs",
   "tools/godot_material_delivery_mcp.test.mjs",
