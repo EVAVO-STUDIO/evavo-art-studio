@@ -27,7 +27,24 @@
         "registeredToolCount": {"type": "integer", "minimum": 0},
         "mcpServerCount": {"type": "integer", "minimum": 0},
         "estateCapabilityCount": {"type": "integer", "minimum": 0},
-        "estate": {"type": ["object", "null"]}
+        "estate": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "properties": {
+                "contract": {"type": "string"},
+                "generatedAt": {"type": ["string", "null"]},
+                "owner": {"type": ["string", "null"]},
+                "evidenceComplete": {"type": "boolean"},
+                "repositoryCount": {"type": "integer", "minimum": 0},
+                "capabilityRepositoryCount": {"type": "integer", "minimum": 0},
+                "declaredCapabilityCount": {"type": "integer", "minimum": 0},
+                "absenceClaimsAllowed": {"type": "boolean"}
+              }
+            }
+          ]
+        }
       }
     },
     "discovery": {
@@ -36,7 +53,10 @@
         "toolRegistryOrigin": {"enum": ["explicit", "repository-config", "sibling-development-studio", "unavailable"]},
         "siblingDevelopmentStudioRegistryAutoDiscovered": {"type": "boolean"},
         "mcpLaunchManifestObserved": {"type": "boolean"},
-        "mcpLaunchManifestSanitized": {"type": "boolean"}
+        "mcpLaunchManifestSanitized": {"type": "boolean"},
+        "estateSnapshotOrigin": {"enum": ["explicit", "development-studio-latest-estate-audit", "unavailable"]},
+        "developmentEstateAuditAutoDiscovered": {"type": "boolean"},
+        "estateEvidenceComplete": {"type": "boolean"}
       }
     },
     "orientation": {
@@ -55,7 +75,21 @@
         "capabilities": {"type": "array"},
         "scripts": {"type": "array"},
         "tools": {"type": "array"},
-        "estateCapabilities": {"type": "array"}
+        "estateCapabilities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string", "minLength": 1},
+              "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+              "authority": {"type": ["string", "null"]},
+              "manifestStatus": {"type": "string"},
+              "evidenceState": {"type": "string"},
+              "runtimeReadiness": {"const": "unknown"},
+              "relevance": {"type": "number"}
+            }
+          }
+        }
       }
     },
     "automation": {
@@ -76,7 +110,8 @@
         "publicationRequiresSeparateAuthority": {"const": true},
         "mcpRegistrationDoesNotImplyRuntimeReadiness": {"const": true},
         "mcpEnvironmentValuesRetained": {"const": false},
-        "mcpArgumentValuesRetained": {"const": false}
+        "mcpArgumentValuesRetained": {"const": false},
+        "estateAutoDiscoveryRunsProviderQueries": {"const": false}
       }
     }
   },
