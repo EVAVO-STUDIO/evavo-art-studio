@@ -167,15 +167,19 @@ function humanCelSmokeAuthority() {
   });
 
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
-  assert.equal(authority.protocolVersion, "2026-09-09.8");
+  assert.equal(authority.protocolVersion, "2026-09-09.9");
   assert.equal(authority.authority.mode, "human-cel-authored");
   assert.equal(authority.authority.cleanupInk, "strict");
   assert.equal(authority.authority.colourPaint, "strict");
+  assert.equal(authority.authority.colourReview, "strict");
   assert.equal(authority.authority.performanceActing, "strict");
   assert.equal(authority.authority.opticalCompositing, "strict");
+  assert.equal(authority.authority.compositeReview, "strict");
   assert.equal(authority.authority.requiredPersistenceGate, "strict-human-cel-promotion-receipt-gate");
   assert.equal(authority.authority.requiredPersistedStateIntegrity, "canonical-snapshot-render-job-integrity");
-  assert.equal(authority.handoff.minimumPackageVersion, "0.38.0");
+  assert.equal(authority.handoff.minimumPackageVersion, "0.39.0");
+  assert.equal(authority.handoff.contractsPackage, "@evavo/cel-contracts");
+  assert.equal(authority.handoff.minimumContractsPackageVersion, "0.15.0");
   assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
   assert.equal(authority.handoff.minimumStorePackageVersion, "0.27.0");
   for (const required of [
@@ -185,6 +189,8 @@ function humanCelSmokeAuthority() {
     "createHumanCelCleanupInkDirective",
     "createHumanCelPerformanceDirective",
     "createHumanCelCompositingDirective",
+    "evaluateHumanCelColourReview",
+    "evaluateHumanCelCompositeReview",
     "evaluateHumanCelPerformanceReview",
     "evaluateHumanCelQualityGate",
     "createHumanCelQualityReceipt",
@@ -293,10 +299,11 @@ async function main() {
     "docs/human-cel-animation-authority-v1.md",
   ]);
   assertRequires(humanCelCapability, [
-    "Cel Animation Studio @evavo/cel-core 0.38.0 or newer",
+    "Cel Animation Studio @evavo/cel-core 0.39.0 or newer",
+    "Cel Animation Studio @evavo/cel-contracts 0.15.0 or newer",
     "Cel Animation Studio @evavo/cel-store 0.27.0 or newer",
     "Strict human-cel cleanup/ink, colour/paint, acting/performance and optical/compositing grammar",
-    "createHumanCelColourPaintDirective, createHumanCelCleanupInkDirective, createHumanCelPerformanceDirective and createHumanCelCompositingDirective downstream surfaces",
+    "Dedicated human-cel colour-script and optical-composite review downstream surfaces",
     "Candidate provenance containing the exact strict-envelope digest",
     "Canonical persisted snapshot and render-job integrity before strict promotion",
     "Zero-blocker persisted quality receipt for strict approval",
@@ -315,6 +322,8 @@ async function main() {
     "@evavo/cel-core 0.35.0",
     "@evavo/cel-core 0.36.0",
     "@evavo/cel-core 0.37.0",
+    "@evavo/cel-core 0.38.0",
+    "@evavo/cel-contracts 0.14.0",
     "@evavo/cel-store 0.26.0",
   ]) {
     assert.equal(capabilityText.includes(stale), false, `Capability registry must not advertise ${stale}`);
@@ -330,11 +339,14 @@ async function main() {
       contentDigest: humanCelAuthority.contentDigest,
       protocolVersion: humanCelAuthority.protocolVersion,
       coreMinimumVersion: humanCelAuthority.handoff.minimumPackageVersion,
+      contractsMinimumVersion: humanCelAuthority.handoff.minimumContractsPackageVersion,
       storeMinimumVersion: humanCelAuthority.handoff.minimumStorePackageVersion,
       cleanupInkRequired: true,
       colourPaintRequired: true,
+      colourReviewRequired: true,
       performanceActingRequired: true,
       opticalCompositingRequired: true,
+      compositeReviewRequired: true,
       candidateEnvelopeProvenanceRequired: true,
       qualityReceiptRequired: true,
       storePromotionGateRequired: true,
