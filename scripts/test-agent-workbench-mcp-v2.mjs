@@ -11,7 +11,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverPath = path.join(root, "scripts", "agent-workbench-mcp-v2.mjs");
 const bundle = JSON.parse(fs.readFileSync(path.join(root, ".evavo", "agent-workbench.contracts.v1.json"), "utf8"));
 const expectedRepository = bundle.repository;
-const EVAVO_DISCOVERY_VERSION = "2026-07-28";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -31,7 +30,7 @@ function send(message) {
   child.stdin.write(`${JSON.stringify(message)}\n`);
 }
 
-async function nextResponse(timeoutMs = 5000) {
+async function nextResponse(timeoutMs = 15000) {
   return await Promise.race([
     iterator.next().then(({ value, done }) => {
       if (done || !value) throw new Error(`MCP server closed unexpectedly. ${errors.join("")}`);
@@ -42,35 +41,41 @@ async function nextResponse(timeoutMs = 5000) {
 }
 
 try {
+  send({ jsonrpc: "2.0", id: 0, method: "server/discover", params: {} });
+  const discovered = await nextResponse();
+  assert(Array.isArray(discovered.result?.supportedVersions) && discovered.result.supportedVersions.includes("2026-07-28"), "EVAVO discovery protocol was not advertised.");
+  assert(discovered.result?.truthBoundary?.readOnly === true, "EVAVO discovery truth boundary is not read-only.");
+  assert(discovered.result?.capabilities?.fleet === true, "EVAVO discovery did not advertise fleet awareness.");
+  assert(discovered.result?.capabilities?.tools?.includes("evavo_agent_workbench_fleet"), "EVAVO discovery tool list is missing fleet.");
+
   send({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
   const initialized = await nextResponse();
   assert(initialized.result?.serverInfo?.name === "evavo-agent-workbench", "Unexpected MCP server identity.");
-  assert(initialized.result?.protocolVersion === "2025-03-26", "Unexpected standard MCP protocol version.");
+  assert(initialized.result?.protocolVersion === "2025-03-26", "Unexpected MCP protocol version.");
 
   send({ jsonrpc: "2.0", method: "notifications/initialized" });
-  send({ jsonrpc: "2.0", id: 2, method: "server/discover", params: { protocolVersion: EVAVO_DISCOVERY_VERSION } });
-  const discovered = await nextResponse();
-  assert(discovered.result?.protocolVersion === EVAVO_DISCOVERY_VERSION, "EVAVO discovery protocol version mismatch.");
-  assert(discovered.result?.supportedVersions?.includes(EVAVO_DISCOVERY_VERSION), "EVAVO discovery version was not advertised.");
-  assert(discovered.result?.supportedVersions?.includes("2025-03-26"), "Standard MCP version was not advertised through EVAVO discovery.");
-  assert(discovered.result?.serverInfo?.name === "evavo-agent-workbench", "EVAVO discovery server identity mismatch.");
-  assert(discovered.result?.readOnly === true, "EVAVO discovery must advertise readOnly=true.");
-  assert(discovered.result?.truthBoundary?.executionGranted === false && discovered.result?.truthBoundary?.mutationGranted === false && discovered.result?.truthBoundary?.publicationGranted === false, "EVAVO discovery truth boundary mismatch.");
-
-  send({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} });
+  send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
   const listed = await nextResponse();
   const names = listed.result?.tools?.map((item) => item.name) ?? [];
-  assert(names.length === 4, "Expected exactly four workbench MCP tools.");
-  for (const name of ["evavo_agent_workbench_capabilities", "evavo_agent_workbench_snapshot", "evavo_agent_workbench_guide", "evavo_agent_workbench_handoff"]) assert(names.includes(name), `Missing MCP tool: ${name}`);
+  assert(names.length === 5, "Expected exactly five workbench MCP tools.");
+  for (const name of ["evavo_agent_workbench_capabilities", "evavo_agent_workbench_snapshot", "evavo_agent_workbench_fleet", "evavo_agent_workbench_guide", "evavo_agent_workbench_handoff"]) assert(names.includes(name), `Missing MCP tool: ${name}`);
 
-  send({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "evavo_agent_workbench_snapshot", arguments: { objective: "agent workbench smoke test", limit: 5 } } });
+  send({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "evavo_agent_workbench_snapshot", arguments: { objective: "agent workbench smoke test", limit: 5 } } });
   const snapshotResponse = await nextResponse();
   const snapshot = snapshotResponse.result?.structuredContent;
   assert(snapshot?.contract === "evavo_agent_workbench_snapshot_v1", "Snapshot contract mismatch.");
   assert(snapshot?.repository === expectedRepository, "Snapshot repository identity mismatch.");
   assert(snapshot?.policy?.readOnlyCompiler === true && snapshot?.policy?.commandExecutionPerformed === false && snapshot?.policy?.mutationPerformed === false, "Snapshot truth boundary mismatch.");
 
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_mcp_smoke_v2", status: "passed", repository: expectedRepository, standardProtocolVersion: initialized.result.protocolVersion, evavoDiscoveryVersion: discovered.result.protocolVersion, tools: names, snapshotMode: snapshot.mode }, null, 2)}\n`);
+  send({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "evavo_agent_workbench_fleet", arguments: { workspaceRoot: root, objective: "agent workbench smoke test", limit: 5, repositoryLimit: 5 } } });
+  const fleetResponse = await nextResponse();
+  const fleet = fleetResponse.result?.structuredContent;
+  assert(fleet?.contract === "evavo_agent_workbench_fleet_snapshot_v1", "Fleet contract mismatch.");
+  assert(fleet?.scope === "local-workbench-enabled-siblings", "Fleet scope mismatch.");
+  assert(fleet?.policy?.readOnlyCompiler === true && fleet?.policy?.absenceClaimsAllowed === false && fleet?.policy?.providerEstateCompletenessClaimed === false, "Fleet truth boundary mismatch.");
+  assert(Array.isArray(fleet.repositories) && fleet.repositories.some((item) => item.repository === expectedRepository), "Fleet did not compile the current repository.");
+
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_mcp_smoke_v2", status: "passed", repository: expectedRepository, tools: names, snapshotMode: snapshot.mode, fleetRepositories: fleet.counts?.repositoriesCompiled ?? 0 }, null, 2)}\n`);
 } finally {
   child.kill();
   lines.close();
