@@ -4,15 +4,24 @@
   "authority": "art-studio",
   "transport": "stdio",
   "protocolVersion": "2025-03-26",
+  "supportedProtocolVersions": ["2025-03-26", "2026-07-28"],
+  "evavoDiscoveryMethod": "server/discover",
   "command": "node",
   "args": ["scripts/agent-workbench-mcp-v2.mjs"],
   "readOnly": true,
   "tools": [
     "evavo_agent_workbench_capabilities",
     "evavo_agent_workbench_snapshot",
+    "evavo_agent_workbench_fleet",
     "evavo_agent_workbench_guide",
     "evavo_agent_workbench_handoff"
   ],
+  "fleet": {
+    "schema": "schemas/evavo.agent-workbench-fleet.schema.json",
+    "compiler": "scripts/agent-workbench-fleet.mjs",
+    "verifier": "scripts/verify-agent-workbench-fleet.mjs",
+    "scope": "local-workbench-enabled-siblings"
+  },
   "guidance": {
     "schema": "schemas/evavo.agent-workbench-guidance.schema.json",
     "compiler": "scripts/agent-workbench-guide.mjs",
@@ -39,6 +48,9 @@
     "grantsMutationAuthority": false,
     "grantsPublicationAuthority": false,
     "guidanceProvesReadiness": false,
+    "fleetAuthorizesExecution": false,
+    "fleetClaimsProviderCompleteness": false,
+    "fleetAllowsAbsenceClaims": false,
     "registrationExecutesServer": false,
     "registrationGrantsAuthority": false,
     "doctorAuthorizesEffects": false,
