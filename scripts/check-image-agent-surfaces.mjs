@@ -66,7 +66,14 @@ for (const requiredExport of mediaExports) {
   }
 }
 const finishingPacket = await readFile(path.join(root, "packages/media/src/image-finishing-review-packet.ts"), "utf8");
-for (const requiredPacketFeature of ["createImageFinishingReviewPacket", "automaticPromotionAllowed", "approved-reference-set-is-not-stable-enough", "generated-detail-risk:"]) {
+for (const requiredPacketFeature of [
+  "createImageFinishingReviewPacket",
+  "createImageFinishingReviewBatch",
+  "Finishing review batch requires 1 through 128 images",
+  "automaticPromotionAllowed",
+  "approved-reference-set-is-not-stable-enough",
+  "generated-detail-risk:",
+]) {
   if (!finishingPacket.includes(requiredPacketFeature)) throw new Error(`Unified finishing packet is missing ${requiredPacketFeature}.`);
 }
 const generatedDetailRisk = await readFile(path.join(root, "packages/media/src/image-generated-detail-risk.ts"), "utf8");
@@ -147,7 +154,7 @@ process.stdout.write(`${JSON.stringify({
   ok: true,
   surfaces: parsed,
   mediaExports,
-  finishingPacket: ["technical-review", "artifact-triage", "repair-routing", "approved-reference-consistency", "semantic-findings", "no-auto-promotion"],
+  finishingPacket: ["single-review", "batch-1-to-128", "shared-reference-model", "compact-batch-response", "artifact-triage", "repair-routing", "approved-reference-consistency", "semantic-findings", "no-auto-promotion"],
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   artifactTriage: ["ringing", "posterization", "resampling", "repeated-detail", "detail-density-imbalance", "advisory-only", "no-ai-origin-claim"],
   referenceConsistency: ["approved-reference-baseline", "reference-set-coherence", "palette-tone-detail-silhouette-framing", "batch-outlier-ranking", "guarded-visual-proof", "no-ai-origin-claim"],
