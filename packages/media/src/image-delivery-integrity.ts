@@ -1,6 +1,6 @@
 import sharp from "sharp";
 
-export const IMAGE_DELIVERY_INTEGRITY_CONTRACT = "evavo.image-delivery-integrity.v1" as const;
+export const IMAGE_DELIVERY_INTEGRITY_CONTRACT = "evavo.image-delivery-integrity.v1_1" as const;
 
 export type ImageDeliveryTarget = "web" | "game-art" | "game-data-map" | "print" | "archive";
 export type ImageDeliveryGrade = "pass" | "warn" | "fail";
@@ -16,6 +16,7 @@ export interface ImageDeliveryIntegritySpec {
   readonly allowEmbeddedMetadata?: boolean;
   readonly allowOrientationMetadata?: boolean;
   readonly maximumMegapixels?: number;
+  readonly maximumBytes?: number;
 }
 
 export interface ImageDeliveryIntegrityEvidence {
@@ -25,6 +26,7 @@ export interface ImageDeliveryIntegrityEvidence {
   readonly width: number;
   readonly height: number;
   readonly megapixels: number;
+  readonly encodedBytes: number;
   readonly format: string | null;
   readonly colourSpace: string | null;
   readonly channels: number | null;
@@ -58,6 +60,12 @@ function positive(value: number | undefined, fallback: number | null, label: str
   return value;
 }
 
+function positiveInteger(value: number | undefined, fallback: number | null, label: string): number | null {
+  if (value === undefined) return fallback;
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${label} must be a positive safe integer.`);
+  return value;
+}
+
 function formatName(value: string | undefined): string | null {
   return value ?? null;
 }
@@ -88,12 +96,14 @@ export async function reviewImageDeliveryIntegrity(
   }
   const minimumPrintDpi = positive(spec.minimumPrintDpi, spec.target === "print" ? 300 : null, "minimumPrintDpi");
   const maximumMegapixels = positive(spec.maximumMegapixels, null, "maximumMegapixels");
+  const maximumBytes = positiveInteger(spec.maximumBytes, null, "maximumBytes");
 
   const metadata = await sharp(encoded, { failOn: "error" }).metadata();
   if (!metadata.width || !metadata.height) throw new Error("Image delivery integrity input has no dimensions.");
   const width = metadata.width;
   const height = metadata.height;
   const megapixels = (width * height) / 1_000_000;
+  const encodedBytes = encoded.length;
   const hasAlpha = metadata.hasAlpha ?? false;
   const format = formatName(metadata.format);
   const colourSpace = metadata.space ?? null;
@@ -112,9 +122,12 @@ export async function reviewImageDeliveryIntegrity(
   if (maximumMegapixels !== null && megapixels > maximumMegapixels) {
     blockers.push(`megapixel-budget-exceeded:${megapixels.toFixed(3)}>${maximumMegapixels.toFixed(3)}`);
   }
+  if (maximumBytes !== null && encodedBytes > maximumBytes) {
+    blockers.push(`encoded-byte-budget-exceeded:${encodedBytes}>${maximumBytes}`);
+  }
   if (spec.requireAlpha === true && !hasAlpha) blockers.push("required-alpha-channel-missing");
-  if (spec.forbidAlpha === true && hasAlpha) warnings.push("unexpected-alpha-channel-present");
-  if (spec.intendedFormat && format !== spec.intendedFormat) warnings.push(`encoded-format-does-not-match-intent:${format ?? "unknown"}->${spec.intendedFormat}`);
+  if (spec.forbidAlpha === true && hasAlpha) blockers.push("forbidden-alpha-channel-present");
+  if (spec.intendedFormat && format !== spec.intendedFormat) blockers.push(`encoded-format-does-not-match-intent:${format ?? "unknown"}->${spec.intendedFormat}`);
   if (spec.intendedFormat === "jpeg" && hasAlpha) blockers.push("jpeg-delivery-cannot-preserve-alpha");
 
   if (orientation !== null && orientation !== 1 && spec.allowOrientationMetadata !== true) {
@@ -140,7 +153,10 @@ export async function reviewImageDeliveryIntegrity(
   }
 
   if (spec.target === "web") {
-    if (!iccBytes) warnings.push("no-embedded-icc-profile; verify the derivative is intentionally authored/interpreted in the expected display colour space");
+    if (!iccBytes && colourSpace !== "srgb") {
+      warnings.push(`web-colour-space-is-not-explicitly-srgb:${colourSpace ?? "unknown"}`);
+      recommendations.push("Confirm the delivery derivative is intentionally authored/interpreted as sRGB or embed the required display profile when a different colour space is intended.");
+    }
     recommendations.push("Inspect the encoded derivative in a real browser at intended CSS size; container metadata preflight does not prove visual colour matching.");
   }
 
@@ -171,6 +187,7 @@ export async function reviewImageDeliveryIntegrity(
     width,
     height,
     megapixels,
+    encodedBytes,
     format,
     colourSpace,
     channels: metadata.channels ?? null,
