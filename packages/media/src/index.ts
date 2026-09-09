@@ -28,6 +28,7 @@ export * from "./existing-image-finishing-plan.js";
 export * from "./image-artifact-signals.js";
 export * from "./image-review-profiles.js";
 export * from "./image-similarity.js";
+export * from "./image-reference-consistency.js";
 export * from "./image-review-orchestrator.js";
 export * from "./image-repair-routing.js";
 export * from "./image-agent-routing.js";
