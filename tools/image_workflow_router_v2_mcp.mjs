@@ -7,7 +7,7 @@ import {
 } from "../packages/media/dist/index.js";
 
 const SERVER_NAME = "evavo-image-workflow-router-v2";
-const SERVER_VERSION = "2.0.0";
+const SERVER_VERSION = "2.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const GOALS = Object.freeze([
   "quality-review",
@@ -69,6 +69,7 @@ async function callTool(name, args) {
         "ordered sequence finishing",
         "approved-reference consistency",
         "artifact/generated-detail triage",
+        "byte-bound provenance evidence with delegated external-verifier results",
         "delivery integrity preflight",
         "finalization admission",
         "texture/UV/Godot material workflow",
@@ -103,7 +104,7 @@ async function dispatch(request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions: "Use v2 routing first when choosing an Art Studio image workflow. The router is read-only and separates review, write, provider/mask and native-execution privilege classes; it never grants approval authority.",
+        instructions: "Use v2 routing first when choosing an Art Studio image workflow. The router is read-only and separates review, write, provider/mask and native-execution privilege classes; it never grants approval authority. Origin questions use byte-bound provenance evidence plus visual/artifact review and never pixel-only AI detection.",
       },
     };
   }
