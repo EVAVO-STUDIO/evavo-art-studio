@@ -8,7 +8,9 @@ import hashlib
 import json
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageStat
+from collections import Counter
+
+from PIL import Image, ImageChops
 
 
 def digest(path: Path) -> str:
@@ -17,14 +19,15 @@ def digest(path: Path) -> str:
 
 def matte_colour(cell: Image.Image) -> tuple[int, int, int]:
     rgb = cell.convert("RGB")
-    border_pixels = []
-    for x in range(rgb.width):
-        border_pixels.extend((rgb.getpixel((x, 0)), rgb.getpixel((x, rgb.height - 1))))
-    for y in range(1, rgb.height - 1):
-        border_pixels.extend((rgb.getpixel((0, y)), rgb.getpixel((rgb.width - 1, y))))
-    samples = Image.new("RGB", (len(border_pixels), 1))
-    samples.putdata(border_pixels)
-    return tuple(int(value) for value in ImageStat.Stat(samples).median)
+    # Generated sheets often wrap every cell in a solid white grid, so border
+    # sampling can select the divider instead of the overwhelmingly larger matte.
+    # Quantize the whole cell and recover the median colour from its dominant bin.
+    pixels = list(rgb.getdata())
+    bins = Counter((r >> 3, g >> 3, b >> 3) for r, g, b in pixels)
+    dominant = bins.most_common(1)[0][0]
+    members = [pixel for pixel in pixels if tuple(channel >> 3 for channel in pixel) == dominant]
+    channels = [sorted(pixel[index] for pixel in members) for index in range(3)]
+    return tuple(channel[len(channel) // 2] for channel in channels)
 
 
 def foreground_bbox(cell: Image.Image, matte: tuple[int, int, int], threshold: int):

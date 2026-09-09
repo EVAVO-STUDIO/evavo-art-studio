@@ -37,6 +37,11 @@ class SpriteSheetSafeMarginTests(unittest.TestCase):
         ImageDraw.Draw(image).line((0, 63, 63, 63), fill=(255, 255, 255))
         self.assertEqual(matte_colour(image), (0, 255, 0))
 
+    def test_uses_dominant_matte_when_every_border_pixel_is_a_divider(self):
+        image = Image.new("RGB", (64, 64), (0, 245, 8))
+        ImageDraw.Draw(image).rectangle((0, 0, 63, 63), outline=(250, 250, 250), width=5)
+        self.assertEqual(matte_colour(image), (0, 245, 8))
+
     def test_retains_and_moves_subject_pixels_touching_cell_boundary(self):
         with tempfile.TemporaryDirectory() as folder:
             source, output = Path(folder) / "source.png", Path(folder) / "output.png"
