@@ -10,6 +10,7 @@ const manifests = [
   "config/image-finishing-artist.capabilities.json",
   "config/image-repair-agent.capabilities.json",
   "config/texture-review-agent.capabilities.json",
+  "config/image-effects-agent.capabilities.json",
 ];
 
 const parsed = [];
@@ -44,9 +45,18 @@ for (const requiredExport of ["./image-repair-routing.js", "./texture-map-review
   }
 }
 
+const spriteEffectsIndex = await readFile(
+  path.join(root, "packages/godot-sprite-effects/src/index.ts"),
+  "utf8",
+);
+if (!spriteEffectsIndex.includes('export * from "./agent-planner.js";')) {
+  throw new Error("godot-sprite-effects index does not export the agent planner.");
+}
+
 for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
+  "packages/godot-sprite-effects/test/agent-planner.test.mjs",
 ]) {
   await access(path.join(root, requiredTest));
 }
@@ -56,4 +66,5 @@ process.stdout.write(`${JSON.stringify({
   ok: true,
   surfaces: parsed,
   mediaExports: ["image-repair-routing", "texture-map-review"],
+  spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
