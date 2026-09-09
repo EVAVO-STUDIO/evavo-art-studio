@@ -15,6 +15,15 @@ test("all image agent goals resolve to deterministic routes", () => {
   }
 });
 
+test("ordinary quality review prefers the unified finishing packet", () => {
+  const route = routeImageAgentTask("quality-review");
+  assert.equal(route.primarySurface, "evavo-image-finishing-packet");
+  assert.equal(route.orderedTools[0], "evavo_review_image_finishing_packet");
+  assert.ok(route.orderedTools.includes("evavo_review_image_for_finishing"));
+  assert.equal(route.writeClass, "read-only");
+  assert.match(route.evidenceExpected.join(" "), /combined disposition and priority/);
+});
+
 test("fake transparency routes to real-alpha mastering and proof", () => {
   const route = routeImageAgentTask("fake-transparency");
   assert.equal(route.primarySurface, "evavo-raster-finishing");
@@ -85,4 +94,15 @@ test("artifact assessment uses dedicated triage while refusing pixel-origin conc
   assert.match(route.evidenceExpected.join(" "), /provenance status/);
   assert.match(route.notes.join(" "), /not image authorship/);
   assert.match(route.notes.join(" "), /provenance records/);
+});
+
+test("finalization brackets pixel changes with the unified packet and keeps promotion explicit", () => {
+  const route = routeImageAgentTask("finalize-image");
+  assert.match(route.primarySurface, /evavo-image-finishing-packet/);
+  assert.equal(route.orderedTools[0], "evavo_review_image_finishing_packet");
+  assert.equal(route.orderedTools.filter((tool) => tool === "evavo_review_image_finishing_packet").length, 2);
+  assert.match(route.stopConditions.join(" "), /finishing packet is not ready for visual review/);
+  assert.match(route.evidenceExpected.join(" "), /pre\/post finishing decision packet/);
+  assert.match(route.notes.join(" "), /Re-run the unified finishing packet/);
+  assert.match(route.notes.join(" "), /remains unapproved/);
 });
