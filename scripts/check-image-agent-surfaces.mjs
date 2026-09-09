@@ -68,8 +68,10 @@ for (const requiredExport of mediaExports) {
 }
 
 const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts"), "utf8");
-if (!godotIndex.includes('export * from "./material-delivery.js";')) {
-  throw new Error("packages/godot/src/index.ts does not export material-delivery.");
+for (const requiredExport of ["material-delivery", "material-resource"]) {
+  if (!godotIndex.includes(`export * from "./${requiredExport}.js";`)) {
+    throw new Error(`packages/godot/src/index.ts does not export ${requiredExport}.`);
+  }
 }
 const godotMaterialDelivery = await readFile(path.join(root, "packages/godot/src/material-delivery.ts"), "utf8");
 for (const requiredBinding of [
@@ -85,6 +87,13 @@ for (const requiredBinding of [
   if (!godotMaterialDelivery.includes(requiredBinding)) {
     throw new Error(`Godot material delivery planner is missing ${requiredBinding}.`);
   }
+}
+const godotMaterialResource = await readFile(path.join(root, "packages/godot/src/material-resource.ts"), "utf8");
+if (!godotMaterialResource.includes("renderGodotMaterialTres") || !godotMaterialResource.includes("format=3")) {
+  throw new Error("Godot material resource renderer is missing current format=3 TRES rendering.");
+}
+if (godotMaterialResource.includes("load_steps=")) {
+  throw new Error("Godot material resource renderer must not emit deprecated load_steps for 4.6 resources.");
 }
 
 const enhancementSession = await readFile(
@@ -114,6 +123,7 @@ for (const requiredTest of [
   "packages/media/test/wavefront-obj-uv.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
   "packages/godot/test/material-delivery.test.mjs",
+  "packages/godot/test/material-resource.test.mjs",
   "packages/godot/test/material-delivery-mcp.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/texture_review_mcp.test.mjs",
@@ -130,7 +140,7 @@ process.stdout.write(`${JSON.stringify({
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   textureProofSampling: ["continuous", "nearest"],
   textureMaterialReview: ["single-map", "material-set", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
-  godotMaterialDelivery: ["StandardMaterial3D", "ORMMaterial3D", "guarded-preprocessing"],
+  godotMaterialDelivery: ["StandardMaterial3D", "ORMMaterial3D", "guarded-preprocessing", "format-3-tres", "create-only-resource-write"],
   unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
 }, null, 2)}\n`);
