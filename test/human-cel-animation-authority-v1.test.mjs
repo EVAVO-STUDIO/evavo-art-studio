@@ -64,7 +64,8 @@ test("compiles strict human cel authority for cel animation requests", () => {
   assert.equal(authority.handoff.contractsPackage, "@evavo/cel-contracts");
   assert.equal(authority.handoff.minimumContractsPackageVersion, "0.15.0");
   assert.equal(authority.handoff.storePackage, "@evavo/cel-store");
-  assert.equal(authority.handoff.minimumStorePackageVersion, "0.27.0");
+  assert.equal(authority.handoff.minimumStorePackageVersion, "0.28.0");
+  assert.equal(authority.handoff.requiredStandaloneEvidenceStoreIntegrity, "integrity-aware-strict-envelope-and-quality-receipt-defaults");
   assert.equal(authority.handoff.requiredStoreBehavior, "strict-human-cel-promotion-receipt-gate");
   assert.equal(authority.handoff.requiredStoreIntegrity, "canonical-snapshot-render-job-integrity");
   for (const required of [
