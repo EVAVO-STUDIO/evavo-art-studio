@@ -4,10 +4,7 @@ import {
   type ArtifactStore,
   type StoredArtifact,
 } from "@evavo/art-artifacts";
-import {
-  createImageProvenancePacket,
-  type ImageReportedOrigin,
-} from "@evavo/art-media";
+import { createImageProvenancePacket } from "@evavo/art-media";
 
 import { executeProviderCandidateRequest as executeProviderCandidateRequestRaw } from "./orchestrator.js";
 import {
@@ -25,6 +22,8 @@ export const PROVIDER_IMAGE_PROVENANCE_RECORD_CONTRACT = "evavo.image-provenance
 export interface ProviderCandidateRunWithProvenanceResult extends ProviderCandidateRunResult {
   readonly provenanceArtifact: ArtifactId;
 }
+
+type ProviderReportedOrigin = "ai-generated" | "machine-assisted" | "unknown";
 
 type VerifiedReferenceBinding = Readonly<{
   artifactId: ArtifactId;
@@ -62,7 +61,7 @@ async function verifiedArtifact(
 function reportedOrigin(
   request: NormalizedProviderCandidateRequest,
   adapterId: string,
-): Exclude<ImageReportedOrigin, "not-reported"> {
+): ProviderReportedOrigin {
   if (adapterId === "fixture-image") return "unknown";
   if (request.operation === "generate") return "ai-generated";
   return "machine-assisted";
@@ -119,9 +118,7 @@ async function storeProviderProvenanceBundle(
     .reverse()
     .find((attempt) => attempt.outcome === "succeeded" && attempt.adapterId === result.adapterId)?.completedAt;
   const origin = reportedOrigin(request, result.adapterId);
-  const records = [];
-
-  for (const [index, candidate] of candidates.entries()) {
+  const records = await Promise.all(candidates.map(async (candidate, index) => {
     const record = Object.freeze({
       contract: PROVIDER_IMAGE_PROVENANCE_RECORD_CONTRACT,
       subjectSha256: candidate.contentSha256,
@@ -143,7 +140,7 @@ async function storeProviderProvenanceBundle(
         "permanent",
       );
     }
-    records.push(Object.freeze({
+    return Object.freeze({
       candidateArtifactId: candidate.artifactId,
       candidateIndex: index + 1,
       mediaType: candidate.mediaType,
@@ -157,8 +154,8 @@ async function storeProviderProvenanceBundle(
         externalCryptographicVerificationPerformedByArtStudio: false,
         originClaimExternallyVerified: false,
       }),
-    }));
-  }
+    });
+  }));
 
   const bundle = Object.freeze({
     schemaVersion: "1.0",
@@ -237,7 +234,6 @@ export async function executeProviderCandidateRequest(
       provenanceArtifact: provenance.artifactId,
     });
   } catch (error: unknown) {
-    if (error instanceof ProviderError && error.code.startsWith("PROVIDER_PROVENANCE_")) throw error;
     throw new ProviderError(
       "PROVIDER_PROVENANCE_EMISSION_FAILED",
       `Provider candidates were created but their mandatory provenance bundle could not be stored: ${error instanceof Error ? error.message : String(error)}`,
@@ -247,6 +243,7 @@ export async function executeProviderCandidateRequest(
           candidateArtifacts: result.candidateArtifacts,
           evidenceArtifactId: result.evidenceArtifact,
           requestId: result.requestId,
+          causeCode: error instanceof ProviderError ? error.code : null,
         }),
       },
     );
