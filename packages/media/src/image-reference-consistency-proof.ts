@@ -37,6 +37,8 @@ export interface ImageReferenceConsistencyProofResult {
   }>;
 }
 
+type CompositeItem = Readonly<{ input: Buffer; left: number; top: number }>;
+
 function integer(value: number | undefined, fallback: number, min: number, max: number, label: string): number {
   if (value === undefined) return fallback;
   if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label} must be an integer from ${min} through ${max}.`);
@@ -148,7 +150,7 @@ export async function createImageReferenceConsistencyProof(
     + candidateRows * cardHeight + Math.max(0, candidateRows - 1) * gap
     + margin;
 
-  const composites: sharp.OverlayOptions[] = [];
+  const composites: CompositeItem[] = [];
   let top = margin;
   composites.push({
     input: sectionHeader(canvasWidth - margin * 2, "Approved references", `${references.length} supplied • ${batch.referenceCoherence.state} set • max pair distance ${batch.referenceCoherence.maximumDistance.toFixed(3)}`),
