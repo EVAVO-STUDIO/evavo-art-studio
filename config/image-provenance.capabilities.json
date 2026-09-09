@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-provenance",
+  "purpose": "Read-only exact-byte provenance and lineage review that reuses EVAVO receipts/manifests and can carry externally verified content-credential/provider claims without pixel-based authorship inference.",
+  "entrypoint": "tools/image_provenance_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_IMAGE_PROVENANCE_ALLOWED_ROOTS": {
+      "requiredForImageReads": true,
+      "description": "Platform-delimited canonical roots containing image assets that may be hash-bound to provenance evidence."
+    }
+  },
+  "tools": [
+    "evavo_image_provenance_capabilities",
+    "evavo_review_image_provenance"
+  ],
+  "packetStatuses": ["verified", "unverified", "absent", "invalid"],
+  "evidenceKinds": ["source-binding", "generation-receipt", "content-credential", "evavo-record"],
+  "recognizedEvavoLineage": [
+    "evavo.image-provenance-record.v1",
+    "evavo.enhancement-art-review.v1",
+    "evavo-master-transparent-asset receipts"
+  ],
+  "guarantees": {
+    "writesFiles": false,
+    "sourceMutationAllowed": false,
+    "localSha256BindingPerformedByArtStudio": true,
+    "externalCryptographicVerificationPerformedByThisTool": false,
+    "verifiedExternalClaimsRequireVerifierAndRecordId": true,
+    "claimsPixelAiOriginDetection": false,
+    "automaticCreativeApproval": false,
+    "publicationAllowed": false,
+    "visualReviewRequired": true
+  }
+}
