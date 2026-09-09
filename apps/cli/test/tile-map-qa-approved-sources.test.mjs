@@ -34,7 +34,7 @@ async function fixture({ candidateClear = true, familyClear = true, wrongReview 
   const candidatePath = path.join(root, "candidate.png");
   await writeFile(candidatePath, candidateBytes);
 
-  const packagePayload = {
+  const packageBody = {
     schema_version: 1,
     source_plan_sha256: "a".repeat(64),
     source_plan_fingerprint: "b".repeat(64),
@@ -63,21 +63,81 @@ async function fixture({ candidateClear = true, familyClear = true, wrongReview 
     authority: {},
     promotion_policy: {},
     status: "ready-for-candidate-authoring",
-    package_fingerprint: "d".repeat(64),
+  };
+  const packagePayload = {
+    ...packageBody,
+    package_fingerprint: fingerprint(packageBody),
   };
   const packagePath = path.join(root, "source-package.json");
   await writeFile(packagePath, JSON.stringify(packagePayload));
 
-  const providerResults = {
+  const providerBatchBody = {
     schema_version: 1,
+    source_candidate_batch_sha256: "d".repeat(64),
+    source_candidate_batch_fingerprint: "e".repeat(64),
+    source_package_fingerprint: packagePayload.package_fingerprint,
+    source_map_fingerprint: packagePayload.source_map_fingerprint,
+    map_id: "map",
+    consumer_adapter: "epochbound",
+    projection: "orthogonal",
+    jobs: [],
+    authority: {},
+    status: "ready-for-provider-runtime",
+  };
+  const providerBatch = { ...providerBatchBody, provider_batch_fingerprint: fingerprint(providerBatchBody) };
+  const providerBatchPath = path.join(root, "provider-batch.json");
+  await writeFile(providerBatchPath, JSON.stringify(providerBatch));
+  const providerBatchBytes = await readFile(providerBatchPath);
+
+  const executionBody = {
+    schema: "evavo.tile-map-provider-execution-receipt.v1",
+    status: "succeeded",
+    completedAt: "2026-08-30T00:05:00.000Z",
+    sourceMapFingerprint: packagePayload.source_map_fingerprint,
+    jobs: [],
+    authority: {},
+  };
+  const executionSha256 = fingerprint(executionBody);
+  const execution = { ...executionBody, executionSha256, runId: executionSha256.slice(0, 20) };
+  const executionPath = path.join(root, "execution.json");
+  await writeFile(executionPath, JSON.stringify(execution));
+  const executionBytes = await readFile(executionPath);
+
+  const masteringBody = {
+    schema: "evavo.tile-map-candidate-mastering-receipt.v1",
+    status: "succeeded",
+    completedAt: "2026-08-30T00:06:00.000Z",
+    sourceProviderBatch: { path: providerBatchPath, fileSha256: sha(providerBatchBytes), documentSha256: providerBatch.provider_batch_fingerprint },
+    sourceProviderExecution: { path: executionPath, fileSha256: sha(executionBytes), documentSha256: execution.executionSha256 },
+    sourceMapFingerprint: packagePayload.source_map_fingerprint,
+    jobs: [],
+    authority: {},
+  };
+  const masteringSha256 = fingerprint(masteringBody);
+  const mastering = { ...masteringBody, masteringSha256, runId: masteringSha256.slice(0, 20) };
+  const masteringPath = path.join(root, "mastering.json");
+  await writeFile(masteringPath, JSON.stringify(mastering));
+  const masteringBytes = await readFile(masteringPath);
+
+  const providerResultsBody = {
+    schema_version: 2,
     source_batch_fingerprint: "e".repeat(64),
-    source_provider_batch_fingerprint: "f".repeat(64),
-    source_execution_sha256: "1".repeat(64),
+    source_provider_batch_path: providerBatchPath,
+    source_provider_batch_sha256: sha(providerBatchBytes),
+    source_provider_batch_fingerprint: providerBatch.provider_batch_fingerprint,
+    source_execution_receipt_path: executionPath,
+    source_execution_receipt_sha256: sha(executionBytes),
+    source_execution_sha256: execution.executionSha256,
+    source_mastering_receipt_path: masteringPath,
+    source_mastering_receipt_sha256: sha(masteringBytes),
+    source_mastering_sha256: mastering.masteringSha256,
     source_map_fingerprint: "c".repeat(64),
     authority: {
       provider_output_authority: "intermediate-only",
       review_required: true,
       approval_authority: false,
+      deterministic_mastering_required: true,
+      mastering_quality_required: true,
     },
     candidates: [
       {
@@ -87,20 +147,29 @@ async function fixture({ candidateClear = true, familyClear = true, wrongReview 
       },
     ],
   };
+  const providerResults = { ...providerResultsBody, results_fingerprint: fingerprint(providerResultsBody) };
   const providerResultsPath = path.join(root, "provider-results.json");
   await writeFile(providerResultsPath, JSON.stringify(providerResults));
   const providerResultsBytes = await readFile(providerResultsPath);
 
-  const review = {
+  const reviewBody = {
     schema_version: 1,
     source_batch_sha256: "2".repeat(64),
     source_batch_fingerprint: "e".repeat(64),
-    source_package_fingerprint: "d".repeat(64),
-    source_provider_batch_fingerprint: "f".repeat(64),
-    source_execution_sha256: "1".repeat(64),
+    source_package_fingerprint: packagePayload.package_fingerprint,
+    source_provider_batch_path: providerBatchPath,
+    source_provider_batch_sha256: sha(providerBatchBytes),
+    source_provider_batch_fingerprint: providerBatch.provider_batch_fingerprint,
+    source_execution_receipt_path: executionPath,
+    source_execution_receipt_sha256: sha(executionBytes),
+    source_execution_sha256: execution.executionSha256,
+    source_mastering_receipt_path: masteringPath,
+    source_mastering_receipt_sha256: sha(masteringBytes),
+    source_mastering_sha256: mastering.masteringSha256,
     source_map_fingerprint: "c".repeat(64),
     provider_results_path: providerResultsPath,
     provider_results_sha256: sha(providerResultsBytes),
+    provider_results_fingerprint: providerResults.results_fingerprint,
     candidate_root: root,
     map_id: "map",
     projection: "orthogonal",
@@ -126,10 +195,12 @@ async function fixture({ candidateClear = true, familyClear = true, wrongReview 
       review_authority: "art-studio",
       provider_authority: "intermediate-only",
       execution_evidence_required: true,
+      deterministic_mastering_required: true,
+      mastering_quality_required: true,
     },
     status: "awaiting-review",
-    review_fingerprint: "3".repeat(64),
   };
+  const review = { ...reviewBody, review_fingerprint: fingerprint(reviewBody) };
   const reviewPath = path.join(root, "review.json");
   await writeFile(reviewPath, JSON.stringify(review));
 
@@ -137,12 +208,12 @@ async function fixture({ candidateClear = true, familyClear = true, wrongReview 
     schema_version: 1,
     source_package_path: packagePath,
     source_package_sha256: sha(await readFile(packagePath)),
-    source_package_fingerprint: "d".repeat(64),
+    source_package_fingerprint: packagePayload.package_fingerprint,
     source_review_path: reviewPath,
     source_review_sha256: sha(await readFile(reviewPath)),
-    source_review_fingerprint: wrongReview ? "4".repeat(64) : "3".repeat(64),
-    source_provider_batch_fingerprint: "f".repeat(64),
-    source_execution_sha256: "1".repeat(64),
+    source_review_fingerprint: wrongReview ? "4".repeat(64) : review.review_fingerprint,
+    source_provider_batch_fingerprint: providerBatch.provider_batch_fingerprint,
+    source_execution_sha256: execution.executionSha256,
     source_map_fingerprint: "c".repeat(64),
     map_id: "map",
     consumer_adapter: "epochbound",
@@ -213,10 +284,10 @@ async function fixture({ candidateClear = true, familyClear = true, wrongReview 
   const qaPath = path.join(root, "candidate-qa.json");
   await writeFile(qaPath, JSON.stringify(qa));
 
-  const finalization = {
+  const finalizationBody = {
     schema_version: 1,
-    source_review_fingerprint: "3".repeat(64),
-    source_package_fingerprint: "d".repeat(64),
+    source_review_fingerprint: review.review_fingerprint,
+    source_package_fingerprint: packagePayload.package_fingerprint,
     source_map_fingerprint: "c".repeat(64),
     map_id: "map",
     projection: "orthogonal",
@@ -247,8 +318,8 @@ async function fixture({ candidateClear = true, familyClear = true, wrongReview 
     ],
     authority: {},
     status: "review-finalized",
-    finalization_fingerprint: "5".repeat(64),
   };
+  const finalization = { ...finalizationBody, finalization_fingerprint: fingerprint(finalizationBody) };
   const finalizationPath = path.join(root, "finalization.json");
   await writeFile(finalizationPath, JSON.stringify(finalization));
   return { packagePath, reviewPath, qaPath, finalizationPath };

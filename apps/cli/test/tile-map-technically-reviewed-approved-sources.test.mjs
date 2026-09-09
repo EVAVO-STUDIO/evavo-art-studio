@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -34,27 +34,7 @@ async function fixture({ technicalStatus = "passed", corruptQaHash = false } = {
   }).png().toBuffer();
   await writeFile(absoluteCandidate, image);
 
-  const providerResults = {
-    schema_version: 1,
-    source_batch_fingerprint: "1".repeat(64),
-    source_provider_batch_fingerprint: "2".repeat(64),
-    source_execution_sha256: "3".repeat(64),
-    source_map_fingerprint: "4".repeat(64),
-    candidates: [{
-      candidate_id: "candidate-1",
-      path: candidatePath,
-      sha256: sha(image),
-    }],
-    authority: {
-      provider_output_authority: "intermediate-only",
-      review_required: true,
-      approval_authority: false,
-    },
-  };
-  const providerResultsPath = path.join(candidateRoot, "provider-results.json");
-  await writeFile(providerResultsPath, JSON.stringify(providerResults));
-
-  const sourcePackage = {
+  const sourcePackageBody = {
     schema_version: 1,
     source_plan_sha256: "5".repeat(64),
     source_plan_fingerprint: "6".repeat(64),
@@ -81,21 +61,73 @@ async function fixture({ technicalStatus = "passed", corruptQaHash = false } = {
     authority: {},
     promotion_policy: {},
     status: "ready-for-candidate-authoring",
-    package_fingerprint: "7".repeat(64),
   };
+  const sourcePackage = { ...sourcePackageBody, package_fingerprint: sha(Buffer.from(canonical(sourcePackageBody))) };
   const packagePath = path.join(root, "source-package.json");
   await writeFile(packagePath, JSON.stringify(sourcePackage));
 
-  const review = {
+  const providerBatchBody = {
+    schema_version: 1,
+    source_candidate_batch_sha256: "d".repeat(64),
+    source_candidate_batch_fingerprint: "1".repeat(64),
+    source_package_fingerprint: sourcePackage.package_fingerprint,
+    source_map_fingerprint: "4".repeat(64),
+    map_id: "map", consumer_adapter: "epochbound", projection: "orthogonal",
+    jobs: [], authority: {}, status: "ready-for-provider-runtime",
+  };
+  const providerBatch = { ...providerBatchBody, provider_batch_fingerprint: sha(Buffer.from(canonical(providerBatchBody))) };
+  const providerBatchPath = path.join(root, "provider-batch.json");
+  await writeFile(providerBatchPath, JSON.stringify(providerBatch));
+  const providerBatchBytes = await readFile(providerBatchPath);
+  const executionBody = { schema: "evavo.tile-map-provider-execution-receipt.v1", status: "succeeded", completedAt: "2026-08-30T00:05:00.000Z", sourceMapFingerprint: "4".repeat(64), jobs: [], authority: {} };
+  const executionSha256 = sha(Buffer.from(canonical(executionBody)));
+  const execution = { ...executionBody, executionSha256, runId: executionSha256.slice(0, 20) };
+  const executionPath = path.join(root, "execution.json");
+  await writeFile(executionPath, JSON.stringify(execution));
+  const executionBytes = await readFile(executionPath);
+  const masteringBody = {
+    schema: "evavo.tile-map-candidate-mastering-receipt.v1", status: "succeeded", completedAt: "2026-08-30T00:06:00.000Z",
+    sourceProviderBatch: { path: providerBatchPath, fileSha256: sha(providerBatchBytes), documentSha256: providerBatch.provider_batch_fingerprint },
+    sourceProviderExecution: { path: executionPath, fileSha256: sha(executionBytes), documentSha256: execution.executionSha256 },
+    sourceMapFingerprint: "4".repeat(64), jobs: [], authority: {},
+  };
+  const masteringSha256 = sha(Buffer.from(canonical(masteringBody)));
+  const mastering = { ...masteringBody, masteringSha256, runId: masteringSha256.slice(0, 20) };
+  const masteringPath = path.join(root, "mastering.json");
+  await writeFile(masteringPath, JSON.stringify(mastering));
+  const masteringBytes = await readFile(masteringPath);
+  const providerResultsBody = {
+    schema_version: 2, source_batch_fingerprint: "1".repeat(64),
+    source_provider_batch_path: providerBatchPath, source_provider_batch_sha256: sha(providerBatchBytes), source_provider_batch_fingerprint: providerBatch.provider_batch_fingerprint,
+    source_execution_receipt_path: executionPath, source_execution_receipt_sha256: sha(executionBytes), source_execution_sha256: execution.executionSha256,
+    source_mastering_receipt_path: masteringPath, source_mastering_receipt_sha256: sha(masteringBytes), source_mastering_sha256: mastering.masteringSha256,
+    source_map_fingerprint: "4".repeat(64),
+    candidates: [{ candidate_id: "candidate-1", path: candidatePath, sha256: sha(image) }],
+    authority: { provider_output_authority: "intermediate-only", deterministic_mastering_required: true, mastering_quality_required: true, review_required: true, approval_authority: false },
+  };
+  const providerResults = { ...providerResultsBody, results_fingerprint: sha(Buffer.from(canonical(providerResultsBody))) };
+  const providerResultsPath = path.join(candidateRoot, "provider-results.json");
+  await writeFile(providerResultsPath, JSON.stringify(providerResults));
+  const providerResultsBytes = await readFile(providerResultsPath);
+
+  const reviewBody = {
     schema_version: 1,
     source_batch_sha256: "8".repeat(64),
     source_batch_fingerprint: "1".repeat(64),
-    source_package_fingerprint: "7".repeat(64),
-    source_provider_batch_fingerprint: "2".repeat(64),
-    source_execution_sha256: "3".repeat(64),
+    source_package_fingerprint: sourcePackage.package_fingerprint,
+    source_provider_batch_path: providerBatchPath,
+    source_provider_batch_sha256: sha(providerBatchBytes),
+    source_provider_batch_fingerprint: providerBatch.provider_batch_fingerprint,
+    source_execution_receipt_path: executionPath,
+    source_execution_receipt_sha256: sha(executionBytes),
+    source_execution_sha256: execution.executionSha256,
+    source_mastering_receipt_path: masteringPath,
+    source_mastering_receipt_sha256: sha(masteringBytes),
+    source_mastering_sha256: mastering.masteringSha256,
     source_map_fingerprint: "4".repeat(64),
     provider_results_path: providerResultsPath,
-    provider_results_sha256: sha(Buffer.from(JSON.stringify(providerResults))),
+    provider_results_sha256: sha(providerResultsBytes),
+    provider_results_fingerprint: providerResults.results_fingerprint,
     candidate_root: candidateRoot,
     map_id: "map",
     projection: "orthogonal",
@@ -114,10 +146,10 @@ async function fixture({ technicalStatus = "passed", corruptQaHash = false } = {
       creative_review: "pending",
       promotion_eligible: false,
     }],
-    authority: {},
+    authority: { semantic_authority: "tile-map-studio", review_authority: "art-studio", provider_authority: "intermediate-only", execution_evidence_required: true, deterministic_mastering_required: true, mastering_quality_required: true },
     status: "awaiting-review",
-    review_fingerprint: "9".repeat(64),
   };
+  const review = { ...reviewBody, review_fingerprint: sha(Buffer.from(canonical(reviewBody))) };
   const reviewPath = path.join(root, "review.json");
   await writeFile(reviewPath, JSON.stringify(review));
 
@@ -126,12 +158,12 @@ async function fixture({ technicalStatus = "passed", corruptQaHash = false } = {
     policy_version: "2026-08-30.1",
     source_package_path: packagePath,
     source_package_sha256: sha(Buffer.from(JSON.stringify(sourcePackage))),
-    source_package_fingerprint: "7".repeat(64),
+    source_package_fingerprint: sourcePackage.package_fingerprint,
     source_review_path: reviewPath,
     source_review_sha256: sha(Buffer.from(JSON.stringify(review))),
-    source_review_fingerprint: "9".repeat(64),
-    source_provider_batch_fingerprint: "2".repeat(64),
-    source_execution_sha256: "3".repeat(64),
+    source_review_fingerprint: review.review_fingerprint,
+    source_provider_batch_fingerprint: providerBatch.provider_batch_fingerprint,
+    source_execution_sha256: execution.executionSha256,
     source_map_fingerprint: "4".repeat(64),
     candidate_root: candidateRoot,
     map_id: "map",
@@ -171,10 +203,10 @@ async function fixture({ technicalStatus = "passed", corruptQaHash = false } = {
   const qaPath = path.join(root, "technical-qa.json");
   await writeFile(qaPath, JSON.stringify(qa));
 
-  const finalization = {
+  const finalizationBody = {
     schema_version: 1,
-    source_review_fingerprint: "9".repeat(64),
-    source_package_fingerprint: "7".repeat(64),
+    source_review_fingerprint: review.review_fingerprint,
+    source_package_fingerprint: sourcePackage.package_fingerprint,
     source_map_fingerprint: "4".repeat(64),
     map_id: "map",
     projection: "orthogonal",
@@ -201,8 +233,8 @@ async function fixture({ technicalStatus = "passed", corruptQaHash = false } = {
     }],
     authority: {},
     status: "review-finalized",
-    finalization_fingerprint: "b".repeat(64),
   };
+  const finalization = { ...finalizationBody, finalization_fingerprint: sha(Buffer.from(canonical(finalizationBody))) };
   const finalizationPath = path.join(root, "finalization.json");
   await writeFile(finalizationPath, JSON.stringify(finalization));
   return { packagePath, reviewPath, qaPath, finalizationPath };

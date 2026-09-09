@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const cwd = new URL("..", import.meta.url);
@@ -28,7 +29,7 @@ test("general CLI router compiles sprite plans through the dedicated surface", (
   const result = run([
     "sprite-plan-compile",
     "--input",
-    decodeURIComponent(example.pathname),
+    fileURLToPath(example),
   ]);
   assert.equal(result.status, 0, result.stderr);
   const body = JSON.parse(result.stdout);

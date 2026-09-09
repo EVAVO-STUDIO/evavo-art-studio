@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const cwd = new URL("..", import.meta.url);
@@ -35,7 +36,7 @@ test("CLI compiles a source sprite-plan request into a durable root job", () => 
   const result = run([
     "sprite-supervisor-compile",
     "--input",
-    decodeURIComponent(example.pathname),
+    fileURLToPath(example),
   ]);
   assert.equal(result.status, 0, result.stderr);
   const body = JSON.parse(result.stdout);
@@ -60,7 +61,7 @@ test("CLI starts supervision only through explicit durable submission", async ()
     const result = run([
       "sprite-supervisor-start",
       "--input",
-      decodeURIComponent(example.pathname),
+      fileURLToPath(example),
       "--runtime-root",
       runtimeRoot,
       "--actor",

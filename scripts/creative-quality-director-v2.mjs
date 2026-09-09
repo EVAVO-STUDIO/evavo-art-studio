@@ -119,7 +119,7 @@ function readJson(path, code = "ART_DIRECTOR_JSON") {
     const opened = fstatSync(handle, { bigint: true });
     require(opened.isFile(), `${code}_REGULAR_FILE_REQUIRED`);
     require(opened.size <= BigInt(MAX_JSON_BYTES), `${code}_TOO_LARGE`);
-    if (info.ino !== 0n && opened.ino !== 0n) {
+    if (process.platform !== "win32" && info.ino !== 0n && opened.ino !== 0n) {
       require(
         info.dev === opened.dev && info.ino === opened.ino,
         `${code}_CHANGED_DURING_OPEN`,
