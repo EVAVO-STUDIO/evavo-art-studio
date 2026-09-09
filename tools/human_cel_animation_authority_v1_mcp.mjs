@@ -10,7 +10,7 @@ import {
 const TOOL_DEFINITIONS = [
   {
     name: "compile_human_cel_animation_authority_v1",
-    description: "Compile an Art Studio animation request into a strict human-cel handoff requiring authored cleanup/ink, colour/paint, acting/performance, optical compositing, candidate-envelope provenance, quality receipts and integrity-aware Store promotion enforcement.",
+    description: "Compile an Art Studio animation request into a strict human-cel handoff requiring authored cleanup/ink, colour/paint, dedicated colour review, acting/performance, optical compositing, dedicated composite review, candidate-envelope provenance, quality receipts and integrity-aware Store promotion enforcement.",
     inputSchema: {
       type: "object",
       required: ["request"],
@@ -20,7 +20,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "verify_human_cel_animation_authority_v1",
-    description: "Verify protocol .8, Core 0.38 authored departments, Store 0.27 promotion/integrity gates and mandatory strict human-cel bindings without side effects.",
+    description: "Verify protocol .9, Core 0.39, Contracts 0.15, Store 0.27 and mandatory strict human-cel authored/review bindings without side effects.",
     inputSchema: {
       type: "object",
       required: ["authority"],
@@ -51,8 +51,10 @@ function callTool(name, args) {
       mode: args.authority.authority.mode,
       cleanupInk: args.authority.authority.cleanupInk,
       colourPaint: args.authority.authority.colourPaint,
+      colourReview: args.authority.authority.colourReview,
       performanceActing: args.authority.authority.performanceActing,
       opticalCompositing: args.authority.authority.opticalCompositing,
+      compositeReview: args.authority.authority.compositeReview,
       candidateEnvelopeProvenanceRequired:
         args.authority.authority.requiresCandidateEnvelopeProvenance,
       persistencePromotionGateRequired:
@@ -61,6 +63,7 @@ function callTool(name, args) {
         args.authority.authority.requiresPersistedStateIntegrity,
       targetRepository: args.authority.handoff.targetRepository,
       coreMinimumVersion: args.authority.handoff.minimumPackageVersion,
+      contractsMinimumVersion: args.authority.handoff.minimumContractsPackageVersion,
       storeMinimumVersion: args.authority.handoff.minimumStorePackageVersion,
       requiredStoreBehavior: args.authority.handoff.requiredStoreBehavior,
       requiredStoreIntegrity: args.authority.handoff.requiredStoreIntegrity,
@@ -74,8 +77,8 @@ async function dispatch(message) {
     return {
       protocolVersion: message.params?.protocolVersion ?? "2025-06-18",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "evavo-human-cel-animation-authority-v1", version: "1.3.0" },
-      instructions: "Use this bridge when Art Studio animation must be handed to cel-animation-studio under strict human-authored cel production. A valid handoff requires Cel Core 0.38+ with strict cleanup/ink, colour/paint, acting/performance and optical/compositing grammar, Cel Store 0.27+ with canonical persisted-state integrity, candidate provenance containing the persisted strict-envelope digest, an immutable candidate-byte-bound zero-blocker quality receipt and the Store strict-human-cel-promotion-receipt-gate before approved state is authoritative. Auto-trace wobble, generic blue/night or LUT grading, blanket bloom, optical-flow smoothing and fake analogue degradation are not valid substitutes. This bridge grants no provider execution, creative approval, repository mutation or publication authority.",
+      serverInfo: { name: "evavo-human-cel-animation-authority-v1", version: "1.4.0" },
+      instructions: "Use this bridge when Art Studio animation must be handed to cel-animation-studio under strict human-authored cel production. A valid handoff requires Cel Core 0.39+ with strict cleanup/ink, colour/paint, acting/performance and optical/compositing grammar plus dedicated colour-script and optical-composite review; Cel Contracts 0.15+ with both observations mandatory in quality requests; Cel Store 0.27+ with canonical persisted-state integrity; candidate provenance containing the persisted strict-envelope digest; an immutable candidate-byte-bound zero-blocker quality receipt; and the Store strict-human-cel-promotion-receipt-gate before approved state is authoritative. Auto-trace wobble, generic blue/night or LUT grading, multiply-everything shadows, universal rim/gloss, blanket bloom, optical-flow smoothing, flat weather overlays and fake analogue degradation are not valid substitutes. This bridge grants no provider execution, creative approval, repository mutation or publication authority.",
     };
   }
   if (message.method === "notifications/initialized") return null;
