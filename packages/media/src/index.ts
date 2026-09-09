@@ -29,6 +29,7 @@ export * from "./image-artifact-signals.js";
 export * from "./image-review-profiles.js";
 export * from "./image-similarity.js";
 export * from "./image-review-orchestrator.js";
+export * from "./image-repair-routing.js";
 export * from "./enhancement-review-bridge.js";
 export * from "./enhancement-local-detail-risk.js";
 export * from "./enhancement-review-session.js";
