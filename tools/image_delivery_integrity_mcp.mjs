@@ -10,7 +10,7 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-image-delivery-integrity";
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_IMAGE_DELIVERY_ALLOWED_ROOTS";
 const MAX_BATCH = 128;
@@ -35,6 +35,7 @@ function specFromArgs(args) {
     ...(typeof args.allowEmbeddedMetadata === "boolean" ? { allowEmbeddedMetadata: args.allowEmbeddedMetadata } : {}),
     ...(typeof args.allowOrientationMetadata === "boolean" ? { allowOrientationMetadata: args.allowOrientationMetadata } : {}),
     ...(Number.isFinite(args.maximumMegapixels) ? { maximumMegapixels: args.maximumMegapixels } : {}),
+    ...(Number.isSafeInteger(args.maximumBytes) ? { maximumBytes: args.maximumBytes } : {}),
   };
 }
 
@@ -67,6 +68,8 @@ async function reviewBatch(args) {
       ...(typeof item.forbidAlpha === "boolean" ? { forbidAlpha: item.forbidAlpha } : {}),
       ...(Number.isFinite(item.outputWidthMm) ? { outputWidthMm: item.outputWidthMm } : {}),
       ...(Number.isFinite(item.outputHeightMm) ? { outputHeightMm: item.outputHeightMm } : {}),
+      ...(Number.isFinite(item.maximumMegapixels) ? { maximumMegapixels: item.maximumMegapixels } : {}),
+      ...(Number.isSafeInteger(item.maximumBytes) ? { maximumBytes: item.maximumBytes } : {}),
     });
     items.push(Object.freeze({ id: item.id, path: inputPath, evidence }));
   }
@@ -95,6 +98,7 @@ async function reviewBatch(args) {
       width: item.evidence.width,
       height: item.evidence.height,
       megapixels: item.evidence.megapixels,
+      encodedBytes: item.evidence.encodedBytes,
       format: item.evidence.format,
       colourSpace: item.evidence.colourSpace,
       hasAlpha: item.evidence.hasAlpha,
@@ -120,6 +124,7 @@ const commonProperties = Object.freeze({
   allowEmbeddedMetadata: { type: "boolean" },
   allowOrientationMetadata: { type: "boolean" },
   maximumMegapixels: { type: "number", exclusiveMinimum: 0 },
+  maximumBytes: { type: "integer", minimum: 1 },
 });
 const imageSchema = Object.freeze({
   type: "object",
@@ -131,6 +136,8 @@ const imageSchema = Object.freeze({
     forbidAlpha: { type: "boolean" },
     outputWidthMm: { type: "number", exclusiveMinimum: 0 },
     outputHeightMm: { type: "number", exclusiveMinimum: 0 },
+    maximumMegapixels: { type: "number", exclusiveMinimum: 0 },
+    maximumBytes: { type: "integer", minimum: 1 },
   },
   required: ["id", "path"],
   additionalProperties: false,
@@ -144,7 +151,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_image_delivery_integrity",
-    description: "Audit one finished image's format, alpha compatibility, colour-space/profile metadata, orientation, metadata privacy risk, megapixel budget and optional physical print DPI without changing the file.",
+    description: "Audit one finished image's format, alpha compatibility, colour-space/profile metadata, orientation, metadata privacy risk, megapixel/encoded-byte budget and optional physical print DPI without changing the file.",
     inputSchema: {
       type: "object",
       properties: { inputPath: { type: "string", minLength: 1 }, ...commonProperties },
@@ -154,7 +161,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_image_delivery_batch",
-    description: "Audit 1-128 finished images for one delivery target and rank packaging failures/warnings first. Per-image alpha/format/physical-size intent may override shared defaults.",
+    description: "Audit 1-128 finished images for one delivery target and rank packaging failures/warnings first. Per-image alpha/format/size/budget intent may override shared defaults.",
     inputSchema: {
       type: "object",
       properties: {
@@ -170,7 +177,7 @@ const tools = Object.freeze([
 async function callTool(name, args) {
   if (name === "evavo_image_delivery_integrity_capabilities") {
     return Object.freeze({
-      contract: "evavo_image_delivery_integrity_agent_v1",
+      contract: "evavo_image_delivery_integrity_agent_v1_1",
       mode: "read-only-delivery-preflight",
       tools: tools.map((tool) => tool.name),
       targets: TARGETS,
@@ -182,6 +189,7 @@ async function callTool(name, args) {
         "orientation-metadata-normalization-risk",
         "EXIF/XMP-runtime-or-public-metadata-risk",
         "megapixel-budget",
+        "encoded-byte-budget",
         "effective-print-dpi-when-physical-size-is-known",
         "game-data-map-linear-non-colour-guidance",
       ],
@@ -238,7 +246,7 @@ input.on("line", (line) => {
   chain = chain.then(async () => {
     let request;
     try { request = JSON.parse(line); } catch {
-      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })\n`);
+      process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })}\n`);
       return;
     }
     const response = await dispatch(request);
