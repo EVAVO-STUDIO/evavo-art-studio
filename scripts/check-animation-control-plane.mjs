@@ -180,16 +180,27 @@ function humanCelSmokeAuthority() {
   assert.equal(assertHumanCelAnimationAuthorityIntegrity(authority), true);
   assert.equal(authority.authority.mode, "human-cel-authored");
   assert.equal(authority.authority.preferredPromptCompiler, "createStrictHumanCelRenderPrompt");
+  assert.equal(authority.authority.requiredQualityGate, "evaluateHumanCelQualityGate");
+  assert.equal(authority.authority.requiredQualityReceipt, "createHumanCelQualityReceipt");
+  assert.equal(authority.authority.requiredApprovalPath, "reviewHumanCelArtefact");
   assert.equal(authority.authority.requiresExactProductionAuthority, true);
+  assert.equal(authority.authority.requiresCandidateEnvelopeProvenance, true);
   assert.equal(authority.handoff.targetRepository, "EVAVO-STUDIO/cel-animation-studio");
-  assert.equal(authority.handoff.minimumPackageVersion, "0.34.0");
-  assert.ok(authority.handoff.requiredExports.includes("createHumanCelProductionAuthority"));
-  assert.ok(authority.handoff.requiredExports.includes("assertHumanCelProductionAuthorityBinding"));
-  assert.ok(authority.handoff.requiredExports.includes("createStrictHumanCelRenderPrompt"));
-  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelQualityGate"));
-  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelFinishReview"));
-  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelCinematographyReview"));
-  assert.ok(authority.handoff.requiredExports.includes("evaluateHumanCelEnvironmentReview"));
+  assert.equal(authority.handoff.minimumPackageVersion, "0.35.0");
+  for (const required of [
+    "createHumanCelProductionAuthority",
+    "assertHumanCelProductionAuthorityBinding",
+    "createStrictHumanCelRenderPrompt",
+    "evaluateHumanCelQualityGate",
+    "evaluateHumanCelFinishReview",
+    "evaluateHumanCelCinematographyReview",
+    "evaluateHumanCelEnvironmentReview",
+    "createHumanCelQualityReceipt",
+    "assertHumanCelQualityReceiptBinding",
+    "reviewHumanCelArtefact",
+  ]) {
+    assert.ok(authority.handoff.requiredExports.includes(required), required);
+  }
   return authority;
 }
 
@@ -335,6 +346,9 @@ async function main() {
       contentDigest: humanCelAuthority.contentDigest,
       coreMinimumVersion: humanCelAuthority.handoff.minimumPackageVersion,
       strict: true,
+      candidateEnvelopeProvenanceRequired: true,
+      qualityReceiptRequired: true,
+      strictApprovalPathRequired: true,
     },
     verifiedCapabilities: [
       "art.animation.pipeline",
