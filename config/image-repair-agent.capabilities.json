@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "id": "evavo-image-repair-agent",
+  "purpose": "Review-first, create-only image repair for deterministic preservation cleanup and explicit masked candidate edits.",
+  "entrypoint": "tools/image_repair_mcp.mjs",
+  "protocol": "mcp-stdio-2025-03-26",
+  "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_IMAGE_REPAIR_ALLOWED_ROOTS": {
+      "requiredForImageReadsAndWrites": true,
+      "description": "Platform-delimited canonical roots the repair server may read and create outputs within."
+    },
+    "EVAVO_IMAGE_REPAIR_ALLOW_WRITES": {
+      "requiredForWrites": true,
+      "value": "true"
+    }
+  },
+  "tools": [
+    "evavo_image_repair_capabilities",
+    "evavo_plan_image_repair",
+    "evavo_apply_preservation_image_repair",
+    "evavo_apply_masked_candidate_image_repair"
+  ],
+  "repairDispositions": [
+    "no-repair",
+    "safe-local-repair",
+    "localized-repair",
+    "semantic-edit",
+    "reacquire-or-regenerate",
+    "human-review"
+  ],
+  "guarantees": {
+    "sourceMutationAllowed": false,
+    "createOnlyOutputs": true,
+    "explicitWriteConfirmation": true,
+    "postEditReviewBeforeWrite": true,
+    "outsideMaskPreservedForLocalizedEdits": true,
+    "automaticPromotion": false,
+    "claimsAiOriginDetection": false
+  }
+}
