@@ -27,7 +27,6 @@ export * from "./defect-region-components.js";
 export * from "./existing-image-finishing-plan.js";
 export * from "./image-artifact-signals.js";
 export * from "./image-generated-detail-risk.js";
-export * from "./image-provenance-evidence.js";
 export * from "./image-provenance-packet.js";
 export * from "./image-review-profiles.js";
 export * from "./image-similarity.js";
