@@ -1,10 +1,20 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "id": "evavo-texture-review-agent",
-  "purpose": "Map-aware technical review for texture and PBR data assets plus sampling-aware bounded 3x3 tile proofs.",
+  "purpose": "Map-aware technical review for texture/PBR data assets, coherent material-set validation, sampling-aware tile proofs and guarded Godot ORM packing.",
   "entrypoint": "tools/texture_review_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
+  "environment": {
+    "EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS": {
+      "requiredForImageReadsAndWrites": true,
+      "description": "Platform-delimited canonical roots the texture review server may read and create derived outputs within."
+    },
+    "EVAVO_TEXTURE_REVIEW_ALLOW_WRITES": {
+      "requiredForWrites": true,
+      "value": "true"
+    }
+  },
   "mapKinds": [
     "base-color",
     "normal-tangent",
@@ -22,18 +32,38 @@
     "continuous": "Lanczos3 is used only when the diagnostic tile must be reduced; this avoids artificial blockiness on continuous-tone textures.",
     "nearest": "Explicit opt-in for pixel art or exact texel/block inspection."
   },
+  "materialSet": {
+    "matchingDimensionsByDefault": true,
+    "powerOfTwoPolicyDefault": "warn",
+    "supportsExpectedMapRoles": true,
+    "duplicateRolesRejected": true
+  },
+  "godot": {
+    "normalConvention": "OpenGL X+ Y+ Z+",
+    "ormChannelContract": "R=ambient-occlusion,G=roughness,B=metallic",
+    "ormDefaults": {
+      "ambientOcclusion": 255,
+      "roughness": 255,
+      "metallic": 0
+    },
+    "materials": ["StandardMaterial3D", "ORMMaterial3D"]
+  },
   "tools": [
     "evavo_texture_review_capabilities",
     "evavo_review_texture_map",
-    "evavo_create_texture_tile_proof"
+    "evavo_review_texture_set",
+    "evavo_create_texture_tile_proof",
+    "evavo_pack_godot_orm_texture"
   ],
   "guarantees": {
     "sourceMutationAllowed": false,
-    "proofOutputsCreateOnly": true,
-    "proofWritesRequireExplicitConfirmation": true,
+    "derivedOutputsCreateOnly": true,
+    "derivedWritesRequireExplicitConfirmation": true,
     "continuousTextureProofsAvoidForcedNearestResampling": true,
+    "strictScalarValidationByDefault": true,
     "silentNormalChannelFlip": false,
     "silentPackedMapRepacking": false,
+    "explicitOrmPackingOnly": true,
     "claimsAiOriginDetection": false
   }
 }
