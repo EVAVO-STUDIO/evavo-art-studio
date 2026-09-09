@@ -5,7 +5,7 @@ import { listImageAgentGoals, routeImageAgentTask } from "../dist/index.js";
 
 test("all image agent goals resolve to deterministic routes", () => {
   const goals = listImageAgentGoals();
-  assert.equal(goals.length, 13);
+  assert.equal(goals.length, 14);
   for (const goal of goals) {
     const route = routeImageAgentTask(goal);
     assert.equal(route.goal, goal);
@@ -33,6 +33,18 @@ test("learned enhancement explicitly checks micro detail and macro redraw risk",
   const route = routeImageAgentTask("learned-enhancement-review");
   assert.match(route.stopConditions.join(" "), /macro redraw risk/);
   assert.match(route.evidenceExpected.join(" "), /macro structure risk/);
+});
+
+test("approved-reference consistency is separate from frame continuity and never claims identity or AI origin", () => {
+  const route = routeImageAgentTask("reference-consistency");
+  assert.equal(route.primarySurface, "evavo-image-reference-consistency");
+  assert.equal(route.writeClass, "read-only");
+  assert.ok(route.orderedTools.includes("evavo_review_image_against_references"));
+  assert.ok(route.orderedTools.includes("evavo_review_image_batch_against_references"));
+  assert.match(route.stopConditions.join(" "), /reference set is unstable/);
+  assert.match(route.evidenceExpected.join(" "), /palette\/tone\/detail\/silhouette\/framing/);
+  assert.match(route.notes.join(" "), /not character\/object identity recognition/);
+  assert.match(route.notes.join(" "), /does not detect or prove AI authorship/);
 });
 
 test("texture route spans review, preprocessing, materialization and native Godot validation", () => {
