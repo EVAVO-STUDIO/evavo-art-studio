@@ -4,6 +4,7 @@ import { detectExistingImageDefects } from "./existing-image-defect-detection.js
 import { segmentDefectMaskRegions } from "./defect-region-components.js";
 import { planExistingImageFinishing } from "./existing-image-finishing-plan.js";
 import { detectImageArtifactSignals } from "./image-artifact-signals.js";
+import { detectGeneratedDetailArtifactRisk } from "./image-generated-detail-risk.js";
 import { reviewWorkHeaderImage } from "./work-header-quality.js";
 import { compareImageSimilarity } from "./image-similarity.js";
 import {
@@ -28,6 +29,7 @@ export interface ImageReviewOrchestrationResult {
   }>;
   readonly finishingPlan: ReturnType<typeof planExistingImageFinishing>;
   readonly artifactSignals: Awaited<ReturnType<typeof detectImageArtifactSignals>>;
+  readonly generatedDetailRisk: Awaited<ReturnType<typeof detectGeneratedDetailArtifactRisk>>;
   readonly header?: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"];
   readonly similarity: readonly Readonly<{
     id: string;
@@ -96,7 +98,7 @@ export async function orchestrateImageReview(
   const inferred = await inferProfile(encoded, context);
   const profile = getImageReviewProfile(inferred.profile);
   const strictTransparentRgb = inferred.profile === "logo-transparent" || inferred.profile === "product-cutout";
-  const [quality, defects, artifactSignals] = await Promise.all([
+  const [quality, defects, artifactSignals, generatedDetailRisk] = await Promise.all([
     reviewExistingImageQuality(encoded, {
       minimumSharpness: profile.minimumSharpness,
       minimumLumaStdDev: profile.minimumLumaStdDev,
@@ -108,6 +110,7 @@ export async function orchestrateImageReview(
     }),
     detectExistingImageDefects(encoded, { profile: inferred.profile }),
     detectImageArtifactSignals(encoded, { profile: inferred.profile }),
+    detectGeneratedDetailArtifactRisk(encoded, { profile: inferred.profile }),
   ]);
   const defectRegions = await segmentDefectMaskRegions(defects.maskPng, {
     minimumPixelCount: 2,
@@ -117,7 +120,7 @@ export async function orchestrateImageReview(
   const finishingPlan = planExistingImageFinishing(defects.evidence, defectRegions, { profile: inferred.profile });
 
   const blockers: string[] = [];
-  const warnings: string[] = [...quality.issues, ...artifactSignals.warnings];
+  const warnings: string[] = [...quality.issues, ...artifactSignals.warnings, ...generatedDetailRisk.warnings];
 
   if (quality.grade === "fail") blockers.push("technical image-quality review failed");
   if (quality.transparentRgbContaminationRatio > profile.maximumTransparentRgbContaminationRatio) blockers.push("transparent RGB contamination exceeds profile limit");
@@ -134,6 +137,8 @@ export async function orchestrateImageReview(
   if (artifactSignals.nearestNeighbourUpscaleRisk && inferred.profile !== "pixel-art") blockers.push("probable-nearest-neighbour-upscale-of-non-pixel-art");
   if (artifactSignals.posterizationRisk) warnings.push("tonal-posterization-needs-visual-review");
   if (artifactSignals.ringingRiskRatio > 0.02 && inferred.profile !== "pixel-art") warnings.push("strong-ringing-or-oversharpen-signal");
+  if (generatedDetailRisk.repeatedDetailRisk) warnings.push("repeated-generated-or-cloned-detail-needs-visual-review");
+  if (generatedDetailRisk.detailImbalanceRisk) warnings.push("local-detail-density-imbalance-needs-visual-review");
 
   let header: Awaited<ReturnType<typeof reviewWorkHeaderImage>>["evidence"] | undefined;
   if (context.intendedRole === "work-header") {
@@ -166,7 +171,8 @@ export async function orchestrateImageReview(
   const finishSignal = finishingPlan.route === "preservation-polish"
     || finishingPlan.route === "localized-repair"
     || artifactSignals.warnings.length > 0
-    || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur|ring|posterization/u.test(warning));
+    || generatedDetailRisk.warnings.length > 0
+    || warnings.some((warning) => /halo|contamination|pinhole|block|soft|blur|ring|posterization|repeated|detail-density/u.test(warning));
   const decision: ImageReviewOrchestrationResult["decision"] = blockers.length
     ? "reject"
     : finishSignal
@@ -180,6 +186,7 @@ export async function orchestrateImageReview(
     defectReview: Object.freeze({ evidence: defects.evidence, regions: defectRegions }),
     finishingPlan,
     artifactSignals,
+    generatedDetailRisk,
     ...(header ? { header } : {}),
     similarity: Object.freeze(similarity),
     decision,
@@ -190,9 +197,11 @@ export async function orchestrateImageReview(
       ...profile.visualChecks,
       "Inspect the highest-ranked connected defect regions and confirm the preservation-first finishing route before authorising any repair.",
       "Check ringing/oversharpen, tonal posterization and suspicious resampling signals against the actual image before accepting them as defects.",
+      "Inspect repeated-detail and local-detail-density warnings for cloned motifs, doubled structures, nonsensical micro-detail or inconsistent rendering; intentional patterns and focal detail can produce the same numeric signals.",
       "Judge the image at intended runtime size, not only at 100% zoom.",
       "Reject imagery that is technically valid but looks cheap, generic, repetitive, semantically weak or badly art-directed.",
       "For page media, compare against adjacent imagery and avoid near-duplicate storytelling.",
+      "Do not infer AI authorship from artifact signals; use trusted provenance and source lineage when origin matters.",
       "Do not publish automatically from numeric scores or finishing-plan output; the reviewer must inspect the actual proof/crop.",
     ]),
   });
