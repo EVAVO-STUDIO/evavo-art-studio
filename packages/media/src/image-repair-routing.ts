@@ -18,6 +18,7 @@ export type ImageRepairVisualFinding =
   | "perspective-error"
   | "repeated-structure"
   | "nonsensical-detail"
+  | "painted-checkerboard-alpha"
   | "unknown-semantic-defect";
 
 export interface ImageRepairReviewLike {
@@ -44,6 +45,12 @@ export interface ImageRepairReviewLike {
 
 export interface ImageRepairDecisionSpec {
   readonly visualFindings?: readonly ImageRepairVisualFinding[];
+  /**
+   * Set only by a higher-level review surface that has explicit asset-role
+   * evidence. The repair router never infers alpha-recovery eligibility from
+   * pixels or filename appearance by itself.
+   */
+  readonly paintedCheckerboardAlphaRecoveryEligible?: boolean;
 }
 
 export interface ImageRepairDecision {
@@ -114,6 +121,55 @@ export function planImageRepairDecision(
 
   const visualFindings = Object.freeze([...(spec.visualFindings ?? [])]);
   const postRepairRequiredTools = review.finishingPlan.postRepairRequiredTools;
+  const hasPaintedCheckerboardAlpha = visualFindings.includes("painted-checkerboard-alpha");
+  if (hasPaintedCheckerboardAlpha) {
+    const otherFindings = visualFindings.filter((finding) => finding !== "painted-checkerboard-alpha");
+    if (otherFindings.length > 0) {
+      return decision(
+        "human-review",
+        null,
+        null,
+        [
+          "visual-finding:painted-checkerboard-alpha",
+          ...otherFindings.map((finding) => `visual-finding:${finding}`),
+          "painted-checkerboard-alpha-is-mixed-with-other-semantic-findings",
+          "alpha-recovery-must-not-hide-semantic-repair-requirements",
+        ],
+        { postRepairRequiredTools },
+      );
+    }
+    if (spec.paintedCheckerboardAlphaRecoveryEligible !== true) {
+      return decision(
+        "human-review",
+        null,
+        null,
+        [
+          "visual-finding:painted-checkerboard-alpha",
+          "painted-checkerboard-alpha-recovery-requires-explicit-title-logo-ui-or-sprite-role",
+          "transparency-must-not-be-inferred-from-image-appearance",
+        ],
+        { postRepairRequiredTools },
+      );
+    }
+    return decision(
+      "localized-repair",
+      "painted-checkerboard-alpha-recovery",
+      "evavo-title-alpha",
+      [
+        "visual-finding:painted-checkerboard-alpha",
+        "explicit-alpha-recovery-role-is-eligible",
+        "enhancement-repair-requires-explicit-matte-colours-and-create-only-output",
+        "checkerboard-preview-is-not-proof-of-real-alpha",
+      ],
+      {
+        // Recommendation only. Image Enhancement owns execution and must still
+        // receive explicit matte colours and create a new reviewed output.
+        agentExecutable: false,
+        postRepairRequiredTools,
+      },
+    );
+  }
+
   if (visualFindings.length > 0) {
     return decision(
       "semantic-edit",
