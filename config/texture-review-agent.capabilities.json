@@ -1,17 +1,17 @@
 {
-  "schemaVersion": "1.2",
+  "schemaVersion": "1.3",
   "id": "evavo-texture-review-agent",
-  "purpose": "Map-aware technical review for texture/PBR data assets, coherent material-set validation, sampling-aware tile proofs and guarded Godot ORM packing.",
+  "purpose": "Map-aware texture/PBR review, coherent material-set validation, UV/OBJ assurance, sampling-aware tile proofs and guarded Godot ORM packing.",
   "entrypoint": "tools/texture_review_mcp.mjs",
   "protocol": "mcp-stdio-2025-03-26",
   "buildPrerequisite": "pnpm --filter @evavo/art-media build",
   "environment": {
     "EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS": {
-      "requiredForImageReadsAndWrites": true,
-      "description": "Platform-delimited canonical roots the texture review server may read and create derived outputs within."
+      "requiredForLocalReadsAndWrites": true,
+      "description": "Platform-delimited canonical roots the texture review server may read textures/OBJ meshes from and create derived outputs within."
     },
     "EVAVO_TEXTURE_REVIEW_ALLOW_WRITES": {
-      "requiredForWrites": true,
+      "requiredForDerivedWrites": true,
       "value": "true"
     }
   },
@@ -38,6 +38,23 @@
     "supportsExpectedMapRoles": true,
     "duplicateRolesRejected": true
   },
+  "uvAssurance": {
+    "triangleContract": true,
+    "wavefrontObj": true,
+    "maximumTriangles": 5000,
+    "checks": [
+      "degenerate-uv-triangles",
+      "out-of-range-uv-coordinates",
+      "accidental-overlap",
+      "explicit-overlap-groups",
+      "mirrored-winding",
+      "uv-islands",
+      "atlas-boundary-padding",
+      "world-space-texel-density"
+    ],
+    "sourceMutationAllowed": false,
+    "missingObjUvsInvented": false
+  },
   "godot": {
     "normalConvention": "OpenGL X+ Y+ Z+",
     "ormChannelContract": "R=ambient-occlusion,G=roughness,B=metallic",
@@ -52,6 +69,8 @@
     "evavo_texture_review_capabilities",
     "evavo_review_texture_map",
     "evavo_review_texture_set",
+    "evavo_review_uv_layout",
+    "evavo_review_obj_uv_layout",
     "evavo_create_texture_tile_proof",
     "evavo_pack_godot_orm_texture"
   ],
@@ -64,6 +83,7 @@
     "silentNormalChannelFlip": false,
     "silentPackedMapRepacking": false,
     "explicitOrmPackingOnly": true,
+    "uvReviewReadOnly": true,
     "claimsAiOriginDetection": false
   }
 }
