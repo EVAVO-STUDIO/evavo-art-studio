@@ -36,13 +36,16 @@ export interface ImageAgentRoute {
 
 const ROUTES: Readonly<Record<ImageAgentGoal, Omit<ImageAgentRoute, "contract" | "goal">>> = Object.freeze({
   "quality-review": Object.freeze({
-    primarySurface: "evavo-image-finishing-artist",
-    orderedTools: Object.freeze(["evavo_review_image_for_finishing"]),
+    primarySurface: "evavo-image-finishing-packet",
+    orderedTools: Object.freeze(["evavo_review_image_finishing_packet", "evavo_review_image_for_finishing"]),
     writeClass: "read-only",
-    prerequisites: Object.freeze(["local image path beneath EVAVO_IMAGE_REVIEW_ALLOWED_ROOTS"]),
-    stopConditions: Object.freeze(["technical blockers", "manual-review finishing route", "semantic/identity uncertainty"]),
-    evidenceExpected: Object.freeze(["quality metrics", "defect regions", "artifact signals", "finishing plan", "visual checklist"]),
-    notes: Object.freeze(["Use this before changing an image when the defect is not already known."]),
+    prerequisites: Object.freeze(["local image path beneath configured review roots", "approved references and explicit visual findings when available"]),
+    stopConditions: Object.freeze(["technical blockers", "unsafe repair route", "strong approved-reference drift", "semantic/identity uncertainty"]),
+    evidenceExpected: Object.freeze(["combined disposition and priority", "quality metrics and defect regions", "artifact/generated-detail signals", "repair decision", "optional approved-reference consistency", "visual checklist"]),
+    notes: Object.freeze([
+      "Use the unified finishing packet as the default first review because it combines diagnosis with safe next-step routing without editing pixels.",
+      "Use evavo_review_image_for_finishing when a caller specifically needs the lower-level specialist review surface.",
+    ]),
   }),
   "frame-consistency": Object.freeze({
     primarySurface: "evavo-image-finishing-artist",
@@ -222,13 +225,16 @@ const ROUTES: Readonly<Record<ImageAgentGoal, Omit<ImageAgentRoute, "contract" |
     ]),
   }),
   "finalize-image": Object.freeze({
-    primarySurface: "Art Studio finishing + promotion gates",
-    orderedTools: Object.freeze(["evavo_review_image_for_finishing", "evavo_finish_raster_asset", "evavo_create_transparency_proof", "existing promotion/approval tools"]),
+    primarySurface: "evavo-image-finishing-packet + Art Studio finishing + promotion gates",
+    orderedTools: Object.freeze(["evavo_review_image_finishing_packet", "evavo_finish_raster_asset", "evavo_create_transparency_proof", "evavo_review_image_finishing_packet", "existing promotion/approval tools"]),
     writeClass: "write-gated-create-only",
-    prerequisites: Object.freeze(["approved source/candidate lineage", "declared delivery target", "all role-specific visual checks"]),
-    stopConditions: Object.freeze(["technical blocker", "semantic concern", "missing proof", "unapproved candidate"]),
-    evidenceExpected: Object.freeze(["final technical review", "delivery evidence", "proofs", "explicit approval/promotion record"]),
-    notes: Object.freeze(["Finishing output remains unapproved until the existing promotion boundary is explicitly satisfied."]),
+    prerequisites: Object.freeze(["approved source/candidate lineage", "declared delivery target", "approved references when consistency matters", "all role-specific visual checks"]),
+    stopConditions: Object.freeze(["finishing packet is not ready for visual review", "technical blocker", "semantic concern", "reference drift", "missing proof", "unapproved candidate"]),
+    evidenceExpected: Object.freeze(["pre/post finishing decision packet", "final technical and artifact review", "optional approved-reference consistency", "delivery evidence", "proofs", "explicit approval/promotion record"]),
+    notes: Object.freeze([
+      "Re-run the unified finishing packet after every pixel-changing operation so the final evidence reflects the actual delivered candidate.",
+      "Finishing output remains unapproved until the existing promotion boundary is explicitly satisfied.",
+    ]),
   }),
 });
 
