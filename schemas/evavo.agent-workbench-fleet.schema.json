@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evavo.com/schemas/evavo.agent-workbench-fleet.schema.json",
+  "title": "EVAVO Agent Workbench Fleet Snapshot v1",
+  "type": "object",
+  "required": ["contract", "generatedAt", "objective", "scope", "workspaceRoot", "counts", "repositories", "bestRoutes", "errors", "policy"],
+  "properties": {
+    "contract": {"const": "evavo_agent_workbench_fleet_snapshot_v1"},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "objective": {"type": "string"},
+    "scope": {"const": "local-workbench-enabled-siblings"},
+    "workspaceRoot": {"type": "string", "minLength": 1},
+    "counts": {"type": "object", "required": ["repositoryRootsObserved", "repositoriesCompiled", "compileErrors", "routeCandidates", "bestRoutes"], "properties": {"repositoryRootsObserved": {"type": "integer", "minimum": 0}, "repositoriesCompiled": {"type": "integer", "minimum": 0}, "compileErrors": {"type": "integer", "minimum": 0}, "routeCandidates": {"type": "integer", "minimum": 0}, "bestRoutes": {"type": "integer", "minimum": 0}}},
+    "repositories": {"type": "array"},
+    "bestRoutes": {"type": "array", "items": {"type": "object", "required": ["type", "id", "repository", "authority", "relevance", "source", "effects", "requires", "runtimeReadiness"], "properties": {"type": {"enum": ["capability", "tool", "estate-capability", "script"]}, "id": {"type": "string", "minLength": 1}, "repository": {"type": "string", "minLength": 1}, "authority": {"type": "string", "minLength": 1}, "relevance": {"type": "number"}, "source": {"type": "string", "minLength": 1}, "effects": {"type": "array"}, "requires": {"type": "array"}, "runtimeReadiness": {"type": ["string", "null"]}}}},
+    "errors": {"type": "array"},
+    "policy": {"type": "object", "required": ["readOnlyCompiler", "commandExecutionPerformed", "mutationPerformed", "localSiblingDiscoveryOnly", "providerEstateCompletenessClaimed", "absenceClaimsAllowed", "mcpRegistrationDoesNotImplyRuntimeReadiness", "rawMcpEnvironmentValuesRetained", "rawMcpArgumentValuesRetained"], "properties": {"readOnlyCompiler": {"const": true}, "commandExecutionPerformed": {"const": false}, "mutationPerformed": {"const": false}, "localSiblingDiscoveryOnly": {"const": true}, "providerEstateCompletenessClaimed": {"const": false}, "absenceClaimsAllowed": {"const": false}, "mcpRegistrationDoesNotImplyRuntimeReadiness": {"const": true}, "rawMcpEnvironmentValuesRetained": {"const": false}, "rawMcpArgumentValuesRetained": {"const": false}}}
+  }
+}
