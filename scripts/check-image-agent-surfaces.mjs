@@ -28,25 +28,15 @@ for (const relative of manifests) {
   }
   const entrypoint = path.join(root, manifest.entrypoint);
   await access(entrypoint);
-  const syntax = spawnSync(process.execPath, ["--check", entrypoint], {
-    cwd: root,
-    encoding: "utf8",
-  });
-  if (syntax.status !== 0) {
-    throw new Error(`${manifest.entrypoint} failed node --check:\n${syntax.stderr || syntax.stdout}`);
-  }
+  const syntax = spawnSync(process.execPath, ["--check", entrypoint], { cwd: root, encoding: "utf8" });
+  if (syntax.status !== 0) throw new Error(`${manifest.entrypoint} failed node --check:\n${syntax.stderr || syntax.stdout}`);
   const source = await readFile(entrypoint, "utf8");
   for (const tool of manifest.tools ?? []) {
     if (!source.includes(`name: "${tool}"`) && !source.includes(`name: '${tool}'`)) {
       throw new Error(`${relative} advertises ${tool}, but ${manifest.entrypoint} does not expose it.`);
     }
   }
-  parsed.push({
-    id: manifest.id,
-    schemaVersion: manifest.schemaVersion,
-    entrypoint: manifest.entrypoint,
-    tools: manifest.tools?.length ?? 0,
-  });
+  parsed.push({ id: manifest.id, schemaVersion: manifest.schemaVersion, entrypoint: manifest.entrypoint, tools: manifest.tools?.length ?? 0 });
 }
 
 const mediaIndex = await readFile(path.join(root, "packages/media/src/index.ts"), "utf8");
@@ -57,6 +47,7 @@ const mediaExports = [
   "texture-tile-proof",
   "texture-set-review",
   "texture-channel-pack",
+  "texture-preprocess",
   "uv-layout-review",
   "wavefront-obj-uv",
   "enhancement-structure-risk",
@@ -66,51 +57,30 @@ for (const requiredExport of mediaExports) {
     throw new Error(`packages/media/src/index.ts does not export ${requiredExport}.`);
   }
 }
+const texturePreprocess = await readFile(path.join(root, "packages/media/src/texture-preprocess.ts"), "utf8");
+for (const requiredPrimitive of ["convertTangentNormalYConvention", "composeOpacityIntoAlbedoAlpha", "G=255-G"]) {
+  if (!texturePreprocess.includes(requiredPrimitive)) throw new Error(`Texture preprocessing is missing ${requiredPrimitive}.`);
+}
 
 const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts"), "utf8");
 for (const requiredExport of ["material-delivery", "material-resource"]) {
-  if (!godotIndex.includes(`export * from "./${requiredExport}.js";`)) {
-    throw new Error(`packages/godot/src/index.ts does not export ${requiredExport}.`);
-  }
+  if (!godotIndex.includes(`export * from "./${requiredExport}.js";`)) throw new Error(`packages/godot/src/index.ts does not export ${requiredExport}.`);
 }
 const godotMaterialDelivery = await readFile(path.join(root, "packages/godot/src/material-delivery.ts"), "utf8");
-for (const requiredBinding of [
-  "albedo_texture",
-  "normal_texture",
-  "roughness_texture",
-  "metallic_texture",
-  "ao_texture",
-  "heightmap_texture",
-  "emission_texture",
-  "orm_texture",
-]) {
-  if (!godotMaterialDelivery.includes(requiredBinding)) {
-    throw new Error(`Godot material delivery planner is missing ${requiredBinding}.`);
-  }
+for (const requiredBinding of ["albedo_texture", "normal_texture", "roughness_texture", "metallic_texture", "ao_texture", "heightmap_texture", "emission_texture", "orm_texture"]) {
+  if (!godotMaterialDelivery.includes(requiredBinding)) throw new Error(`Godot material delivery planner is missing ${requiredBinding}.`);
 }
 const godotMaterialResource = await readFile(path.join(root, "packages/godot/src/material-resource.ts"), "utf8");
 if (!godotMaterialResource.includes("renderGodotMaterialTres") || !godotMaterialResource.includes("format=3")) {
   throw new Error("Godot material resource renderer is missing current format=3 TRES rendering.");
 }
-if (godotMaterialResource.includes("load_steps=")) {
-  throw new Error("Godot material resource renderer must not emit deprecated load_steps for 4.6 resources.");
-}
+if (godotMaterialResource.includes("load_steps=")) throw new Error("Godot material resource renderer must not emit deprecated load_steps for 4.6 resources.");
 
-const enhancementSession = await readFile(
-  path.join(root, "packages/media/src/enhancement-review-session.ts"),
-  "utf8",
-);
-if (!enhancementSession.includes("reviewEnhancementStructureRisk")) {
-  throw new Error("Enhancement review session does not enforce macro structure preservation.");
-}
+const enhancementSession = await readFile(path.join(root, "packages/media/src/enhancement-review-session.ts"), "utf8");
+if (!enhancementSession.includes("reviewEnhancementStructureRisk")) throw new Error("Enhancement review session does not enforce macro structure preservation.");
 
-const spriteEffectsIndex = await readFile(
-  path.join(root, "packages/godot-sprite-effects/src/index.ts"),
-  "utf8",
-);
-if (!spriteEffectsIndex.includes('export * from "./agent-planner.js";')) {
-  throw new Error("godot-sprite-effects index does not export the agent planner.");
-}
+const spriteEffectsIndex = await readFile(path.join(root, "packages/godot-sprite-effects/src/index.ts"), "utf8");
+if (!spriteEffectsIndex.includes('export * from "./agent-planner.js";')) throw new Error("godot-sprite-effects index does not export the agent planner.");
 
 for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
@@ -119,6 +89,7 @@ for (const requiredTest of [
   "packages/media/test/texture-tile-proof.test.mjs",
   "packages/media/test/texture-set-review.test.mjs",
   "packages/media/test/texture-channel-pack.test.mjs",
+  "packages/media/test/texture-preprocess.test.mjs",
   "packages/media/test/uv-layout-review.test.mjs",
   "packages/media/test/wavefront-obj-uv.test.mjs",
   "packages/media/test/enhancement-structure-risk.test.mjs",
@@ -127,10 +98,9 @@ for (const requiredTest of [
   "packages/godot/test/material-delivery-mcp.test.mjs",
   "packages/godot-sprite-effects/test/agent-planner.test.mjs",
   "tools/texture_review_mcp.test.mjs",
+  "tools/texture_preprocess_mcp.test.mjs",
   "tools/godot_material_delivery_mcp.test.mjs",
-]) {
-  await access(path.join(root, requiredTest));
-}
+]) await access(path.join(root, requiredTest));
 
 process.stdout.write(`${JSON.stringify({
   contract: "evavo.image-agent-surfaces.check.v1",
@@ -139,7 +109,7 @@ process.stdout.write(`${JSON.stringify({
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
   textureProofSampling: ["continuous", "nearest"],
-  textureMaterialReview: ["single-map", "material-set", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
+  textureMaterialReview: ["single-map", "material-set", "normal-y-conversion", "opacity-alpha-composition", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
   godotMaterialDelivery: ["StandardMaterial3D", "ORMMaterial3D", "guarded-preprocessing", "format-3-tres", "create-only-resource-write"],
   unifiedRouting: true,
   spriteEffectExports: ["agent-planner"],
