@@ -5,6 +5,8 @@ import path from "node:path";
 import readline from "node:readline";
 
 import {
+  composeOpacityIntoAlbedoAlpha,
+  convertTangentNormalYConvention,
   createTextureTileProofWithSampling,
   packGodotOrmTexture,
   reviewTextureMap,
@@ -18,7 +20,7 @@ import {
 } from "./lib/local_path_policy.mjs";
 
 const SERVER_NAME = "evavo-texture-review";
-const SERVER_VERSION = "1.4.0";
+const SERVER_VERSION = "1.5.0";
 const PROTOCOL_VERSION = "2025-03-26";
 const ALLOWED_ROOTS_ENV = "EVAVO_TEXTURE_REVIEW_ALLOWED_ROOTS";
 const WRITE_ENV = "EVAVO_TEXTURE_REVIEW_ALLOW_WRITES";
@@ -39,6 +41,7 @@ const MAP_KINDS = Object.freeze([
 ]);
 const PROOF_SAMPLING = Object.freeze(["continuous", "nearest"]);
 const SCALAR_CHANNELS = Object.freeze(["r", "g", "b", "a"]);
+const NORMAL_CONVENTIONS = Object.freeze(["opengl", "directx"]);
 const UV_POLICIES = Object.freeze(["ignore", "warn", "reject"]);
 const UV_ORIENTATIONS = Object.freeze(["majority", "positive", "negative"]);
 
@@ -193,14 +196,24 @@ async function createOnly(filePath, contents) {
   await writeFile(filePath, contents, { flag: "wx" });
 }
 
+async function resolveOutputPair(args) {
+  if (typeof args.outputPath !== "string") throw new Error("outputPath is required.");
+  const outputPath = await assertAllowed(args.outputPath, { output: true });
+  const receiptPath = await assertAllowed(
+    typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`,
+    { output: true },
+  );
+  return { outputPath, receiptPath };
+}
+
 async function createTileProof(args) {
   requireWriteAdmission(args);
-  if (typeof args.inputPath !== "string" || typeof args.outputPath !== "string") throw new Error("inputPath and outputPath are required.");
+  if (typeof args.inputPath !== "string") throw new Error("inputPath is required.");
   if (!MAP_KINDS.includes(args.kind)) throw new Error("A supported texture map kind is required.");
   const inputPath = await assertAllowed(args.inputPath);
-  const outputPath = await assertAllowed(args.outputPath, { output: true });
-  const receiptPath = await assertAllowed(typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`, { output: true });
-  assertDistinctPaths([inputPath], [outputPath, receiptPath]);
+  const outputSet = await resolveOutputPair(args);
+  assertDistinctPaths([inputPath], Object.values(outputSet));
+  await assertCreateOnlyTargets(Object.values(outputSet));
 
   const source = await readFile(inputPath);
   const review = await reviewTextureMap(source, reviewSpec(args));
@@ -209,21 +222,19 @@ async function createTileProof(args) {
     Number.isInteger(args.maximumTileDimension) ? args.maximumTileDimension : 512,
     typeof args.sampling === "string" ? args.sampling : "continuous",
   );
-  await assertCreateOnlyTargets([outputPath, receiptPath]);
   const receipt = Object.freeze({
-    schemaVersion: "1.4",
+    schemaVersion: "1.5",
     operation: "evavo-texture-tile-proof",
     approvalState: "diagnostic-only",
     inputPath,
-    outputPath,
-    receiptPath,
+    ...outputSet,
     review,
     proof: proof.evidence,
     sourceModified: false,
   });
-  await createOnly(outputPath, proof.png);
-  await createOnly(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-  return Object.freeze({ ok: true, outputPath, receiptPath, evidence: review, proof: proof.evidence, approvalState: "diagnostic-only", bytesReturned: false, sourceModified: false });
+  await createOnly(outputSet.outputPath, proof.png);
+  await createOnly(outputSet.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  return Object.freeze({ ok: true, ...outputSet, evidence: review, proof: proof.evidence, approvalState: "diagnostic-only", bytesReturned: false, sourceModified: false });
 }
 
 async function readScalarSource(value, label) {
@@ -243,12 +254,10 @@ async function packGodotOrm(args) {
   const roughness = await readScalarSource(args.roughness, "roughness");
   const metallic = await readScalarSource(args.metallic, "metallic");
   if (!ambientOcclusion && !roughness && !metallic) throw new Error("At least one ambientOcclusion, roughness or metallic source is required.");
-  if (typeof args.outputPath !== "string") throw new Error("outputPath is required.");
-  const outputPath = await assertAllowed(args.outputPath, { output: true });
-  const receiptPath = await assertAllowed(typeof args.receiptPath === "string" ? args.receiptPath : `${outputPath}.receipt.json`, { output: true });
+  const outputSet = await resolveOutputPair(args);
   const sourcePaths = [ambientOcclusion?.inputPath, roughness?.inputPath, metallic?.inputPath].filter(Boolean);
-  assertDistinctPaths(sourcePaths, [outputPath, receiptPath]);
-  await assertCreateOnlyTargets([outputPath, receiptPath]);
+  assertDistinctPaths(sourcePaths, Object.values(outputSet));
+  await assertCreateOnlyTargets(Object.values(outputSet));
 
   const packed = await packGodotOrmTexture({
     ...(ambientOcclusion ? { ambientOcclusion: ambientOcclusion.source } : {}),
@@ -262,19 +271,85 @@ async function packGodotOrm(args) {
   const postReview = await reviewTextureMap(packed.png, { kind: "orm-packed", ...(args.expectSeamless === true ? { expectSeamless: true } : {}) });
   if (postReview.grade === "fail") throw new Error(`Packed ORM failed post-pack review: ${postReview.blockers.join(", ") || "texture-review-failed"}`);
   const receipt = Object.freeze({
-    schemaVersion: "1.4",
+    schemaVersion: "1.5",
     operation: "evavo-pack-godot-orm-texture",
     approvalState: "unapproved",
     sourcePaths,
-    outputPath,
-    receiptPath,
+    ...outputSet,
     packing: packed.evidence,
     postReview,
     sourceModified: false,
   });
-  await createOnly(outputPath, packed.png);
-  await createOnly(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-  return Object.freeze({ ok: true, outputPath, receiptPath, packing: packed.evidence, postReview, approvalState: "unapproved", bytesReturned: false, sourcesModified: false });
+  await createOnly(outputSet.outputPath, packed.png);
+  await createOnly(outputSet.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  return Object.freeze({ ok: true, ...outputSet, packing: packed.evidence, postReview, approvalState: "unapproved", bytesReturned: false, sourcesModified: false });
+}
+
+async function convertNormalConvention(args) {
+  requireWriteAdmission(args);
+  if (typeof args.inputPath !== "string") throw new Error("inputPath is required.");
+  if (!NORMAL_CONVENTIONS.includes(args.sourceConvention) || !NORMAL_CONVENTIONS.includes(args.targetConvention)) {
+    throw new Error("sourceConvention and targetConvention must be opengl or directx.");
+  }
+  const inputPath = await assertAllowed(args.inputPath);
+  const outputSet = await resolveOutputPair(args);
+  assertDistinctPaths([inputPath], Object.values(outputSet));
+  await assertCreateOnlyTargets(Object.values(outputSet));
+  const converted = await convertTangentNormalYConvention(await readFile(inputPath), {
+    sourceConvention: args.sourceConvention,
+    targetConvention: args.targetConvention,
+  });
+  const receipt = Object.freeze({
+    schemaVersion: "1.5",
+    operation: "evavo-convert-tangent-normal-y-convention",
+    approvalState: "unapproved",
+    inputPath,
+    ...outputSet,
+    conversion: converted.evidence,
+    sourceModified: false,
+  });
+  await createOnly(outputSet.outputPath, converted.png);
+  await createOnly(outputSet.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  return Object.freeze({ ok: true, ...outputSet, conversion: converted.evidence, approvalState: "unapproved", bytesReturned: false, sourceModified: false });
+}
+
+async function composeOpacityAlpha(args) {
+  requireWriteAdmission(args);
+  if (typeof args.albedoPath !== "string" || typeof args.opacityPath !== "string") {
+    throw new Error("albedoPath and opacityPath are required.");
+  }
+  if (args.sourceChannel !== undefined && !SCALAR_CHANNELS.includes(args.sourceChannel)) {
+    throw new Error("sourceChannel must be r, g, b or a.");
+  }
+  const albedoPath = await assertAllowed(args.albedoPath);
+  const opacityPath = await assertAllowed(args.opacityPath);
+  const outputSet = await resolveOutputPair(args);
+  assertDistinctPaths([albedoPath, opacityPath], Object.values(outputSet));
+  await assertCreateOnlyTargets(Object.values(outputSet));
+  const composed = await composeOpacityIntoAlbedoAlpha(
+    await readFile(albedoPath),
+    await readFile(opacityPath),
+    {
+      ...(typeof args.sourceChannel === "string" ? { sourceChannel: args.sourceChannel } : {}),
+      ...(typeof args.invertOpacity === "boolean" ? { invertOpacity: args.invertOpacity } : {}),
+      strictOpacityValidation: args.strictOpacityValidation !== false,
+    },
+  );
+  const postReview = await reviewTextureMap(composed.png, { kind: "base-color" });
+  const receipt = Object.freeze({
+    schemaVersion: "1.5",
+    operation: "evavo-compose-opacity-into-albedo-alpha",
+    approvalState: "unapproved",
+    albedoPath,
+    opacityPath,
+    ...outputSet,
+    composition: composed.evidence,
+    postReview,
+    sourceModified: false,
+  });
+  await createOnly(outputSet.outputPath, composed.png);
+  await createOnly(outputSet.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  return Object.freeze({ ok: true, ...outputSet, composition: composed.evidence, postReview, approvalState: "unapproved", bytesReturned: false, sourcesModified: false });
 }
 
 const reviewProperties = Object.freeze({
@@ -317,11 +392,16 @@ const scalarSourceSchema = Object.freeze({
   required: ["path"],
   additionalProperties: false,
 });
+const outputProperties = Object.freeze({
+  outputPath: { type: "string", minLength: 1 },
+  receiptPath: { type: "string", minLength: 1 },
+  confirmLocalWrite: { type: "boolean", const: true },
+});
 
 const tools = Object.freeze([
   Object.freeze({
     name: "evavo_texture_review_capabilities",
-    description: "Describe map-aware texture review, coherent material-set validation, topology-aware UV/OBJ assurance, diagnostic tile proofs and explicit Godot ORM packing.",
+    description: "Describe map/material review, topology-aware UV/OBJ assurance, explicit texture preprocessing, tile proofs and Godot ORM packing.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   }),
   Object.freeze({
@@ -336,9 +416,7 @@ const tools = Object.freeze([
       type: "object",
       properties: {
         maps: {
-          type: "array",
-          minItems: 1,
-          maxItems: MAX_SET_SIZE,
+          type: "array", minItems: 1, maxItems: MAX_SET_SIZE,
           items: {
             type: "object",
             properties: {
@@ -363,14 +441,12 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_uv_layout",
-    description: "Read-only UV assurance from triangle UV/world-position data. Supports mesh vertex keys for topology-aware island detection and checks degenerates, overlap, mirrored winding, range, density, atlas boundary padding and inter-island padding.",
+    description: "Read-only UV assurance from triangle UV/world-position data, with optional mesh vertex keys for topology-aware island detection.",
     inputSchema: {
       type: "object",
       properties: {
         triangles: {
-          type: "array",
-          minItems: 1,
-          maxItems: MAX_UV_TRIANGLES,
+          type: "array", minItems: 1, maxItems: MAX_UV_TRIANGLES,
           items: {
             type: "object",
             properties: {
@@ -392,7 +468,7 @@ const tools = Object.freeze([
   }),
   Object.freeze({
     name: "evavo_review_obj_uv_layout",
-    description: "Read a local Wavefront OBJ, triangulate polygon faces, preserve authored UVs and mesh vertex topology, and review the resulting layout without modifying the mesh. Faces with missing UVs are counted, not fabricated.",
+    description: "Read a local Wavefront OBJ and review topology-aware UV layout without modifying the mesh. Missing UV faces are counted, never fabricated.",
     inputSchema: {
       type: "object",
       properties: { inputPath: { type: "string", minLength: 1 }, flipVForReview: { type: "boolean" }, ...uvProperties },
@@ -401,18 +477,43 @@ const tools = Object.freeze([
     },
   }),
   Object.freeze({
+    name: "evavo_convert_tangent_normal_y_convention",
+    description: "Explicitly convert tangent normal convention by writing a new PNG with G=255-G only. R/B/A are preserved byte-for-byte. Write-gated and create-only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        inputPath: { type: "string", minLength: 1 },
+        sourceConvention: { type: "string", enum: NORMAL_CONVENTIONS },
+        targetConvention: { type: "string", enum: NORMAL_CONVENTIONS },
+        ...outputProperties,
+      },
+      required: ["inputPath", "sourceConvention", "targetConvention", "outputPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
+  Object.freeze({
+    name: "evavo_compose_opacity_into_albedo_alpha",
+    description: "Write a new PNG whose RGB comes exactly from albedo and alpha comes from a declared opacity channel. No resize/filtering. Write-gated and create-only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        albedoPath: { type: "string", minLength: 1 },
+        opacityPath: { type: "string", minLength: 1 },
+        sourceChannel: { type: "string", enum: SCALAR_CHANNELS },
+        invertOpacity: { type: "boolean" },
+        strictOpacityValidation: { type: "boolean" },
+        ...outputProperties,
+      },
+      required: ["albedoPath", "opacityPath", "outputPath", "confirmLocalWrite"],
+      additionalProperties: false,
+    },
+  }),
+  Object.freeze({
     name: "evavo_create_texture_tile_proof",
     description: "Create a diagnostic 3x3 tile proof plus receipt using create-only paths. Continuous textures default to Lanczos3 proof resizing; nearest is explicit for texel inspection.",
     inputSchema: {
       type: "object",
-      properties: {
-        ...reviewProperties,
-        outputPath: { type: "string", minLength: 1 },
-        receiptPath: { type: "string", minLength: 1 },
-        maximumTileDimension: { type: "integer", minimum: 64, maximum: 2048 },
-        sampling: { type: "string", enum: PROOF_SAMPLING },
-        confirmLocalWrite: { type: "boolean", const: true },
-      },
+      properties: { ...reviewProperties, ...outputProperties, maximumTileDimension: { type: "integer", minimum: 64, maximum: 2048 }, sampling: { type: "string", enum: PROOF_SAMPLING } },
       required: ["inputPath", "kind", "outputPath", "confirmLocalWrite"],
       additionalProperties: false,
     },
@@ -431,9 +532,7 @@ const tools = Object.freeze([
         defaultMetallic: { type: "integer", minimum: 0, maximum: 255 },
         strictScalarValidation: { type: "boolean" },
         expectSeamless: { type: "boolean" },
-        outputPath: { type: "string", minLength: 1 },
-        receiptPath: { type: "string", minLength: 1 },
-        confirmLocalWrite: { type: "boolean", const: true },
+        ...outputProperties,
       },
       required: ["outputPath", "confirmLocalWrite"],
       anyOf: [{ required: ["ambientOcclusion"] }, { required: ["roughness"] }, { required: ["metallic"] }],
@@ -445,35 +544,30 @@ const tools = Object.freeze([
 async function callTool(name, args) {
   if (name === "evavo_texture_review_capabilities") {
     return Object.freeze({
-      contract: "evavo_texture_review_agent_v1_4",
+      contract: "evavo_texture_review_agent_v1_5",
       mapKinds: MAP_KINDS,
       tools: tools.map((tool) => tool.name),
-      proofSampling: {
-        default: "continuous",
-        continuous: "Lanczos3 only when a proof tile must be downsized.",
-        nearest: "Opt-in for pixel art or exact texel/block inspection.",
-      },
+      proofSampling: { default: "continuous", continuous: "Lanczos3 only when a proof tile must be downsized.", nearest: "Opt-in for pixel art or exact texel/block inspection." },
       checks: [
         "opposite-edge-seam-error",
         "scalar-rgb-contamination",
         "tangent-normal-vector-plausibility",
         "material-set-dimension-and-role-consistency",
-        "power-of-two-policy",
-        "godot-colour-vs-linear-data-intent",
         "topology-aware-uv-island-connectivity",
-        "uv-degenerate-overlap-mirror-range-and-padding",
-        "inter-island-padding-in-output-texels",
+        "uv-overlap-orientation-range-and-padding",
         "world-space-texel-density-consistency",
         "wavefront-obj-uv-and-topology-extraction",
+        "exact-normal-y-convention-conversion",
+        "exact-opacity-to-albedo-alpha-composition",
         "sampling-aware-bounded-3x3-tile-proof",
+        "lossless-godot-orm-packing",
       ],
-      godot: {
-        normalConvention: "OpenGL X+ Y+ Z+",
-        ormChannels: "R=ambient-occlusion,G=roughness,B=metallic",
-        materials: ["StandardMaterial3D", "ORMMaterial3D"],
+      godot: { normalConvention: "OpenGL X+ Y+ Z+", ormChannels: "R=ambient-occlusion,G=roughness,B=metallic", materials: ["StandardMaterial3D", "ORMMaterial3D"] },
+      preprocessing: {
+        normalY: "Explicit DirectX/OpenGL conversion changes only G via 255-G.",
+        opacity: "Explicit composition preserves albedo RGB and replaces alpha from the selected opacity channel.",
+        specular: "No automatic conversion; re-author or use a reviewed custom shader.",
       },
-      engineNote: "Normal channel conversion and ORM packing are explicit. UV review is topology-aware when vertex identities are available and remains separate from semantic mesh/material visual review.",
-      aiOriginDetection: "not claimed",
       writesEnabled: process.env[WRITE_ENV] === "true",
       allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),
       bytesReturned: false,
@@ -485,6 +579,8 @@ async function callTool(name, args) {
   if (name === "evavo_review_texture_set") return reviewMaterialSet(args ?? {});
   if (name === "evavo_review_uv_layout") return reviewUvTriangles(args ?? {});
   if (name === "evavo_review_obj_uv_layout") return reviewObjUv(args ?? {});
+  if (name === "evavo_convert_tangent_normal_y_convention") return convertNormalConvention(args ?? {});
+  if (name === "evavo_compose_opacity_into_albedo_alpha") return composeOpacityAlpha(args ?? {});
   if (name === "evavo_create_texture_tile_proof") return createTileProof(args ?? {});
   if (name === "evavo_pack_godot_orm_texture") return packGodotOrm(args ?? {});
   throw new Error(`Unknown tool ${JSON.stringify(name)}.`);
@@ -504,7 +600,7 @@ async function dispatch(request) {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
-        instructions: `Texture/material/UV review is local-first. Configure ${ALLOWED_ROOTS_ENV}; derived writes additionally require ${WRITE_ENV}=true and confirmLocalWrite=true. Sources and meshes are never modified.`,
+        instructions: `Texture/material/UV review is local-first. Derived preprocessing/proofs/packing require ${WRITE_ENV}=true, ${ALLOWED_ROOTS_ENV}, and confirmLocalWrite=true. Sources and meshes are never modified.`,
       },
     };
   }
@@ -514,11 +610,7 @@ async function dispatch(request) {
     try {
       return { jsonrpc: "2.0", id: request.id, result: result(await callTool(request.params?.name, request.params?.arguments)) };
     } catch (error) {
-      return {
-        jsonrpc: "2.0",
-        id: request.id,
-        result: result({ code: "TEXTURE_REVIEW_FAILED", message: error instanceof Error ? error.message : String(error) }, true),
-      };
+      return { jsonrpc: "2.0", id: request.id, result: result({ code: "TEXTURE_REVIEW_FAILED", message: error instanceof Error ? error.message : String(error) }, true) };
     }
   }
   if (request.method?.startsWith("notifications/")) return null;
@@ -531,9 +623,7 @@ input.on("line", (line) => {
   if (!line.trim()) return;
   chain = chain.then(async () => {
     let request;
-    try {
-      request = JSON.parse(line);
-    } catch {
+    try { request = JSON.parse(line); } catch {
       process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })}\n`);
       return;
     }
