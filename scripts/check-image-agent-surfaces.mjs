@@ -46,6 +46,7 @@ const mediaExports = [
   "image-repair-routing",
   "image-agent-routing",
   "image-reference-consistency",
+  "image-reference-consistency-proof",
   "texture-map-review",
   "texture-tile-proof",
   "texture-set-review",
@@ -67,6 +68,10 @@ for (const requiredPrimitive of ["convertTangentNormalYConvention", "composeOpac
 const referenceConsistency = await readFile(path.join(root, "packages/media/src/image-reference-consistency.ts"), "utf8");
 for (const requiredSignal of ["palette-distribution-drift", "silhouette-or-occupancy-drift", "reference-set-unstable", "aiOriginDetection"]) {
   if (!referenceConsistency.includes(requiredSignal)) throw new Error(`Reference consistency is missing ${requiredSignal}.`);
+}
+const referenceProof = await readFile(path.join(root, "packages/media/src/image-reference-consistency-proof.ts"), "utf8");
+for (const requiredProofFeature of ["createImageReferenceConsistencyProof", "strongest deterministic visual drift first", "diagnosticOnly"]) {
+  if (!referenceProof.includes(requiredProofFeature)) throw new Error(`Reference consistency proof is missing ${requiredProofFeature}.`);
 }
 
 const godotIndex = await readFile(path.join(root, "packages/godot/src/index.ts"), "utf8");
@@ -99,6 +104,7 @@ for (const requiredTest of [
   "packages/media/test/image-repair-routing.test.mjs",
   "packages/media/test/image-agent-routing.test.mjs",
   "packages/media/test/image-reference-consistency.test.mjs",
+  "packages/media/test/image-reference-consistency-proof.test.mjs",
   "packages/media/test/texture-map-review.test.mjs",
   "packages/media/test/texture-tile-proof.test.mjs",
   "packages/media/test/texture-set-review.test.mjs",
@@ -126,7 +132,7 @@ process.stdout.write(`${JSON.stringify({
   surfaces: parsed,
   mediaExports,
   enhancementIntegrity: ["local-detail-risk", "macro-structure-risk"],
-  referenceConsistency: ["approved-reference-baseline", "reference-set-coherence", "palette-tone-detail-silhouette-framing", "batch-outlier-ranking", "no-ai-origin-claim"],
+  referenceConsistency: ["approved-reference-baseline", "reference-set-coherence", "palette-tone-detail-silhouette-framing", "batch-outlier-ranking", "guarded-visual-proof", "no-ai-origin-claim"],
   textureProofSampling: ["continuous", "nearest"],
   textureMaterialReview: ["single-map", "material-set", "normal-y-conversion", "opacity-alpha-composition", "godot-orm-pack", "uv-layout", "wavefront-obj-uv"],
   godotMaterialDelivery: ["StandardMaterial3D", "ORMMaterial3D", "guarded-preprocessing", "format-3-tres", "create-only-resource-write"],
