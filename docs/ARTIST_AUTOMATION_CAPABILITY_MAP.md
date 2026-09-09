@@ -4,6 +4,14 @@ This map keeps the EVAVO art repositories complementary. Art Studio owns governe
 
 The goal is broad automation with evidence, not a claim that one unattended filter can make every creative decision a senior Photoshop, Illustrator, After Effects, Blender or engine artist would make.
 
+## Preferred agent discovery
+
+For ChatGPT, Claude, Codex and compatible agents, **Image Workflow Router v2 is the preferred image-task discovery surface**. Agents should route high-level intent through `evavo_image_workflow_router_v2_capabilities` / `evavo_route_image_workflow_v2` before memorising individual specialist MCP tools.
+
+Router v2 sits above the specialist surfaces and preserves the existing deterministic processor contract (`config/executable-image-pipeline.v1.json`), generation/model-quality routing (`config/local-image-quality-routes-v1.json`) and the original image agent router. It adds first-class ordered-sequence review, delivery preflight, finalization admission and explicit separation between read-only review, create-only writes, masked writes, provider/human semantic candidates and native execution.
+
+See [`IMAGE_WORKFLOW_ROUTER_V2.md`](./IMAGE_WORKFLOW_ROUTER_V2.md) for the canonical 15-goal routing model, privilege classes and approval boundary. `ready-for-approval-review` is never equivalent to approval or permission to publish.
+
 ## Current routing
 
 | Need | Owning route | What is automated | What still blocks release |
@@ -51,7 +59,9 @@ Chat agents should exchange paths, hashes, roles and receipts, not embed the vis
 7. Repeat technical checks and full-resolution/actual-scale creative review.
 8. Master individual frames or textures.
 9. Build sheets, atlases, tile atlases, motion previews or 3D delivery derivatives only from retained masters.
-10. Hand the exact package to the separately governed target-repository/runtime boundary.
+10. Run destination-specific delivery-integrity preflight on the actual final derivative.
+11. Run finalization admission; `ready-for-approval-review` still requires the existing human/project/runtime approval gate.
+12. Hand the exact approved package to the separately governed target-repository/runtime boundary.
 
 Fully automatic mechanical stages may run unattended when their input contract is exact. Ambiguous segmentation, identity drift, topology deformation, UV seam placement, animation timing and final lighting remain explicit review points; the system records blockers instead of inventing confidence.
 
