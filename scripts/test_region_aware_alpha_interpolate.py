@@ -83,7 +83,7 @@ class RegionAwareAlphaInterpolationTests(unittest.TestCase):
         before = make_articulated_subject()
         after = make_articulated_subject(head_dx=4, torso_dx=2)
         output, _ = region_tool.interpolate_images(before, after, 0.5)
-        for red, green, blue, alpha in output.get_flattened_data():
+        for red, green, blue, alpha in output.getdata():
             if alpha == 0:
                 self.assertEqual((red, green, blue), (0, 0, 0))
 
