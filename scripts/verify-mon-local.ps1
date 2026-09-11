@@ -10,6 +10,8 @@ node --check scripts/compile-mon-ten-image-batch.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 node --check scripts/compile-mon-batch-prompt-packets.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+node --check scripts/compile-mon-ten-image-review-bundle.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (-not (Test-Path ".\examples\mon-ten-image-batch-production.v1.json")) {
     Write-Error "Missing MÔN ten-image batch production profile."
