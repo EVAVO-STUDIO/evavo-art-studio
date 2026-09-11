@@ -14,6 +14,8 @@ node --check scripts/compile-mon-ten-image-review-bundle.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 node --check scripts/prepare-mon-batch-workspace.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+node --check scripts/compile-mon-terrain-source-family.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 python -m py_compile .\scripts\intake-mon-chat-image.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -28,6 +30,10 @@ if (-not (Test-Path ".\examples\mon-ten-image-batch-production.v1.json")) {
 }
 if (-not (Test-Path ".\examples\mon-chat-image-intake.v1.json")) {
     Write-Error "Missing MÔN chat image intake profile."
+    exit 2
+}
+if (-not (Test-Path ".\config\mon-terrain-source-family-v1.json")) {
+    Write-Error "Missing MÔN terrain source family profile."
     exit 2
 }
 
