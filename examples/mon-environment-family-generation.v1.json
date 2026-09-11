@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "mon_environment_family_generation_v1",
+  "project": "moonstone-wales",
+  "principle": "family-master first, high variation second, no generic scatter filler",
+  "family_types": ["surface", "macro_chunk", "elevation", "tree", "bush", "undergrowth", "structure", "prop", "decal", "water_edge", "shoreline", "settlement_clutter", "ruin_clutter"],
+  "minimum_variants": {
+    "surface": 8,
+    "tree": 6,
+    "bush": 6,
+    "undergrowth": 10,
+    "structure": 4,
+    "prop": 5,
+    "common_decal": 10,
+    "water_edge": 6,
+    "settlement_clutter": 8
+  },
+  "locks": ["projection", "light_direction", "palette_envelope", "material_language", "detail_scale", "regional_humidity_or_weather_character", "historical_context"],
+  "variation_axes": ["shape", "age", "wear", "damage", "wetness", "growth_density", "species_or_material", "orientation_where_safe", "cluster_composition"],
+  "do_not_vary": ["camera_projection", "structural_topology", "historical_period", "lighting_family", "semantic_role"],
+  "hero_asset_policy": {
+    "examples": ["ancient_tree", "standing_stone", "waystone", "ruin_fragment", "distinctive_cart", "ford_marker"],
+    "rare": true,
+    "must_have_story_or_place_reason": true,
+    "random_scatter_forbidden": true
+  },
+  "review": ["family_contact_sheet", "native_scale_scene", "cluster_composition", "repetition_stress", "wet_state", "snow_state", "busy_scene_readability", "historical_plausibility"]
+}
