@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "producer_tool": "art_studio",
   "project_profile_id": "mon-art-family-governance-v1",
   "producer_profile_commit": "1810ddb312000ca5ff42853e290979861ae6ec70",
+  "producer_profile_blob_sha": "7e8f943c3b0fcb5f773a78c4ea53f35d1e3a7fb1",
   "style_lock_id": "mon_art_style_lock_v1",
   "source_artifact_id": "",
   "source_hash": "",
