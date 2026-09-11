@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "profileId": "mon-terrain-source-family-v1",
   "consumer": "moonstone-wales",
   "purpose": "Generate controlled source masters for later deterministic seamless mastering and tile-map admission.",
@@ -10,12 +10,17 @@
     "projection": "top-down continuous surface",
     "lighting": "flat diffuse, no strong directional hero shadow",
     "allowPromptSeamlessClaim": false,
-    "mustRemainUnapprovedUntilProof": true
+    "mustRemainUnapprovedUntilProof": true,
+    "sourcePreservationRequired": true,
+    "candidateHashRequired": true,
+    "promptPacketRequired": true
   },
   "familyRules": {
-    "minimumCandidatesPerMaterial": 6,
-    "preferredCandidatesPerMaterial": 8,
-    "maximumCandidatesPerMaterial": 12,
+    "minimumCandidatesPerMaterial": 8,
+    "preferredCandidatesPerMaterial": 10,
+    "targetApprovedVariants": 8,
+    "minimumApprovedVariants": 6,
+    "maximumApprovedVariants": 12,
     "lock": [
       "material identity",
       "scale",
@@ -29,18 +34,21 @@
       "small stones",
       "minor colour shift",
       "subtle moss density",
-      "subtle wear"
+      "subtle wear",
+      "restrained vegetation density"
     ],
     "variationForbidden": [
       "large unique boulder",
       "recognisable repeated flower cluster",
+      "large hero heather clump",
       "large puddle",
       "building fragment",
       "road boundary",
       "shoreline",
       "cliff face",
       "dramatic light patch",
-      "obvious centred focal feature"
+      "obvious centred focal feature",
+      "painted tile border"
     ]
   },
   "separateOverlayFamilies": [
@@ -54,15 +62,21 @@
     "puddles",
     "mud-ruts",
     "footprints",
+    "hoofprints",
+    "wheel-ruts",
     "battlefield-debris"
   ],
   "handoff": {
     "textureStudioProfile": "mon-painted-2_5d-surface-production-v1",
+    "tileMapStudioProfile": "mon-transition-topology-v1",
     "tileMapStudioProofs": [
+      "seam-check",
       "offset-proof",
+      "seam-master-offset",
       "tiling-proof",
       "family-edge-check",
-      "family-proof"
+      "family-proof",
+      "native-scale-godot-proof"
     ],
     "approvalRule": "No source becomes seamless-approved from generation alone."
   }
