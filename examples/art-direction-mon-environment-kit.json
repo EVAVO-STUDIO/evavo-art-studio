@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.0",
+  "contractId": "mon-cwm-gloyw-environment-kit",
+  "presetId": "isometric-rpg-1997",
+  "project": {
+    "projectId": "moonstone-wales",
+    "title": "MÔN: Ashen Annwn",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "gameGenre": "historical mythic real-time tactical game",
+    "targetPlatform": "desktop",
+    "viewport": {"width":1280,"height":720},
+    "worldScale": {"pixelsPerTile":64,"characterHeightPixels":112,"tileWidthPixels":64,"tileHeightPixels":32}
+  },
+  "style": {
+    "intent": "Create an authored oblique 2.5D Welsh battlefield kit that reads as one painted landscape rather than a visible tile grid, with mechanically real elevation hidden beneath the presentation.",
+    "mustHave": [
+      "dark wet upland Welsh mood",
+      "peat, heath, rough grass, slate, mud and moss",
+      "large overlapping macro chunks",
+      "terrain height readable through painted rises, cliff faces and foreground overlap",
+      "fixed lighting direction across every family",
+      "transparent alpha on decals, vegetation and structures",
+      "tree and building front-occlusion layers separated from solid bases"
+    ],
+    "mustAvoid": [
+      "visible square tile borders",
+      "photoreal PBR terrain",
+      "generic fantasy ruins",
+      "procedural-noise-looking detail",
+      "random saturated greens",
+      "camera-perspective drift between asset families",
+      "baked units or gameplay markers",
+      "free-rotation 3D assumptions"
+    ],
+    "materialLanguage": ["wet peat", "dark soil", "rough upland grass", "weathered slate", "lichen stone", "aged oak", "hawthorn", "bracken", "cold shallow water"],
+    "antiGeneric": {
+      "requiredDistinctiveMotifs": ["post-Roman Welsh upland landscape", "old tracks", "weathered field boundaries", "subtle archaeological memory"],
+      "prohibitedGenericMotifs": ["fantasy crystals", "glowing rune stones", "lush generic RPG grass", "modern farm infrastructure"],
+      "prohibitUnrequestedProps": true,
+      "prohibitReadableText": true,
+      "prohibitWatermarks": true,
+      "prohibitModernGloss": true,
+      "prohibitRandomMicrodetail": true,
+      "prohibitStyleDrift": true,
+      "requireHistoricalPlausibility": true
+    },
+    "references": [
+      {"id":"mon-style-lock","role":"style","uri":"project://moonstone-wales/game/data/visual/mon_style_lock.json","weight":1,"rights":"EVAVO project-owned style contract."},
+      {"id":"cwm-regional-anchor","role":"environment","uri":"artifact://moonstone-wales/anchors/cwm-gloyw-regional","weight":1,"rights":"EVAVO project-owned approved anchor."},
+      {"id":"cwm-material-board","role":"palette","uri":"artifact://moonstone-wales/anchors/cwm-gloyw-material-board","weight":1,"rights":"EVAVO project-owned approved anchor."}
+    ]
+  },
+  "asset": {
+    "assetId":"cwm-gloyw-environment-kit",
+    "family":"tile-atlas",
+    "purpose":"Painted terrain surfaces, macro chunks, elevation pieces, vegetation, structures, water and decals for the first tactical battlefield.",
+    "dimensions":{"width":1024,"height":1024},
+    "transparency":"mixed",
+    "animated":false,
+    "frameCount":1,
+    "framesPerSecond":1,
+    "loop":false,
+    "directionCount":1,
+    "directionNames":["north-west-camera-quarter"],
+    "asymmetric":true,
+    "runtimeEquipmentSwaps":false,
+    "runtimeCostumeVariants":false,
+    "independentEffects":true,
+    "independentShadow":true,
+    "needsCollision":false,
+    "largeDeformations":false,
+    "secondaryMotion":[],
+    "tileFootprint":{"width":8,"height":8}
+  },
+  "outputProfileIds":["godot-4.6.2-isometric-tile-atlas"],
+  "layerOverrides":[
+    {"role":"shadow","treatment":"separate-frame","reason":"Terrain and prop shadow plates remain separately gradeable."},
+    {"role":"collision","treatment":"engine-sidecar","reason":"Simulation and Tile Map Studio own semantic collision/traversal."}
+  ]
+}
