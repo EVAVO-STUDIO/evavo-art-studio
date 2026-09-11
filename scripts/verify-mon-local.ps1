@@ -6,6 +6,14 @@ Write-Host "Policy: local-only validation; no GitHub Actions/workflow dependency
 node --check scripts/build-mon-candidate-receipt.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+node --check scripts/compile-mon-ten-image-batch.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+if (-not (Test-Path ".\examples\mon-ten-image-batch-production.v1.json")) {
+    Write-Error "Missing MÔN ten-image batch production profile."
+    exit 2
+}
+
 node scripts/validate-mon-profile.mjs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
