@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0",
+  "contractId": "mon-household-spearman-eight-direction",
+  "presetId": "isometric-rpg-1997",
+  "project": {
+    "projectId": "moonstone-wales",
+    "title": "MÔN: Ashen Annwn",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "gameGenre": "historical mythic real-time tactical game",
+    "targetPlatform": "desktop",
+    "viewport": {"width":1280,"height":720},
+    "worldScale": {"pixelsPerTile":64,"characterHeightPixels":112,"tileWidthPixels":64,"tileHeightPixels":32}
+  },
+  "style": {
+    "intent": "Create a grounded late-Roman/post-Roman Welsh tactical warrior whose silhouette remains instantly readable at gameplay scale across eight directions and every animation frame.",
+    "mustHave": [
+      "c. AD 400-550 visual centre of gravity",
+      "stable body proportions and face identity",
+      "stable shield profile and spear length",
+      "weathered wool, linen, leather, wood and iron",
+      "strong readable feet and bottom-centre ground contact",
+      "restrained painterly late-1990s tactical-game character language with modern finish"
+    ],
+    "mustAvoid": [
+      "Viking visual shorthand",
+      "high medieval plate armour",
+      "generic Celtic fantasy costume",
+      "oversized pauldrons or weapons",
+      "neon magic",
+      "different lighting between directions",
+      "independent frame redesign",
+      "random straps, symbols or equipment appearing between frames"
+    ],
+    "materialLanguage": ["wet wool", "rough linen", "aged leather", "ash or oak spear shaft", "dull iron", "old bronze accent", "painted or hide-covered shield"],
+    "antiGeneric": {
+      "requiredDistinctiveMotifs": ["post-Roman western Britain", "restrained period-informed metalwork", "practical warband equipment"],
+      "prohibitedGenericMotifs": ["fantasy barbarian", "MMO druid", "horned helmet", "Viking raider shorthand", "glowing runes"],
+      "prohibitUnrequestedProps": true,
+      "prohibitReadableText": true,
+      "prohibitWatermarks": true,
+      "prohibitModernGloss": true,
+      "prohibitRandomMicrodetail": true,
+      "prohibitStyleDrift": true,
+      "requireHistoricalPlausibility": true
+    },
+    "references": [
+      {"id":"mon-style-lock","role":"style","uri":"project://moonstone-wales/game/data/visual/mon_style_lock.json","weight":1,"rights":"EVAVO project-owned style contract."},
+      {"id":"household-spearman-identity","role":"identity","uri":"artifact://moonstone-wales/anchors/household-spearman","weight":1,"rights":"EVAVO project-owned approved anchor."},
+      {"id":"cwm-palette","role":"palette","uri":"artifact://moonstone-wales/anchors/cwm-gloyw-material-board","weight":1,"rights":"EVAVO project-owned approved palette anchor."}
+    ]
+  },
+  "asset": {
+    "assetId":"household-spearman",
+    "family":"character",
+    "purpose":"Eight-direction tactical combat unit with persistent identity.",
+    "dimensions":{"width":192,"height":192},
+    "transparency":"required",
+    "animated":true,
+    "frameCount":8,
+    "framesPerSecond":10,
+    "loop":true,
+    "directionCount":8,
+    "directionNames":["south","south-west","west","north-west","north","north-east","east","south-east"],
+    "asymmetric":true,
+    "runtimeEquipmentSwaps":true,
+    "runtimeCostumeVariants":false,
+    "independentEffects":true,
+    "independentShadow":true,
+    "needsCollision":true,
+    "largeDeformations":true,
+    "secondaryMotion":["cloak","shield","equipment"],
+    "tileFootprint":{"width":1,"height":1}
+  },
+  "outputProfileIds":["godot-4.6.2-isometric-character"],
+  "layerOverrides":[
+    {"role":"shadow","treatment":"separate-frame","reason":"MÔN contact shadows react independently to terrain and weather."},
+    {"role":"collision","treatment":"engine-sidecar","reason":"Collision remains simulation metadata."}
+  ]
+}
