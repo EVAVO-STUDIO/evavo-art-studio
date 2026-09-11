@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "mon_chat_image_intake_v1",
+  "project": "moonstone-wales",
+  "purpose": "govern images supplied directly through chat as immutable source candidates that can be reviewed, corrected, mastered and promoted into the correct repository path",
+  "source_policy": {
+    "preserve_original_bytes": true,
+    "record_sha256": true,
+    "never_overwrite_original": true,
+    "accepted_formats": ["png", "jpg", "jpeg", "webp"],
+    "preferred_master": "png",
+    "true_alpha_preserved": true
+  },
+  "intake_required": ["source_path", "asset_id", "family_id", "project_id", "target_repo", "target_path", "style_lock_id", "intended_role"],
+  "analysis_required": ["dimensions", "mode", "alpha_presence", "edge_touch", "opaque_bounds", "file_size", "sha256"],
+  "review_modes": ["accept_as_source", "polish", "local_repair", "alpha_cleanup", "edge_cleanup", "colour_match", "style_match", "resize_master", "optimize_runtime", "reject"],
+  "correction_policy": {
+    "smallest_region_first": true,
+    "preserve_identity_and_geometry": true,
+    "new_candidate_for_every_edit": true,
+    "parent_candidate_required": true,
+    "before_after_evidence": true
+  },
+  "promotion": {
+    "branch": "main",
+    "exact_hash_required": true,
+    "explicit_target_repo_and_path_required": true,
+    "runtime_visible_requires_native_scale_review": true,
+    "commit_message_required": true,
+    "github_actions_required": false,
+    "local_validation_authority": true
+  }
+}
