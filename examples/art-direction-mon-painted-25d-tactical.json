@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1.0",
+  "contractId": "mon-painted-25d-tactical",
+  "presetId": "isometric-rpg-1997",
+  "project": {
+    "projectId": "moonstone-wales",
+    "title": "MÔN: Ashen Annwn",
+    "engine": "Godot",
+    "engineVersion": "4.6.2",
+    "gameGenre": "historical mythic real-time tactics",
+    "targetPlatform": "desktop",
+    "viewport": {"width": 1280, "height": 720},
+    "worldScale": {"characterHeightPixels": 112, "tileWidthPixels": 64, "tileHeightPixels": 32}
+  },
+  "style": {
+    "intent": "Create authored painterly 2.5D tactical art for late-Roman/post-Roman Wales, with fixed oblique projection, grounded historical material culture and restrained Welsh mythic atmosphere.",
+    "mustHave": [
+      "fixed oblique tactical readability",
+      "strong silhouettes at 1280x720 gameplay scale",
+      "peat, iron, bone, madder, moss and cold-slate palette relationships",
+      "weathered wool, wood, leather, iron, bronze, wet stone and vegetation",
+      "environmental depth through layered sprites/chunks rather than exposed 3D terrain",
+      "historical plausibility around c.400-550 unless the brief explicitly names an earlier Roman memory layer"
+    ],
+    "mustAvoid": [
+      "generic high fantasy armour",
+      "Viking-age material culture presented as c.500 Wales",
+      "modern glossy fantasy rendering",
+      "neon magic",
+      "visible tile borders",
+      "random ornamental pseudo-Celtic clutter",
+      "per-frame redesign",
+      "independent lighting changes between directions"
+    ],
+    "materialLanguage": ["wet wool", "blackened iron", "weathered bronze", "ash and oak", "peat earth", "slate", "moss", "bone-grey stone"],
+    "antiGeneric": {
+      "prohibitUnrequestedProps": true,
+      "prohibitReadableText": true,
+      "prohibitWatermarks": true,
+      "prohibitModernGloss": true,
+      "prohibitRandomMicrodetail": true,
+      "prohibitStyleDrift": true,
+      "requireHistoricalPlausibility": true
+    },
+    "references": [
+      {"id":"mon-style-lock","role":"style","uri":"repo://moonstone-wales/game/data/visual/mon_style_lock.json","weight":1,"rights":"EVAVO project-owned style contract"},
+      {"id":"mon-art-inventory","role":"production","uri":"repo://moonstone-wales/game/data/visual/master_art_inventory.json","weight":1,"rights":"EVAVO project-owned production contract"}
+    ]
+  },
+  "asset": {
+    "assetId": "mon-production-family",
+    "family": "project-art-family",
+    "purpose": "Anchor and family production for environment chunks, tactical sprites, portraits, cards and props.",
+    "transparency": "required-for-sprites-chunks-decals",
+    "animated": false,
+    "directionCount": 8,
+    "directionNames": ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"],
+    "asymmetric": true,
+    "runtimeEquipmentSwaps": true,
+    "runtimeCostumeVariants": false,
+    "independentEffects": true,
+    "independentShadow": true,
+    "needsCollision": true
+  },
+  "productionRules": {
+    "anchorsImmutableAfterApproval": true,
+    "animationFramesRequireIdentityAndDirectionReferences": true,
+    "inbetweensRequireNeighbourKeyReferences": true,
+    "environmentVariantsRequireFamilyMaster": true,
+    "treeAndTallStructureFrontOcclusionSeparate": true,
+    "candidateNeverRuntimeAuthorityWithoutConsumerApproval": true
+  },
+  "outputProfileIds": ["godot-4.6.2-isometric-character"]
+}
