@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "mon-terrain-source-family-v1",
+  "consumer": "moonstone-wales",
+  "purpose": "Generate controlled source masters for later deterministic seamless mastering and tile-map admission.",
+  "sourceMaster": {
+    "width": 1024,
+    "height": 1024,
+    "background": "opaque",
+    "projection": "top-down continuous surface",
+    "lighting": "flat diffuse, no strong directional hero shadow",
+    "allowPromptSeamlessClaim": false,
+    "mustRemainUnapprovedUntilProof": true
+  },
+  "familyRules": {
+    "minimumCandidatesPerMaterial": 6,
+    "preferredCandidatesPerMaterial": 8,
+    "maximumCandidatesPerMaterial": 12,
+    "lock": [
+      "material identity",
+      "scale",
+      "projection",
+      "detail density",
+      "palette/value envelope",
+      "lighting grammar"
+    ],
+    "variationAllowed": [
+      "microtexture",
+      "small stones",
+      "minor colour shift",
+      "subtle moss density",
+      "subtle wear"
+    ],
+    "variationForbidden": [
+      "large unique boulder",
+      "recognisable repeated flower cluster",
+      "large puddle",
+      "building fragment",
+      "road boundary",
+      "shoreline",
+      "cliff face",
+      "dramatic light patch",
+      "obvious centred focal feature"
+    ]
+  },
+  "separateOverlayFamilies": [
+    "heather-clusters",
+    "gorse",
+    "bracken",
+    "grass-tufts",
+    "rock-scatter",
+    "roots",
+    "branches",
+    "puddles",
+    "mud-ruts",
+    "footprints",
+    "battlefield-debris"
+  ],
+  "handoff": {
+    "textureStudioProfile": "mon-painted-2_5d-surface-production-v1",
+    "tileMapStudioProofs": [
+      "offset-proof",
+      "tiling-proof",
+      "family-edge-check",
+      "family-proof"
+    ],
+    "approvalRule": "No source becomes seamless-approved from generation alone."
+  }
+}
