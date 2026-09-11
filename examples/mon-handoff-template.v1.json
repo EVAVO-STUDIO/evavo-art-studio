@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "producer_tool": "art_studio",
+  "project_profile_id": "mon-art-family-governance-v1",
+  "producer_profile_commit": "1810ddb312000ca5ff42853e290979861ae6ec70",
+  "style_lock_id": "mon_art_style_lock_v1",
+  "source_artifact_id": "",
+  "source_hash": "",
+  "reference_ids": [],
+  "historical_tags": {"period_band":"", "source_type":"", "confidence":"", "interpretation_notes":""},
+  "layer_manifest": {},
+  "prompt_packet_id": "",
+  "review_evidence": {},
+  "review_state": "review_required",
+  "runtime_authority": false
+}
