@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0",
+  "id": "mon-art-family-governance-v1",
+  "project": "moonstone-wales",
+  "styleLockId": "mon_art_style_lock_v1",
+  "principle": "anchor-first, family-locked, review-gated, runtime-never-self-approved",
+  "assetFamilies": {
+    "character": {
+      "requiredAnchors": ["identity_portrait", "full_body_identity", "direction_masters"],
+      "hardLocks": ["body_proportion", "face", "hair", "shield_profile", "weapon_length", "major_equipment", "palette", "light_direction"],
+      "layerPolicy": ["body", "outerwear", "armour_optional", "cloak", "shield", "weapon", "condition_overlay", "contact_shadow"],
+      "reviewEvidence": ["identity_compare", "silhouette_compare", "native_scale_720p", "alpha_proof", "pivot_proof", "direction_contact_sheet"]
+    },
+    "environment": {
+      "requiredAnchors": ["regional_key_art", "material_board", "family_master"],
+      "hardLocks": ["camera_projection", "light_direction", "palette_envelope", "material_language", "detail_density"],
+      "layerPolicy": ["ground", "relief", "rear", "body", "front_occlusion", "shadow", "weather_response"],
+      "reviewEvidence": ["native_scale_720p", "seam_or_edge_proof", "clear_wet_snow_compare", "occlusion_composite", "family_contact_sheet"]
+    },
+    "card": {
+      "requiredAnchors": ["shared_card_frame_master"],
+      "hardLocks": ["frame_materials", "portrait_window", "name_band", "text_safe_zones", "icon_slots"],
+      "reviewEvidence": ["unit_card_proof", "character_card_proof", "advisor_card_proof", "item_card_proof", "omen_card_proof"]
+    }
+  },
+  "historicalTagging": {
+    "requiredFields": ["period_band", "source_type", "confidence", "interpretation_notes"],
+    "allowedConfidence": ["direct", "strong_analogy", "plausible_reconstruction", "narrative_inference"],
+    "rule": "later folklore inspiration must never be silently labelled as direct c.400-550 evidence"
+  },
+  "promptPacket": {
+    "required": ["asset_id", "family_id", "style_lock_id", "gameplay_role", "ordered_reference_ids", "forbidden_drift", "output_role", "review_required"],
+    "persistCompiledPrompt": true,
+    "persistProviderWorkflowIdentity": true,
+    "persistCandidateHash": true
+  },
+  "sourcePreservation": {
+    "immutableOriginals": true,
+    "appendOnlyWorkingVersions": true,
+    "separateMasks": true,
+    "separateLayerManifests": true,
+    "noRuntimePromotionFromProvider": true
+  }
+}
