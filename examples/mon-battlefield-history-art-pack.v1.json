@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "id": "mon_battlefield_history_art_pack_v1",
+  "project": "moonstone-wales",
+  "style_lock_id": "mon_art_style_lock_v1",
+  "families": {
+    "footprints": ["human_dirt", "human_mud", "human_snow", "hoof_mud", "hoof_snow"],
+    "ground_disturbance": ["trampled_grass", "heather_crush", "mud_churn", "snow_disturbance", "sand_disturbance", "wheel_rut"],
+    "blood": ["small_spatter", "pool", "mud_blended", "snow_blended"],
+    "projectile_remains": ["arrow", "javelin", "spear", "broken_arrow", "broken_spear_shaft"],
+    "puddles": ["clean_shallow", "muddy", "rut", "snowmelt"]
+  },
+  "rules": [
+    "all assets bind approved regional surface references",
+    "true alpha required for decal-like assets",
+    "no decorative fantasy motifs",
+    "no oversized blood or exaggerated gore",
+    "variants must differ in shape and breakup while preserving family material language",
+    "footprints and blood must remain secondary to units and command readability"
+  ],
+  "review": ["native_scale_720p", "family_contact_sheet", "repetition_stress_test", "alpha_proof", "wet_weather_comparison"]
+}
