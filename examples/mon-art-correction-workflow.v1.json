@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "mon_art_correction_workflow_v1",
+  "project": "moonstone-wales",
+  "principle": "repair the smallest wrong region while preserving approved identity, style and family locks",
+  "correction_modes": ["local_inpaint", "edge_cleanup", "alpha_repair", "colour_rebalance", "material_repair", "proportion_repair", "layer_replacement", "reference_rebind"],
+  "required_inputs": ["candidate_id", "candidate_hash", "family_id", "style_lock_id", "anchor_ids", "problem_region_or_layer", "correction_reason"],
+  "preserve": ["camera_projection", "approved_silhouette", "palette_envelope", "lighting_direction", "material_language", "historical_tags", "unmodified_layers"],
+  "rules": [
+    "do not regenerate the whole asset when one local region is wrong",
+    "store corrected output as a new candidate with parent_candidate_id",
+    "retain original source and prompt packet",
+    "record changed layers and changed pixel bounds where available",
+    "rerun family review after any silhouette or palette-affecting correction",
+    "runtime promotion always uses exact corrected candidate hash"
+  ],
+  "review_evidence": ["before_after", "changed_region", "native_scale_context", "family_comparison", "historical_check", "alpha_check"]
+}
