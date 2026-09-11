@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0",
+  "id": "mon-ten-image-batch-production-v1",
+  "project": "moonstone-wales",
+  "batchSize": 10,
+  "principle": "every requested production batch contains exactly ten separate image outputs with explicit runtime or reference purpose",
+  "batchKinds": [
+    "style_anchor",
+    "surface_family",
+    "macro_chunk_family",
+    "elevation_family",
+    "vegetation_family",
+    "structure_family",
+    "decal_family",
+    "weather_fx_family",
+    "scenic_layer_pack",
+    "character_anchor",
+    "character_animation_frames",
+    "card_family"
+  ],
+  "requiredBatchFields": [
+    "batch_id",
+    "batch_kind",
+    "family_id",
+    "style_lock_id",
+    "purpose",
+    "runtime_or_reference",
+    "output_size",
+    "background_policy",
+    "ordered_outputs",
+    "ordered_reference_ids",
+    "forbidden_drift",
+    "review_requirements"
+  ],
+  "outputRules": {
+    "exactlyTen": true,
+    "separateFiles": true,
+    "contactSheetAsProductionOutput": false,
+    "bakedLabelsForbidden": true,
+    "trueAlphaWhenRequested": true,
+    "stableCameraAndProjectionWithinFamily": true,
+    "stableLightingWithinFamily": true,
+    "stablePaletteWithinFamily": true,
+    "candidateReceiptPerOutputOrBatch": true
+  },
+  "scenicLayerPack": {
+    "canonicalRoles": [
+      "static_base_plate",
+      "sky_clouds",
+      "far_fog",
+      "mid_fog",
+      "ground_mist",
+      "rear_branch_motion",
+      "front_branch_motion",
+      "water_or_shore_motion",
+      "atmospheric_particles",
+      "lighting_weather_mask"
+    ],
+    "transparentExceptBase": true,
+    "runtimeLoopAssembly": true,
+    "loopAuthority": "particle-studio-and-moonstone-wales"
+  },
+  "review": {
+    "nativeScaleRequired": true,
+    "familyContactSheetAllowedAsReviewOnly": true,
+    "exactHashPromotion": true,
+    "localOnlyValidation": true
+  }
+}
