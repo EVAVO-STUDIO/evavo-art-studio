@@ -8,13 +8,39 @@ from pathlib import Path
 from PIL import Image
 
 
-TOOLS_PATH = Path(__file__).resolve().parents[1] / "tools"
+ROOT = Path(__file__).resolve().parents[1]
+TOOLS_PATH = ROOT / "tools"
 MODULE_PATH = TOOLS_PATH / "run_project_art_sandbox.py"
 sys.path.insert(0, str(TOOLS_PATH))
 SPEC = importlib.util.spec_from_file_location("project_art_sandbox", MODULE_PATH)
 assert SPEC and SPEC.loader
 SANDBOX = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SANDBOX)
+
+
+def load_test_module(name: str, relative_path: str):
+    path = ROOT / relative_path
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_REGION_TESTS = load_test_module(
+    "evavo_region_aware_alpha_tests",
+    "scripts/test_region_aware_alpha_interpolate.py",
+)
+_ADMISSION_TESTS = load_test_module(
+    "evavo_region_aware_alpha_admission_tests",
+    "scripts/test_region_aware_alpha_interpolate_admission.py",
+)
+
+# Expose these TestCase classes in this module so the existing
+# project-art:mastering:check unittest invocation automatically runs them.
+RegionAwareAlphaInterpolationTests = _REGION_TESTS.RegionAwareAlphaInterpolationTests
+RegionAwareAdmissionTests = _ADMISSION_TESTS.RegionAwareAdmissionTests
 
 
 class GranularEditTests(unittest.TestCase):
