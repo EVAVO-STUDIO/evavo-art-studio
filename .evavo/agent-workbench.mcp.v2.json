@@ -20,7 +20,10 @@
     "schema": "schemas/evavo.agent-workbench-fleet.schema.json",
     "compiler": "scripts/agent-workbench-fleet.mjs",
     "verifier": "scripts/verify-agent-workbench-fleet.mjs",
-    "scope": "local-workbench-enabled-siblings"
+    "scope": "local-workbench-enabled-siblings",
+    "canonicalRouteOwnership": true,
+    "duplicateRoutesCollapsed": true,
+    "observationProvenance": "observedFromRepositories"
   },
   "guidance": {
     "schema": "schemas/evavo.agent-workbench-guidance.schema.json",
@@ -51,6 +54,8 @@
     "fleetAuthorizesExecution": false,
     "fleetClaimsProviderCompleteness": false,
     "fleetAllowsAbsenceClaims": false,
+    "fleetCanonicalRouteOwnershipApplied": true,
+    "fleetDuplicateRoutesCollapsed": true,
     "registrationExecutesServer": false,
     "registrationGrantsAuthority": false,
     "doctorAuthorizesEffects": false,
