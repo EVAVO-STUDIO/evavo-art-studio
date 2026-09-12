@@ -79,10 +79,15 @@ export async function reviewWaterSurfaceKit({ baseReceiptPath, currentReceiptPat
     if (sha256(decoded.encoded) !== entry.sha256) fail(`base hash drift: ${entry.path}`);
     baseByFrame[entry.frame][entry.variant] = decoded.pixels;
   }
+  const reconstructedBaseFrames = [];
   for (let frame = 0; frame < 8; frame += 1) {
     if (baseByFrame[frame].some((value) => !value)) fail(`base frame ${frame} lacks four variants`);
-    exactOuterSeam(reconstructQuadrants(baseByFrame[frame]), 128, 128, `base metatile frame ${frame}`);
+    const reconstructed = reconstructQuadrants(baseByFrame[frame]);
+    exactOuterSeam(reconstructed, 128, 128, `base metatile frame ${frame}`);
+    reconstructedBaseFrames.push(reconstructed);
   }
+  const distinctBaseFrames = new Set(reconstructedBaseFrames.map((pixels) => sha256(pixels))).size;
+  if (distinctBaseFrames !== 8) fail(`base animation declares eight frames but contains only ${distinctBaseFrames} distinct reconstructed exposures`);
 
   const currentFrames = [];
   for (const entry of current.frames) {
@@ -99,7 +104,7 @@ export async function reviewWaterSurfaceKit({ baseReceiptPath, currentReceiptPat
     schema: "evavo.water-surface-kit-review.v1",
     approvalState: "technical-review-only",
     passed: true,
-    base: { variants: 4, framesPerVariant: 8, reconstructedMetatile: [128, 128], exactOuterSeam: true },
+    base: { variants: 4, framesPerVariant: 8, distinctFrames: distinctBaseFrames, reconstructedMetatile: [128, 128], exactOuterSeam: true },
     current: { frames: 8, dimensions: [128, 64], stepPixels: 16, exactIntegerMotion: true, exactLoopClosure: true },
     creativeApproval: false,
     runtimeAdmission: false,

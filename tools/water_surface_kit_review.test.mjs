@@ -20,8 +20,10 @@ test("proves coordinated metatile seams and exact current loop without granting 
     metatile.set([20 + sx, 40 + sy, 48, 255], offset);
   }
   for (let frame = 0; frame < 8; frame += 1) for (let variant = 0; variant < 4; variant += 1) {
+    const animatedMetatile = Buffer.from(metatile);
+    animatedMetatile.set([80 + frame, 96, 104, 255], ((20 + frame) * 128 + 20 + frame) * 4);
     const left = (variant % 2) * 64, top = Math.floor(variant / 2) * 64;
-    const encoded = await sharp(metatile, { raw: { width: 128, height: 128, channels: 4 } }).extract({ left, top, width: 64, height: 64 }).png().toBuffer();
+    const encoded = await sharp(animatedMetatile, { raw: { width: 128, height: 128, channels: 4 } }).extract({ left, top, width: 64, height: 64 }).png().toBuffer();
     const relative = `base/v${variant}-f${frame}.png`; await mkdir(path.dirname(path.join(root, relative)), { recursive: true }); await writeFile(path.join(root, relative), encoded);
     baseFrames.push({ variant, frame, path: relative, sha256: hash(encoded) });
   }
@@ -38,5 +40,16 @@ test("proves coordinated metatile seams and exact current loop without granting 
   await writeFile(baseReceipt, JSON.stringify({ schema:"strikewater_seamless_water_kit_receipt_v1",variants:4,frames_per_variant:8,runtime_admission:false,frames:baseFrames }));
   await writeFile(currentReceipt, JSON.stringify({ schema:"strikewater_directional_current_overlay_receipt_v1",frame_count:8,step_pixels:16,runtime_admission:false,frames:currentFrames }));
   const result = await reviewWaterSurfaceKit({ baseReceiptPath:baseReceipt,currentReceiptPath:currentReceipt,root });
-  assert.equal(result.passed,true); assert.equal(result.current.exactLoopClosure,true); assert.equal(result.creativeApproval,false); assert.equal(result.runtimeAdmission,false);
+  assert.equal(result.passed,true); assert.equal(result.base.distinctFrames,8); assert.equal(result.current.exactLoopClosure,true); assert.equal(result.creativeApproval,false); assert.equal(result.runtimeAdmission,false);
+
+  const duplicateFrames = baseFrames.map((entry) => {
+    const source = baseFrames.find((candidate) => candidate.variant === entry.variant && candidate.frame === 0);
+    return { ...entry, path: source.path, sha256: source.sha256 };
+  });
+  const duplicateReceipt = path.join(root, "duplicate-base.json");
+  await writeFile(duplicateReceipt, JSON.stringify({ schema:"strikewater_seamless_water_kit_receipt_v1",variants:4,frames_per_variant:8,runtime_admission:false,frames:duplicateFrames }));
+  await assert.rejects(
+    reviewWaterSurfaceKit({ baseReceiptPath:duplicateReceipt,currentReceiptPath:currentReceipt,root }),
+    /contains only 1 distinct reconstructed exposures/u,
+  );
 });
