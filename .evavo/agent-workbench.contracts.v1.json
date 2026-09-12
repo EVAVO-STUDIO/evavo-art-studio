@@ -26,7 +26,7 @@
     "verifyGuidance": "scripts/verify-agent-workbench-guidance.mjs",
     "mcp": "scripts/agent-workbench-mcp.mjs",
     "mcpSmoke": "scripts/test-agent-workbench-mcp.mjs",
-    "mcpV2": "scripts/agent-workbench-mp-v2.mjs",
+    "mcpV2": "scripts/agent-workbench-mcp-v2.mjs",
     "mcpV2Smoke": "scripts/test-agent-workbench-mcp-v2.mjs",
     "mcpRegistration": "scripts/agent-workbench-mcp-registration.mjs --write",
     "mcpRegistrationCheck": "scripts/agent-workbench-mcp-registration.mjs --check",
