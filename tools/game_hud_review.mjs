@@ -3,6 +3,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 export const SCHEMA = "evavo.game-hud-review-request.v1";
+const PROFILES = {
+  "vertical-combat": { permanentOcclusion: 0.065, stateOcclusion: 0.14, permanentClusters: 2 },
+  "side-scroller": { permanentOcclusion: 0.07, stateOcclusion: 0.15, permanentClusters: 2 },
+  "strategy": { permanentOcclusion: 0.18, stateOcclusion: 0.28, permanentClusters: 3 },
+  "general": { permanentOcclusion: 0.08, stateOcclusion: 0.16, permanentClusters: 2 },
+};
 function fail(message) { throw new Error(`GAME_HUD_REVIEW_INVALID: ${message}`); }
 function area(rect) { return rect.width * rect.height; }
 function intersects(a, b) { return a.x < b.x+b.width && a.x+a.width > b.x && a.y < b.y+b.height && a.y+a.height > b.y; }
@@ -16,6 +22,8 @@ export function reviewGameHud(request) {
   if (!Number.isInteger(viewport?.width) || !Number.isInteger(viewport?.height) || viewport.width<160 || viewport.height<90) fail("logicalViewport");
   if (!Array.isArray(request.elements) || !request.elements.length) fail("elements");
   if (!Array.isArray(request.states) || !request.states.length) fail("states");
+  const profile=PROFILES[request.genreProfile ?? "general"];
+  if (!profile) fail("genreProfile");
   const ids=new Set();
   for (const element of request.elements) {
     if (typeof element.id!=="string" || !element.id || ids.has(element.id)) fail("element ids must be unique");
@@ -23,6 +31,10 @@ export function reviewGameHud(request) {
     if (!["permanent","contextual","transient"].includes(element.persistence)) fail(`${element.id}.persistence`);
     if (!["critical","tactical","routine"].includes(element.priority)) fail(`${element.id}.priority`);
     if (!Number.isFinite(element.opacity) || element.opacity<0 || element.opacity>1) fail(`${element.id}.opacity`);
+    if (element.adaptiveHousing!==undefined) {
+      if (element.adaptiveHousing?.trigger!=="gameplay-overlap") fail(`${element.id}.adaptiveHousing.trigger`);
+      if (!Number.isFinite(element.adaptiveHousing?.yieldOpacity) || element.adaptiveHousing.yieldOpacity<0 || element.adaptiveHousing.yieldOpacity>=element.opacity) fail(`${element.id}.adaptiveHousing.yieldOpacity`);
+    }
   }
   const byId=new Map(request.elements.map((entry)=>[entry.id,entry])); const viewportArea=viewport.width*viewport.height; const findings=[];
   const states=request.states.map((state)=>{
@@ -31,9 +43,14 @@ export function reviewGameHud(request) {
     const weightedOcclusion=visible.reduce((sum,entry)=>sum+area(entry.rect)*entry.opacity,0)/viewportArea;
     const permanentOcclusion=permanent.reduce((sum,entry)=>sum+area(entry.rect)*entry.opacity,0)/viewportArea;
     const clusters=new Set(permanent.map((entry)=>entry.cluster));
-    if (permanentOcclusion>0.08) findings.push({severity:"block",state:state.id,code:"PERMANENT_OCCLUSION",value:permanentOcclusion});
-    if (clusters.size>2) findings.push({severity:"block",state:state.id,code:"PERSISTENT_CLUSTER_COUNT",value:clusters.size});
-    if (weightedOcclusion>0.16) findings.push({severity:"review",state:state.id,code:"STATE_OCCLUSION",value:weightedOcclusion});
+    if (permanentOcclusion>profile.permanentOcclusion) findings.push({severity:"block",state:state.id,code:"PERMANENT_OCCLUSION",value:permanentOcclusion,limit:profile.permanentOcclusion});
+    if (clusters.size>profile.permanentClusters) findings.push({severity:"block",state:state.id,code:"PERSISTENT_CLUSTER_COUNT",value:clusters.size,limit:profile.permanentClusters});
+    if (weightedOcclusion>profile.stateOcclusion) findings.push({severity:"review",state:state.id,code:"STATE_OCCLUSION",value:weightedOcclusion,limit:profile.stateOcclusion});
+    for (const id of state.gameplayOverlapElementIds ?? []) {
+      const element=byId.get(id) ?? fail(`${state.id} gameplay overlap references ${id}`);
+      if (!visible.includes(element)) fail(`${state.id} gameplay overlap is not visible: ${id}`);
+      if (element.persistence==="permanent" && !element.adaptiveHousing) findings.push({severity:"block",state:state.id,code:"GAMEPLAY_OCCLUSION_WITHOUT_YIELD",elements:[id]});
+    }
     for (let a=0;a<visible.length;a++) for (let b=a+1;b<visible.length;b++) if (intersects(visible[a].rect,visible[b].rect) && visible[a].cluster!==visible[b].cluster && (visible[a].priority==="critical" || visible[b].priority==="critical")) findings.push({severity:"block",state:state.id,code:"CRITICAL_OVERLAP",elements:[visible[a].id,visible[b].id]});
     return {id:state.id,permanentOcclusion:Number(permanentOcclusion.toFixed(4)),weightedOcclusion:Number(weightedOcclusion.toFixed(4)),persistentClusters:clusters.size};
   });
@@ -41,7 +58,7 @@ export function reviewGameHud(request) {
   if (top.length) findings.push({severity:"review",code:"PERMANENT_TOP_EDGE",elements:top.map((entry)=>entry.id)});
   if (!request.states.every((state)=>typeof state.capture==="string" && state.capture.length>0)) findings.push({severity:"review",code:"CAPTURE_EVIDENCE_REQUIRED"});
   const blocked=findings.some((finding)=>finding.severity==="block");
-  return {schemaVersion:"evavo.game-hud-review.v1",projectId:request.projectId,status:blocked?"blocked":findings.length?"review-required":"pass",principles:["protect gameplay visibility","group by player decision","keep permanent clusters peripheral","let critical cues replace routine cues","review representative captures at runtime scale"],states,findings};
+  return {schemaVersion:"evavo.game-hud-review.v1",projectId:request.projectId,genreProfile:request.genreProfile ?? "general",budget:profile,status:blocked?"blocked":findings.length?"review-required":"pass",principles:["protect gameplay visibility","group by player decision","keep permanent clusters peripheral","fade instrument housing when world geometry crosses it","keep critical symbology legible while housing yields","let critical cues replace routine cues","review representative captures at runtime scale"],states,findings};
 }
 async function main() {
   const args=process.argv.slice(2), inputAt=args.indexOf("--input"), outputAt=args.indexOf("--output");
