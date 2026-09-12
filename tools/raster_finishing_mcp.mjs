@@ -25,6 +25,7 @@ const PRESETS = Object.freeze({
   "web-support": Object.freeze({ ensureAlpha: true, trim: { threshold: 8, padding: 32 }, normalize: true, sharpen: { sigma: 1 }, resize: { width: 1400, fit: "inside", withoutEnlargement: true }, format: "webp", quality: 92 }),
   "web-hero": Object.freeze({ ensureAlpha: true, normalize: true, sharpen: { sigma: 0.8 }, resize: { width: 2400, fit: "inside", withoutEnlargement: true }, format: "webp", quality: 92 }),
   "motion-layer": Object.freeze({ ensureAlpha: true, trim: { threshold: 4, padding: 16 }, sharpen: { sigma: 0.7 }, format: "png" }),
+  "pixel-ui": Object.freeze({ ensureAlpha: true, format: "png" }),
 });
 
 const assertAllowed = (filePath, { output = false } = {}) =>
@@ -300,7 +301,7 @@ const tools = Object.freeze([
         removeMaskPath: { type: "string", minLength: 1 },
         allowHighChromaInference: { type: "boolean" },
         pixelArt: { type: "boolean" },
-        preset: { type: "string", enum: ["transparent-object", "motion-layer"] },
+        preset: { type: "string", enum: ["transparent-object", "motion-layer", "pixel-ui"] },
         spec: { type: "object" },
         confirmLocalWrite: { type: "boolean", const: true },
       },
@@ -343,6 +344,7 @@ async function callTool(name, args) {
       segmentation: "provider-agnostic; pass a same-size alpha mask from Cloudinary AI, local segmentation, ComfyUI or another approved provider",
       transparencyProof: "diagnostic proof writes a separate PNG sheet over multiple solid backgrounds plus an explicit alpha mask and SHA evidence; source pixels are not modified",
       motionBridge: "use motion-layer to prepare transparent PNG layers for the existing animation and compositing pipelines",
+      pixelUi: "use pixel-ui to preserve exact native canvas, palette edges and one-pixel HUD linework while admitting real alpha",
       pathPolicy: "input and prospective output paths are canonicalized through existing ancestors so symlink escapes fail closed",
       writesEnabled: process.env.EVAVO_RASTER_FINISH_ALLOW_WRITES === "true",
       allowedRootCount: configuredLocalRootCount(ALLOWED_ROOTS_ENV),

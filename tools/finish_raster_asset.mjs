@@ -44,6 +44,13 @@ const PRESETS = Object.freeze({
     sharpen: { sigma: 0.7 },
     format: "png",
   }),
+  "pixel-ui": Object.freeze({
+    // HUD glyphs and native-resolution sprites must keep their exact canvas,
+    // palette edges and one-pixel linework. This preset performs admission and
+    // PNG/alpha normalization without trim, resize, tonal normalization or blur.
+    ensureAlpha: true,
+    format: "png",
+  }),
 });
 
 function usage() {
@@ -52,7 +59,7 @@ function usage() {
     "  node tools/finish_raster_asset.mjs --input <image> --output <image> [options]",
     "",
     "Options:",
-    "  --preset transparent-object|web-support|web-hero|motion-layer",
+    "  --preset transparent-object|web-support|web-hero|motion-layer|pixel-ui",
     "  --mask <image>          Alpha matte from any segmentation/background-removal provider",
     "  --spec <json>           JSON file containing RasterFinishSpec overrides",
     "  --print-evidence        Print the deterministic operation receipt",

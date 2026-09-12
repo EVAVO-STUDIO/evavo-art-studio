@@ -257,6 +257,8 @@ When replacing a secondary-only public ID for delivery optimization, preserve th
 
 Use the `motion-layer` finishing preset for transparent PNG layers that will be animated later. Ordered compositing can assemble still keyframes or intermediate plates, while timing, alpha sequences, sprite sheets, video encoding and loop validation remain responsibilities of the existing animation/video pipeline.
 
+Use the `pixel-ui` preset for native-resolution HUD frames, bitmap glyphs, radar icons and other one-pixel interface art. It preserves the exact canvas and pixel bytes while normalizing delivery to an alpha-bearing PNG; it deliberately performs no trim, resize, sharpening, blur or tonal normalization.
+
 A shadow or glow created as a separate transparent layer can be animated independently later. This is preferable to baking a glow into the subject when the intended final use includes pulsing, flicker, reveal, UI feedback or atmospheric motion.
 
 A future motion-compositing layer may build on the same contracts rather than duplicating alpha, mask and layer semantics.

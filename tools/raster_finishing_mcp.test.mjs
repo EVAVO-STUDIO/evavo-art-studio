@@ -84,3 +84,26 @@ test("refuses to overwrite the source during transparent mastering", async () =>
   assert.equal(response.isError, true);
   assert.match(response.structuredContent.message, /non-destructive/);
 });
+
+test("pixel-ui finishing preserves native HUD geometry and hard pixel edges", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evavo-pixel-ui-"));
+  const inputPath = path.join(root, "scope-source.png");
+  const outputPath = path.join(root, "scope-finished.png");
+  await writeFile(inputPath, await sharp({
+    create: { width: 100, height: 80, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  }).composite([{ input: { create: { width: 1, height: 64, channels: 4, background: "#62b9be" } }, left: 7, top: 8 }]).png().toBuffer());
+
+  const response = await call(root, "evavo_finish_raster_asset", {
+    inputPath,
+    outputPath,
+    preset: "pixel-ui",
+    confirmLocalWrite: true,
+  });
+  assert.equal(response.isError, false);
+  assert.equal(response.structuredContent.preset, "pixel-ui");
+  const input = await sharp(await readFile(inputPath)).raw().toBuffer({ resolveWithObject: true });
+  const output = await sharp(await readFile(outputPath)).raw().toBuffer({ resolveWithObject: true });
+  assert.equal(output.info.width, 100);
+  assert.equal(output.info.height, 80);
+  assert.deepEqual(output.data, input.data);
+});
