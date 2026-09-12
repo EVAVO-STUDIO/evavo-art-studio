@@ -11,6 +11,7 @@ const CONTRACT = "evavo_agent_workbench_doctor_v1";
 const STANDARD_PROTOCOL = "2025-03-26";
 const EVAVO_DISCOVERY_PROTOCOL = "2026-07-28";
 const FLEET_SCOPE = "local-workbench-enabled-siblings";
+const FLEET_PROVENANCE = "observedFromRepositories";
 const ORIENTATION_GUIDE = "WORKBENCH_FIRST.md";
 const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const fail = (message) => { throw new Error(message); };
@@ -55,10 +56,15 @@ export function inspectAgentWorkbench(root) {
   ];
   if (JSON.stringify(descriptor.tools) !== JSON.stringify(expectedTools)) fail("Workbench MCP v2 tool set mismatch.");
   if (descriptor.protocolVersion !== STANDARD_PROTOCOL || !Array.isArray(descriptor.supportedProtocolVersions) || !descriptor.supportedProtocolVersions.includes(STANDARD_PROTOCOL) || !descriptor.supportedProtocolVersions.includes(EVAVO_DISCOVERY_PROTOCOL) || descriptor.evavoDiscoveryMethod !== "server/discover") fail("Workbench MCP v2 dual-protocol contract mismatch.");
-  if (descriptor.fleet?.schema !== bundle.schemas?.fleet || descriptor.fleet?.compiler !== bundle.entrypoints?.fleet || descriptor.fleet?.verifier !== bundle.entrypoints?.verifyFleet || descriptor.fleet?.scope !== FLEET_SCOPE) fail("Workbench MCP v2 fleet binding mismatch.");
-  if (descriptor.readOnly !== true || descriptor.truthBoundary?.grantsExecutionAuthority !== false || descriptor.truthBoundary?.grantsMutationAuthority !== false || descriptor.truthBoundary?.grantsPublicationAuthority !== false || descriptor.truthBoundary?.guidanceProvesReadiness !== false || descriptor.truthBoundary?.fleetAuthorizesExecution !== false || descriptor.truthBoundary?.fleetClaimsProviderCompleteness !== false || descriptor.truthBoundary?.fleetAllowsAbsenceClaims !== false) fail("Workbench MCP v2 truth boundary mismatch.");
-  if (bundle.truthBoundary?.mcpLaunchEvidenceAuthorizesExecution !== false || bundle.truthBoundary?.mcpLaunchEvidenceRetainsEnvironmentValues !== false || bundle.truthBoundary?.mcpLaunchEvidenceRetainsArgumentValues !== false) fail("Workbench awareness truth boundary mismatch.");
-  if (bundle.truthBoundary?.fleetAuthorizesExecution !== false || bundle.truthBoundary?.fleetClaimsProviderCompleteness !== false || bundle.truthBoundary?.fleetAllowsAbsenceClaims !== false) fail("Workbench fleet truth boundary mismatch.");
+
+  const fleet = descriptor.fleet ?? {};
+  if (fleet.schema !== bundle.schemas?.fleet || fleet.compiler !== bundle.entrypoints?.fleet || fleet.verifier !== bundle.entrypoints?.verifyFleet || fleet.scope !== FLEET_SCOPE || fleet.canonicalRouteOwnership !== true || fleet.duplicateRoutesCollapsed !== true || fleet.observationProvenance !== FLEET_PROVENANCE) fail("Workbench MCP v2 fleet binding mismatch.");
+  const descriptorTruth = descriptor.truthBoundary ?? {};
+  if (descriptor.readOnly !== true || descriptorTruth.grantsExecutionAuthority !== false || descriptorTruth.grantsMutationAuthority !== false || descriptorTruth.grantsPublicationAuthority !== false || descriptorTruth.guidanceProvesReadiness !== false || descriptorTruth.fleetAuthorizesExecution !== false || descriptorTruth.fleetClaimsProviderCompleteness !== false || descriptorTruth.fleetAllowsAbsenceClaims !== false || descriptorTruth.fleetCanonicalRouteOwnershipApplied !== true || descriptorTruth.fleetDuplicateRoutesCollapsed !== true) fail("Workbench MCP v2 truth boundary mismatch.");
+
+  const bundleTruth = bundle.truthBoundary ?? {};
+  if (bundleTruth.mcpLaunchEvidenceAuthorizesExecution !== false || bundleTruth.mcpLaunchEvidenceRetainsEnvironmentValues !== false || bundleTruth.mcpLaunchEvidenceRetainsArgumentValues !== false) fail("Workbench awareness truth boundary mismatch.");
+  if (bundleTruth.fleetAuthorizesExecution !== false || bundleTruth.fleetClaimsProviderCompleteness !== false || bundleTruth.fleetAllowsAbsenceClaims !== false || bundleTruth.fleetCanonicalRouteOwnershipApplied !== true || bundleTruth.fleetDuplicateRoutesCollapsed !== true) fail("Workbench fleet truth boundary mismatch.");
 
   const requiredPaths = [
     bundle.orientationGuide,
@@ -108,7 +114,16 @@ export function inspectAgentWorkbench(root) {
     orientation: { guide: ORIENTATION_GUIDE, readFirst: true },
     protocol: { standard: STANDARD_PROTOCOL, evavoDiscovery: EVAVO_DISCOVERY_PROTOCOL, dualProtocolReady: true },
     awareness: { required: true, sanitizedMcpEvidenceRequired: true, siblingToolRegistryDiscoverySupported: true },
-    fleet: { required: true, toolExposed: true, localSiblingDiscoveryOnly: true, providerEstateCompletenessClaimed: false, absenceClaimsAllowed: false },
+    fleet: {
+      required: true,
+      toolExposed: true,
+      localSiblingDiscoveryOnly: true,
+      providerEstateCompletenessClaimed: false,
+      absenceClaimsAllowed: false,
+      canonicalRouteOwnershipApplied: true,
+      duplicateRoutesCollapsed: true,
+      observationProvenance: FLEET_PROVENANCE,
+    },
     artifactCount: artifacts.length,
     artifacts,
     registration: {
@@ -133,6 +148,8 @@ export function inspectAgentWorkbench(root) {
       fleetAuthorizesExecution: false,
       fleetClaimsProviderCompleteness: false,
       fleetAllowsAbsenceClaims: false,
+      fleetCanonicalRouteOwnershipApplied: true,
+      fleetDuplicateRoutesCollapsed: true,
       repairScope: ".mcp.json workbench v2 registration only",
     },
   };
@@ -151,8 +168,16 @@ function parse(argv) {
 }
 
 function selfTest() {
-  if (digest(Buffer.from("test")).length !== 64 || STANDARD_PROTOCOL === EVAVO_DISCOVERY_PROTOCOL || FLEET_SCOPE !== "local-workbench-enabled-siblings" || ORIENTATION_GUIDE !== "WORKBENCH_FIRST.md") fail("doctor self-test failed");
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v3", status: "passed", assertions: 4 }, null, 2)}\n`);
+  const assertions = [
+    digest(Buffer.from("test")).length === 64,
+    STANDARD_PROTOCOL !== EVAVO_DISCOVERY_PROTOCOL,
+    FLEET_SCOPE === "local-workbench-enabled-siblings",
+    FLEET_PROVENANCE === "observedFromRepositories",
+    ORIENTATION_GUIDE === "WORKBENCH_FIRST.md",
+    CONTRACT === "evavo_agent_workbench_doctor_v1",
+  ];
+  if (assertions.some((value) => value !== true)) fail("doctor self-test failed");
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v4", status: "passed", assertions: assertions.length }, null, 2)}\n`);
 }
 
 function main() {
