@@ -12,33 +12,14 @@ const serverPath = path.join(root, "scripts", "agent-workbench-mcp-v2.mjs");
 const bundle = JSON.parse(fs.readFileSync(path.join(root, ".evavo", "agent-workbench.contracts.v1.json"), "utf8"));
 const expectedRepository = bundle.repository;
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-const child = spawn(process.execPath, [serverPath], {
-  cwd: root,
-  env: { ...process.env, EVAVO_AGENT_WORKBENCH_ROOT: root },
-  stdio: ["pipe", "pipe", "pipe"],
-});
+function assert(condition, message) { if (!condition) throw new Error(message); }
+const child = spawn(process.execPath, [serverPath], { cwd: root, env: { ...process.env, EVAVO_AGENT_WORKBENCH_ROOT: root }, stdio: ["pipe", "pipe", "pipe"] });
 const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
 const errors = [];
 child.stderr.on("data", (chunk) => errors.push(String(chunk)));
 const iterator = lines[Symbol.asyncIterator]();
-
-function send(message) {
-  child.stdin.write(`${JSON.stringify(message)}\n`);
-}
-
-async function nextResponse(timeoutMs = 15000) {
-  return await Promise.race([
-    iterator.next().then(({ value, done }) => {
-      if (done || !value) throw new Error(`MCP server closed unexpectedly. ${errors.join("")}`);
-      return JSON.parse(value);
-    }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out waiting for MCP response.")), timeoutMs)),
-  ]);
-}
+function send(message) { child.stdin.write(`${JSON.stringify(message)}\n`); }
+async function nextResponse(timeoutMs = 15000) { return await Promise.race([iterator.next().then(({ value, done }) => { if (done || !value) throw new Error(`MCP server closed unexpectedly. ${errors.join("")}`); return JSON.parse(value); }), new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out waiting for MCP response.")), timeoutMs))]); }
 
 try {
   send({ jsonrpc: "2.0", id: 0, method: "server/discover", params: {} });
@@ -73,9 +54,13 @@ try {
   assert(fleet?.contract === "evavo_agent_workbench_fleet_snapshot_v1", "Fleet contract mismatch.");
   assert(fleet?.scope === "local-workbench-enabled-siblings", "Fleet scope mismatch.");
   assert(fleet?.policy?.readOnlyCompiler === true && fleet?.policy?.absenceClaimsAllowed === false && fleet?.policy?.providerEstateCompletenessClaimed === false, "Fleet truth boundary mismatch.");
+  assert(fleet?.policy?.canonicalRouteOwnershipApplied === true && fleet?.policy?.duplicateRoutesCollapsed === true, "Fleet canonical routing policy mismatch.");
+  assert(Number.isInteger(fleet?.counts?.routeCandidatesRaw) && Number.isInteger(fleet?.counts?.routeCandidates) && Number.isInteger(fleet?.counts?.duplicateRoutesCollapsed), "Fleet route counts are missing.");
+  assert(fleet.counts.routeCandidatesRaw >= fleet.counts.routeCandidates && fleet.counts.routeCandidatesRaw - fleet.counts.routeCandidates === fleet.counts.duplicateRoutesCollapsed, "Fleet route deduplication counts are inconsistent.");
   assert(Array.isArray(fleet.repositories) && fleet.repositories.some((item) => item.repository === expectedRepository), "Fleet did not compile the current repository.");
+  assert(Array.isArray(fleet.bestRoutes) && fleet.bestRoutes.every((route) => Array.isArray(route.observedFromRepositories) && route.observedFromRepositories.length > 0), "Fleet route observation provenance is missing.");
 
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_mcp_smoke_v2", status: "passed", repository: expectedRepository, tools: names, snapshotMode: snapshot.mode, fleetRepositories: fleet.counts?.repositoriesCompiled ?? 0 }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_mcp_smoke_v3", status: "passed", repository: expectedRepository, tools: names, snapshotMode: snapshot.mode, fleetRepositories: fleet.counts?.repositoriesCompiled ?? 0, fleetRouteCandidatesRaw: fleet.counts?.routeCandidatesRaw ?? 0, fleetRouteCandidates: fleet.counts?.routeCandidates ?? 0, fleetDuplicateRoutesCollapsed: fleet.counts?.duplicateRoutesCollapsed ?? 0 }, null, 2)}\n`);
 } finally {
   child.kill();
   lines.close();
