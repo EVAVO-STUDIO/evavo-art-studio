@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
+import {pathToFileURL} from "node:url";
 
 export const SCHEMA = "evavo.game-hud-review-request.v1";
 const PROFILES = {
@@ -16,6 +17,7 @@ function validateRect(rect, viewport, id) {
   for (const key of ["x","y","width","height"]) if (!Number.isFinite(rect?.[key])) fail(`${id}.${key}`);
   if (rect.width<=0 || rect.height<=0 || rect.x<0 || rect.y<0 || rect.x+rect.width>viewport.width || rect.y+rect.height>viewport.height) fail(`${id} is outside viewport`);
 }
+function nonEmpty(value) { return typeof value==="string" && value.trim().length>0; }
 export function reviewGameHud(request) {
   if (request?.schemaVersion!==SCHEMA) fail("unsupported schemaVersion");
   const viewport=request.logicalViewport;
@@ -37,6 +39,22 @@ export function reviewGameHud(request) {
     }
   }
   const byId=new Map(request.elements.map((entry)=>[entry.id,entry])); const viewportArea=viewport.width*viewport.height; const findings=[];
+  const criticalDecisions=Array.isArray(request.criticalDecisions) ? request.criticalDecisions : [];
+  if (!criticalDecisions.length || criticalDecisions.some((entry)=>!nonEmpty(entry)) || new Set(criticalDecisions).size!==criticalDecisions.length) findings.push({severity:"block",code:"CRITICAL_DECISIONS_REQUIRED"});
+  const decisionElements=new Map(criticalDecisions.map((entry)=>[entry,[]]));
+  for (const element of request.elements) for (const decision of element.decisionIds ?? []) {
+    if (!decisionElements.has(decision)) fail(`${element.id}.decisionIds references undeclared decision ${decision}`);
+    decisionElements.get(decision).push(element);
+  }
+  for (const [decision,elements] of decisionElements) {
+    if (!elements.length) findings.push({severity:"block",code:"CRITICAL_DECISION_MISSING",decision});
+    const permanentClusters=new Set(elements.filter((entry)=>entry.persistence==="permanent").map((entry)=>entry.cluster));
+    if (permanentClusters.size>1) findings.push({severity:"review",code:"CRITICAL_DECISION_DUPLICATED",decision,elements:elements.map((entry)=>entry.id)});
+  }
+  const style=request.styleContract;
+  const requiredStyleFields=["visualPeriod","fiction","typography","iconLanguage","framingLanguage"];
+  const styleComplete=Boolean(style && requiredStyleFields.every((key)=>nonEmpty(style[key])) && Number.isInteger(style.nativePixelGrid) && style.nativePixelGrid>0 && Array.isArray(style.opacityHierarchy) && style.opacityHierarchy.length>=3 && style.semanticColors && typeof style.semanticColors==="object" && Object.keys(style.semanticColors).length>=3);
+  if (!styleComplete) findings.push({severity:"block",code:"STYLE_CONTRACT_REQUIRED",required:[...requiredStyleFields,"nativePixelGrid","opacityHierarchy[3+]","semanticColors[3+]" ]});
   const states=request.states.map((state)=>{
     const visible=state.visibleElementIds.map((id)=>byId.get(id) ?? fail(`${state.id} references ${id}`));
     const permanent=visible.filter((entry)=>entry.persistence==="permanent");
@@ -58,7 +76,8 @@ export function reviewGameHud(request) {
   if (top.length) findings.push({severity:"review",code:"PERMANENT_TOP_EDGE",elements:top.map((entry)=>entry.id)});
   if (!request.states.every((state)=>typeof state.capture==="string" && state.capture.length>0)) findings.push({severity:"review",code:"CAPTURE_EVIDENCE_REQUIRED"});
   const blocked=findings.some((finding)=>finding.severity==="block");
-  return {schemaVersion:"evavo.game-hud-review.v1",projectId:request.projectId,genreProfile:request.genreProfile ?? "general",budget:profile,status:blocked?"blocked":findings.length?"review-required":"pass",principles:["protect gameplay visibility","group by player decision","keep permanent clusters peripheral","fade instrument housing when world geometry crosses it","keep critical symbology legible while housing yields","let critical cues replace routine cues","review representative captures at runtime scale"],states,findings};
+  const uxStudioObservations={gameplay_hud_occlusion_acceptable:!findings.some((finding)=>["PERMANENT_OCCLUSION","STATE_OCCLUSION","GAMEPLAY_OCCLUSION_WITHOUT_YIELD","CRITICAL_OVERLAP"].includes(finding.code)),critical_hud_state_glanceable:!findings.some((finding)=>["CRITICAL_DECISIONS_REQUIRED","CRITICAL_DECISION_MISSING","CRITICAL_DECISION_DUPLICATED","PERSISTENT_CLUSTER_COUNT"].includes(finding.code)),hud_visual_language_coherent:styleComplete};
+  return {schemaVersion:"evavo.game-hud-review.v1",projectId:request.projectId,genreProfile:request.genreProfile ?? "general",budget:profile,status:blocked?"blocked":findings.length?"review-required":"pass",principles:["protect gameplay visibility","group by player decision","keep permanent clusters peripheral","fade instrument housing when world geometry crosses it","keep critical symbology legible while housing yields","let critical cues replace routine cues","bind typography, icons, frames and color to one declared visual language","review representative captures at runtime scale"],styleContract:style ?? null,criticalDecisions,uxStudioObservations,states,findings};
 }
 async function main() {
   const args=process.argv.slice(2), inputAt=args.indexOf("--input"), outputAt=args.indexOf("--output");
@@ -67,4 +86,4 @@ async function main() {
   if (outputAt>=0 && args[outputAt+1]) await fs.writeFile(path.resolve(args[outputAt+1]),text,"utf8"); else process.stdout.write(text);
   if (result.status==="blocked") process.exitCode=2;
 }
-if (import.meta.url===`file://${process.argv[1]?.replaceAll("\\","/")}`) await main();
+if (process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href) await main();

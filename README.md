@@ -2,6 +2,8 @@
 
 EVAVO Art Studio is a governed art-production platform for professional game, digital and print assets. It inspects a project, understands its design and art direction, calculates the complete asset inventory, creates and revises artwork through explicit stages, masters transparent sprites and animation, and exports evidence-backed delivery packages.
 
+For persistent game interfaces, use the native-resolution composition and evidence workflow in [`docs/GAME_HUD_ART_DIRECTION.md`](./docs/GAME_HUD_ART_DIRECTION.md). It treats play-space occlusion, glanceability and style coherence as separate review outcomes.
+
 This repository is intentionally broader than an image generator. It is the shared production engine behind a premium web control plane, versioned REST API, local CLI, MCP tools for ChatGPT and Claude, durable workers, provider adapters and engine-specific exporters.
 
 ## Working foundation
