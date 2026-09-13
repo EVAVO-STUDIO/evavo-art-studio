@@ -13,6 +13,7 @@
     "evavo_agent_workbench_capabilities",
     "evavo_agent_workbench_snapshot",
     "evavo_agent_workbench_fleet",
+    "evavo_agent_workbench_shared_drift",
     "evavo_agent_workbench_guide",
     "evavo_agent_workbench_handoff"
   ],
@@ -24,6 +25,12 @@
     "canonicalRouteOwnership": true,
     "duplicateRoutesCollapsed": true,
     "observationProvenance": "observedFromRepositories"
+  },
+  "sharedDrift": {
+    "inspector": "scripts/agent-workbench-shared-drift.mjs",
+    "test": "scripts/test-agent-workbench-shared-drift.mjs",
+    "scope": "workspace-root-direct-children",
+    "comparisonBasis": "byte-identical-sha256"
   },
   "guidance": {
     "schema": "schemas/evavo.agent-workbench-guidance.schema.json",
@@ -56,6 +63,10 @@
     "fleetAllowsAbsenceClaims": false,
     "fleetCanonicalRouteOwnershipApplied": true,
     "fleetDuplicateRoutesCollapsed": true,
+    "sharedDriftAuthorizesExecution": false,
+    "sharedDriftAuthorizesMutation": false,
+    "sharedDriftAutomaticRepair": false,
+    "sharedDriftUnavailableDoesNotProveAlignment": true,
     "registrationExecutesServer": false,
     "registrationGrantsAuthority": false,
     "doctorAuthorizesEffects": false,
