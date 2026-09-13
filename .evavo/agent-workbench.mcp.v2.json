@@ -4,16 +4,22 @@
   "authority": "art-studio",
   "transport": "stdio",
   "protocolVersion": "2025-03-26",
-  "supportedProtocolVersions": ["2025-03-26", "2026-07-28"],
+  "supportedProtocolVersions": [
+    "2025-03-26",
+    "2026-07-28"
+  ],
   "evavoDiscoveryMethod": "server/discover",
   "command": "node",
-  "args": ["scripts/agent-workbench-mcp-v2.mjs"],
+  "args": [
+    "scripts/agent-workbench-mcp-v2.mjs"
+  ],
   "readOnly": true,
   "tools": [
     "evavo_agent_workbench_capabilities",
     "evavo_agent_workbench_snapshot",
     "evavo_agent_workbench_fleet",
     "evavo_agent_workbench_shared_drift",
+    "evavo_agent_workbench_health_fleet",
     "evavo_agent_workbench_guide",
     "evavo_agent_workbench_handoff"
   ],
@@ -31,6 +37,17 @@
     "test": "scripts/test-agent-workbench-shared-drift.mjs",
     "scope": "workspace-root-direct-children",
     "comparisonBasis": "byte-identical-sha256"
+  },
+  "healthFleet": {
+    "inspector": "scripts/agent-workbench-health-fleet.mjs",
+    "test": "scripts/test-agent-workbench-health-fleet.mjs",
+    "scope": "workspace-root-direct-children",
+    "coreRepositories": [
+      "EVAVO-STUDIO/the-brain",
+      "EVAVO-STUDIO/evavo-development-studio",
+      "EVAVO-STUDIO/evavo-art-studio"
+    ],
+    "partialCoverageIsNotReady": true
   },
   "guidance": {
     "schema": "schemas/evavo.agent-workbench-guidance.schema.json",
@@ -67,6 +84,11 @@
     "sharedDriftAuthorizesMutation": false,
     "sharedDriftAutomaticRepair": false,
     "sharedDriftUnavailableDoesNotProveAlignment": true,
+    "healthFleetAuthorizesExecution": false,
+    "healthFleetAuthorizesMutation": false,
+    "healthFleetAutomaticRepair": false,
+    "healthFleetClaimsProviderCompleteness": false,
+    "healthFleetAllowsAbsenceClaims": false,
     "registrationExecutesServer": false,
     "registrationGrantsAuthority": false,
     "doctorAuthorizesEffects": false,

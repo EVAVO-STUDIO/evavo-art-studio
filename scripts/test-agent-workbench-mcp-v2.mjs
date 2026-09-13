@@ -15,6 +15,7 @@ const expectedTools = [
   "evavo_agent_workbench_snapshot",
   "evavo_agent_workbench_fleet",
   "evavo_agent_workbench_shared_drift",
+  "evavo_agent_workbench_health_fleet",
   "evavo_agent_workbench_guide",
   "evavo_agent_workbench_handoff",
 ];
@@ -36,7 +37,8 @@ try {
   assert(discovered.result?.readOnly === true && discovered.result?.truthBoundary?.executionGranted === false && discovered.result?.truthBoundary?.mutationGranted === false && discovered.result?.truthBoundary?.publicationGranted === false, "EVAVO discovery truth boundary mismatch.");
   assert(discovered.result?.capabilities?.tools?.count === expectedTools.length, "EVAVO discovery tool count mismatch.");
   assert(JSON.stringify(discovered.result?.capabilities?.tools?.names) === JSON.stringify(expectedTools), "EVAVO discovery tool names mismatch.");
-  assert(discovered.result?.capabilities?.fleet === true && discovered.result?.capabilities?.sharedDrift === true, "EVAVO discovery did not advertise fleet/shared-drift awareness.");
+  assert(discovered.result?.capabilities?.fleet === true && discovered.result?.capabilities?.sharedDrift === true && discovered.result?.capabilities?.healthFleet === true, "EVAVO discovery did not advertise fleet/shared-drift/health-fleet awareness.");
+  assert(discovered.result?.truthBoundary?.healthFleetAutomaticRepair === false && discovered.result?.truthBoundary?.healthFleetClaimsProviderCompleteness === false && discovered.result?.truthBoundary?.healthFleetAllowsAbsenceClaims === false, "EVAVO discovery health-fleet truth boundary mismatch.");
 
   send({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
   const initialized = await nextResponse();
@@ -47,7 +49,7 @@ try {
   send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
   const listed = await nextResponse();
   const names = listed.result?.tools?.map((item) => item.name) ?? [];
-  assert(JSON.stringify(names) === JSON.stringify(expectedTools), "Expected exactly the canonical six workbench MCP tools.");
+  assert(JSON.stringify(names) === JSON.stringify(expectedTools), "Expected exactly the canonical seven workbench MCP tools.");
 
   send({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "evavo_agent_workbench_snapshot", arguments: { objective: "agent workbench smoke test", limit: 5 } } });
   const snapshotResponse = await nextResponse();
@@ -72,7 +74,16 @@ try {
   assert(drift?.status === "unavailable", "Repository-scoped smoke should have unavailable sibling evidence.");
   assert(drift?.policy?.readOnly === true && drift?.policy?.providerQueriesPerformed === false && drift?.policy?.mutationPerformed === false && drift?.policy?.unavailableDoesNotProveAlignment === true, "Shared drift truth boundary mismatch.");
 
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_mcp_smoke_v4", status: "passed", repository: expectedRepository, tools: names, snapshotMode: snapshot.mode, fleetRepositories: fleet.counts?.repositoriesCompiled ?? 0, sharedDriftStatus: drift.status }, null, 2)}\n`);
+  send({ jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "evavo_agent_workbench_health_fleet", arguments: { workspaceRoot: root } } });
+  const healthResponse = await nextResponse();
+  const health = healthResponse.result?.structuredContent;
+  assert(health?.contract === "evavo_agent_workbench_health_fleet_v1", "Health-fleet contract mismatch.");
+  assert(health?.status === "partial", "Repository-scoped health smoke must report partial core coverage.");
+  assert(health?.coreCoverage?.complete === false, "Repository-scoped health smoke must not report complete core coverage.");
+  assert(health?.workspace?.providerCompletenessClaimed === false && health?.workspace?.absenceClaimsAllowed === false, "Health-fleet workspace truth boundary mismatch.");
+  assert(health?.policy?.readOnly === true && health?.policy?.mutationPerformed === false && health?.policy?.automaticRepairPerformed === false && health?.policy?.localCoverageDoesNotProveProviderAbsence === true && health?.policy?.partialCoreCoverageIsNotReportedReady === true, "Health-fleet policy mismatch.");
+
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_mcp_smoke_v5", status: "passed", repository: expectedRepository, tools: names, snapshotMode: snapshot.mode, fleetRepositories: fleet.counts?.repositoriesCompiled ?? 0, sharedDriftStatus: drift.status, healthFleetStatus: health.status }, null, 2)}\n`);
 } finally {
   child.kill();
   lines.close();
