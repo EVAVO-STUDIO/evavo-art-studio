@@ -161,3 +161,14 @@ only when the selected boundary pixels belong to one visually compatible
 surface; a body crease, lamp edge, outline or value band crossing the rectangle
 requires a reviewed mask or artist repair. It is not a substitute for semantic
 repair of complex texture, silhouette damage or mixed-boundary regions.
+
+For a genuinely transparent sprite with a proven primary connected subject and
+detached generated dust, shadow lines or alpha specks, use
+`tools/alpha_island_cleanup.mjs`. The default retains only the largest
+8-connected alpha component; `--minimum-pixels` may retain multiple deliberate
+components above an explicit size. Never use largest-component cleanup when the
+asset intentionally contains detached hands, particles, highlights or letters.
+If a reviewed generated artifact is attached to the bottom canvas edge (for
+example a one-pixel shadow rule), `--clear-bottom-rows` can clear at most 16
+explicit rows and reports the exact affected-pixel count. Use it only when the
+hostile proof establishes that no intended silhouette occupies that edge strip.
