@@ -32,6 +32,8 @@ const SHARED_PATHS = Object.freeze([
   "scripts/test-agent-workbench-doctor.mjs",
   "scripts/agent-workbench-shared-drift.mjs",
   "scripts/test-agent-workbench-shared-drift.mjs",
+  "scripts/agent-workbench-health-fleet.mjs",
+  "scripts/test-agent-workbench-health-fleet.mjs",
   "schemas/evavo.agent-workbench-config.schema.json",
   "schemas/evavo.agent-workbench-snapshot.schema.json",
   "schemas/evavo.agent-workbench-handoff.schema.json",
@@ -178,12 +180,14 @@ function selfTest() {
     new Set(SHARED_PATHS).size === SHARED_PATHS.length,
     SHARED_PATHS.includes("scripts/agent-workbench.mjs"),
     SHARED_PATHS.includes("scripts/agent-workbench-doctor.mjs"),
+    SHARED_PATHS.includes("scripts/agent-workbench-health-fleet.mjs"),
+    SHARED_PATHS.includes("scripts/test-agent-workbench-health-fleet.mjs"),
     SHARED_PATHS.includes("scripts/verify-agent-workbench-guidance.mjs"),
     SHARED_PATHS.includes("schemas/evavo.agent-workbench-fleet.schema.json"),
     CONTRACT === "evavo_agent_workbench_shared_drift_v1"
   ];
   if (assertions.some((value) => value !== true)) fail("shared-drift self-test failed");
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_shared_drift_self_test_v1", status: "passed", assertions: assertions.length }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_shared_drift_self_test_v2", status: "passed", assertions: assertions.length }, null, 2)}\n`);
 }
 
 function main() {

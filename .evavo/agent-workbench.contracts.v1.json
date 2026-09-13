@@ -35,7 +35,9 @@
     "doctorRepairRegistration": "scripts/agent-workbench-doctor.mjs --repair-registration",
     "doctorTest": "scripts/test-agent-workbench-doctor.mjs",
     "sharedDrift": "scripts/agent-workbench-shared-drift.mjs",
-    "sharedDriftTest": "scripts/test-agent-workbench-shared-drift.mjs"
+    "sharedDriftTest": "scripts/test-agent-workbench-shared-drift.mjs",
+    "healthFleet": "scripts/agent-workbench-health-fleet.mjs",
+    "healthFleetTest": "scripts/test-agent-workbench-health-fleet.mjs"
   },
   "truthBoundary": {
     "discoveryAuthorizesExecution": false,
@@ -62,6 +64,9 @@
     "sharedDriftCheckReadOnly": true,
     "sharedDriftAutomaticRepair": false,
     "sharedDriftUnavailableDoesNotProveAlignment": true,
+    "healthFleetReadOnly": true,
+    "healthFleetAutomaticRepair": false,
+    "healthFleetLocalCoverageDoesNotProveProviderAbsence": true,
     "doctorRepairScope": ".mcp.json workbench v2 registration only",
     "downstreamAdmissionRequired": true
   },
