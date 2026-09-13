@@ -6,6 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { planAgentWorkbenchMcpRegistration, applyAgentWorkbenchMcpRegistration } from "./agent-workbench-mcp-registration.mjs";
+import { inspectSharedWorkbenchDrift } from "./agent-workbench-shared-drift.mjs";
 
 const CONTRACT = "evavo_agent_workbench_doctor_v1";
 const STANDARD_PROTOCOL = "2025-03-26";
@@ -31,7 +32,7 @@ function safeFile(root, relative, label) {
   return filePath;
 }
 
-export function inspectAgentWorkbench(root) {
+export function inspectAgentWorkbench(root, options = {}) {
   const repositoryRoot = path.resolve(root);
   const configRead = readRegularJson(path.join(repositoryRoot, ".evavo", "agent-workbench.v1.json"), "workbench config");
   const bundleRead = readRegularJson(path.join(repositoryRoot, ".evavo", "agent-workbench.contracts.v1.json"), "workbench bundle");
@@ -52,7 +53,7 @@ export function inspectAgentWorkbench(root) {
     "evavo_agent_workbench_snapshot",
     "evavo_agent_workbench_fleet",
     "evavo_agent_workbench_guide",
-    "evavo_agent_workbench_handoff",
+    "evavo_agent_workbench_handoff"
   ];
   if (JSON.stringify(descriptor.tools) !== JSON.stringify(expectedTools)) fail("Workbench MCP v2 tool set mismatch.");
   if (descriptor.protocolVersion !== STANDARD_PROTOCOL || !Array.isArray(descriptor.supportedProtocolVersions) || !descriptor.supportedProtocolVersions.includes(STANDARD_PROTOCOL) || !descriptor.supportedProtocolVersions.includes(EVAVO_DISCOVERY_PROTOCOL) || descriptor.evavoDiscoveryMethod !== "server/discover") fail("Workbench MCP v2 dual-protocol contract mismatch.");
@@ -65,6 +66,7 @@ export function inspectAgentWorkbench(root) {
   const bundleTruth = bundle.truthBoundary ?? {};
   if (bundleTruth.mcpLaunchEvidenceAuthorizesExecution !== false || bundleTruth.mcpLaunchEvidenceRetainsEnvironmentValues !== false || bundleTruth.mcpLaunchEvidenceRetainsArgumentValues !== false) fail("Workbench awareness truth boundary mismatch.");
   if (bundleTruth.fleetAuthorizesExecution !== false || bundleTruth.fleetClaimsProviderCompleteness !== false || bundleTruth.fleetAllowsAbsenceClaims !== false || bundleTruth.fleetCanonicalRouteOwnershipApplied !== true || bundleTruth.fleetDuplicateRoutesCollapsed !== true) fail("Workbench fleet truth boundary mismatch.");
+  if (bundleTruth.sharedDriftCheckReadOnly !== true || bundleTruth.sharedDriftAutomaticRepair !== false || bundleTruth.sharedDriftUnavailableDoesNotProveAlignment !== true) fail("Workbench shared drift truth boundary mismatch.");
 
   const requiredPaths = [
     bundle.orientationGuide,
@@ -84,13 +86,15 @@ export function inspectAgentWorkbench(root) {
     bundle.entrypoints?.mcpSmoke,
     bundle.entrypoints?.mcpV2,
     bundle.entrypoints?.mcpV2Smoke,
+    bundle.entrypoints?.sharedDrift,
+    bundle.entrypoints?.sharedDriftTest,
     "scripts/agent-workbench-mcp-registration.mjs",
     "scripts/test-agent-workbench-mcp-registration.mjs",
     bundle.schemas?.config,
     bundle.schemas?.snapshot,
     bundle.schemas?.handoff,
     bundle.schemas?.guidance,
-    bundle.schemas?.fleet,
+    bundle.schemas?.fleet
   ].filter(Boolean);
 
   const artifacts = requiredPaths.map((relative) => {
@@ -101,8 +105,10 @@ export function inspectAgentWorkbench(root) {
 
   const registration = planAgentWorkbenchMcpRegistration(repositoryRoot);
   const registrationState = registration.alreadyExact ? "registered" : registration.existingEntryWasDifferent ? "drifted" : "missing";
+  const sharedDrift = inspectSharedWorkbenchDrift(repositoryRoot, { workspaceRoot: options.workspaceRoot });
   const findings = [];
   if (!registration.alreadyExact) findings.push({ severity: "repair", code: "workbench-mcp-v2-registration-not-exact", state: registrationState, action: "node scripts/agent-workbench-mcp-registration.mjs --write" });
+  if (sharedDrift.status === "drifted") findings.push({ severity: "error", code: "workbench-shared-files-drifted", state: "drifted", mismatchCount: sharedDrift.mismatchCount, comparedRepositories: sharedDrift.comparedRepositories, action: "Align shared Workbench files from the canonical reviewed source; automatic drift repair is intentionally disabled." });
 
   return {
     contract: CONTRACT,
@@ -122,8 +128,9 @@ export function inspectAgentWorkbench(root) {
       absenceClaimsAllowed: false,
       canonicalRouteOwnershipApplied: true,
       duplicateRoutesCollapsed: true,
-      observationProvenance: FLEET_PROVENANCE,
+      observationProvenance: FLEET_PROVENANCE
     },
+    sharedDrift,
     artifactCount: artifacts.length,
     artifacts,
     registration: {
@@ -133,7 +140,7 @@ export function inspectAgentWorkbench(root) {
       existingEntryPresent: registration.existingEntryPresent,
       existingEntryWasDifferent: registration.existingEntryWasDifferent,
       beforeSha256: registration.beforeSha256,
-      afterSha256: registration.afterSha256,
+      afterSha256: registration.afterSha256
     },
     findings,
     policy: {
@@ -150,16 +157,20 @@ export function inspectAgentWorkbench(root) {
       fleetAllowsAbsenceClaims: false,
       fleetCanonicalRouteOwnershipApplied: true,
       fleetDuplicateRoutesCollapsed: true,
-      repairScope: ".mcp.json workbench v2 registration only",
-    },
+      sharedDriftCheckReadOnly: true,
+      sharedDriftUnavailableDoesNotProveAlignment: true,
+      sharedDriftAutomaticRepair: false,
+      repairScope: ".mcp.json workbench v2 registration only"
+    }
   };
 }
 
 function parse(argv) {
-  const options = { root: null, repairRegistration: false, selfTest: false };
+  const options = { root: null, workspaceRoot: null, repairRegistration: false, selfTest: false };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--root") options.root = argv[++index] ?? null;
+    else if (token === "--workspace-root") options.workspaceRoot = argv[++index] ?? null;
     else if (token === "--repair-registration") options.repairRegistration = true;
     else if (token === "--self-test") options.selfTest = true;
     else fail(`Unknown argument: ${token}`);
@@ -175,22 +186,24 @@ function selfTest() {
     FLEET_PROVENANCE === "observedFromRepositories",
     ORIENTATION_GUIDE === "WORKBENCH_FIRST.md",
     CONTRACT === "evavo_agent_workbench_doctor_v1",
+    typeof inspectSharedWorkbenchDrift === "function"
   ];
   if (assertions.some((value) => value !== true)) fail("doctor self-test failed");
-  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v4", status: "passed", assertions: assertions.length }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ contract: "evavo_agent_workbench_doctor_self_test_v5", status: "passed", assertions: assertions.length }, null, 2)}\n`);
 }
 
 function main() {
   const options = parse(process.argv.slice(2));
   if (options.selfTest) return selfTest();
   const root = path.resolve(options.root ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
-  let result = inspectAgentWorkbench(root);
+  const inspectOptions = { workspaceRoot: options.workspaceRoot };
+  let result = inspectAgentWorkbench(root, inspectOptions);
   let repair = null;
   if (options.repairRegistration && result.registration.alreadyExact !== true) {
     const plan = planAgentWorkbenchMcpRegistration(root);
     repair = applyAgentWorkbenchMcpRegistration(plan);
-    result = inspectAgentWorkbench(root);
-    if (result.status !== "ready") fail("Workbench doctor registration repair did not reach ready state.");
+    result = inspectAgentWorkbench(root, inspectOptions);
+    if (result.status !== "ready") fail("Workbench doctor registration repair did not reach ready state; unresolved shared drift or another health finding remains.");
   }
   process.stdout.write(`${JSON.stringify({ ...result, repair: repair ? { registrationWritePerformed: repair.written, backupPath: repair.backupPath } : null }, null, 2)}\n`);
 }
