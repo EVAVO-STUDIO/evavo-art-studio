@@ -150,3 +150,14 @@ Admission happens before trimming, slicing or packing. Evidence is retained per 
 - Use protect/remove masks for bounded hand correction.
 - Re-run decoded-pixel QA and transparency admission after every correction.
 - Keep all results unapproved until the existing comparison, sequence, human-review and promotion boundaries pass.
+# Bounded opaque-detail repair
+
+When an exact reference proves that a small opaque detail must be removed, use
+`tools/bounded_scanline_repair.mjs` with an explicit rectangle. The command
+interpolates between retained boundary pixels in horizontal, vertical or
+four-edge surface mode, preserves source bytes outside the rectangle, retains
+canvas and alpha, and refuses in-place source overwrite. Promote its output
+only when the selected boundary pixels belong to one visually compatible
+surface; a body crease, lamp edge, outline or value band crossing the rectangle
+requires a reviewed mask or artist repair. It is not a substitute for semantic
+repair of complex texture, silhouette damage or mixed-boundary regions.
