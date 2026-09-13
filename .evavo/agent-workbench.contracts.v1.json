@@ -33,7 +33,9 @@
     "mcpRegistrationTest": "scripts/test-agent-workbench-mcp-registration.mjs",
     "doctor": "scripts/agent-workbench-doctor.mjs",
     "doctorRepairRegistration": "scripts/agent-workbench-doctor.mjs --repair-registration",
-    "doctorTest": "scripts/test-agent-workbench-doctor.mjs"
+    "doctorTest": "scripts/test-agent-workbench-doctor.mjs",
+    "sharedDrift": "scripts/agent-workbench-shared-drift.mjs",
+    "sharedDriftTest": "scripts/test-agent-workbench-shared-drift.mjs"
   },
   "truthBoundary": {
     "discoveryAuthorizesExecution": false,
@@ -57,6 +59,9 @@
     "registrationExecutesServer": false,
     "registrationAuthorizesEffects": false,
     "doctorAuthorizesEffects": false,
+    "sharedDriftCheckReadOnly": true,
+    "sharedDriftAutomaticRepair": false,
+    "sharedDriftUnavailableDoesNotProveAlignment": true,
     "doctorRepairScope": ".mcp.json workbench v2 registration only",
     "downstreamAdmissionRequired": true
   },
