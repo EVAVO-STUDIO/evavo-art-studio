@@ -38,7 +38,9 @@ export async function boundedScanlineRepair({ input, output, x, y, width, height
       const edgeDistance = Math.min(axisPosition, axisLength + 1 - axisPosition);
       const blend = feather === 0 ? 1 : Math.min(1, edgeDistance / feather);
       const offset = (py * info.width + px) * 4;
-      for (let channel = 0; channel < 4; channel += 1) {
+      // Repair colour only. Alpha is geometry/coverage authority and must remain
+      // byte-identical to the immutable source, including inside the rectangle.
+      for (let channel = 0; channel < 3; channel += 1) {
         let reconstructed = Math.round(data[start + channel] * (1 - t) + data[end + channel] * t);
         if (direction === "surface") {
           const u = (px - x + 1) / (width + 1);
@@ -61,7 +63,15 @@ export async function boundedScanlineRepair({ input, output, x, y, width, height
     }
   }
   await sharp(result, { raw: info }).png().toFile(output);
-  return { input, output, canvas: [info.width, info.height], editedBounds: [x, y, x + width, y + height], direction, changedPixels };
+  return {
+    input,
+    output,
+    canvas: [info.width, info.height],
+    editedBounds: [x, y, x + width, y + height],
+    direction,
+    changedPixels,
+    alphaPreservedExactly: true,
+  };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

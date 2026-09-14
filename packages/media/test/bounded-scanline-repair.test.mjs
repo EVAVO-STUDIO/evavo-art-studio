@@ -11,16 +11,22 @@ test("bounded scanline repair preserves canvas, alpha and every pixel outside it
   const input = path.join(dir, "input.png");
   const output = path.join(dir, "output.png");
   const pixels = Buffer.alloc(8 * 4 * 4, 255);
-  for (let x = 2; x < 5; x += 1) for (let y = 1; y < 3; y += 1) pixels[(y * 8 + x) * 4] = 0;
+  for (let x = 2; x < 5; x += 1) for (let y = 1; y < 3; y += 1) {
+    const offset = (y * 8 + x) * 4;
+    pixels[offset] = 0;
+    pixels[offset + 3] = 180 + x + y;
+  }
   await sharp(pixels, { raw: { width: 8, height: 4, channels: 4 } }).png().toFile(input);
   const receipt = await boundedScanlineRepair({ input, output, x: 2, y: 1, width: 3, height: 2, feather: 0 });
   const before = await sharp(await readFile(input)).ensureAlpha().raw().toBuffer();
   const after = await sharp(await readFile(output)).ensureAlpha().raw().toBuffer();
   assert.deepEqual(receipt.canvas, [8, 4]);
   assert.equal(receipt.changedPixels, 6);
+  assert.equal(receipt.alphaPreservedExactly, true);
   for (let y = 0; y < 4; y += 1) for (let x = 0; x < 8; x += 1) {
-    if (x >= 2 && x < 5 && y >= 1 && y < 3) continue;
     const offset = (y * 8 + x) * 4;
+    assert.equal(after[offset + 3], before[offset + 3], `alpha changed at ${x},${y}`);
+    if (x >= 2 && x < 5 && y >= 1 && y < 3) continue;
     assert.deepEqual(after.subarray(offset, offset + 4), before.subarray(offset, offset + 4));
   }
 });
