@@ -125,3 +125,12 @@ test("catches implausible frame-to-frame rotation and scale pops", () => {
   assert.ok(issues.includes("idle-east-01: implausible equipment rotation jump from idle-east-00"));
   assert.ok(issues.includes("idle-east-01: implausible equipment scale jump from idle-east-00"));
 });
+
+test("treats opposite signs of the same measured principal axis as equivalent", () => {
+  const valid = structuredClone(base);
+  valid.directionRules[0].expectedRotationDegrees = 90;
+  valid.frames[0].equipmentRotationDegrees = -89;
+  valid.frames[1].equipmentRotationDegrees = 89;
+  const issues = validateDirectionalEquipmentContinuityV2(valid);
+  assert.ok(!issues.some((issue) => issue.includes("rotation")));
+});

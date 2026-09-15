@@ -98,6 +98,13 @@ const angularDistance = (a: number, b: number): number => {
   const delta = Math.abs((a - b) % 360);
   return Math.min(delta, 360 - delta);
 };
+// A mask-derived principal axis has no arrow: +89 and -89 degrees describe the
+// same near-vertical axis. Equipment face ownership remains directed and is
+// independently enforced by cameraVector/equipmentOuterNormal.
+const axisAngularDistance = (a: number, b: number): number => {
+  const directed = angularDistance(a, b);
+  return Math.min(directed, Math.abs(180 - directed));
+};
 const inferredFace = (frame: DirectionalEquipmentFrameReviewV2, minimum: number): MeasuredEquipmentFace => {
   const cameraLength = vectorLength(frame.cameraVector);
   const normalLength = vectorLength(frame.equipmentOuterNormal);
@@ -164,7 +171,7 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
       if (!rule.allowedVisibleFaces.includes(frame.visibleFace)) issues.push(`${frame.frameId}: visible face violates ${frame.cameraDirection} rule`);
       if (!rule.allowedScreenSides.includes(frame.equipmentScreenSide)) issues.push(`${frame.frameId}: screen placement violates ${frame.cameraDirection} rule`);
       if (frame.visibleFace !== "occluded" && inferredFace(frame, rule.minimumFaceDotMagnitude) !== frame.visibleFace) issues.push(`${frame.frameId}: visible face disagrees with camera and equipment plane`);
-      if (angularDistance(frame.equipmentRotationDegrees, rule.expectedRotationDegrees) > rule.maximumRotationErrorDegrees) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
+      if (axisAngularDistance(frame.equipmentRotationDegrees, rule.expectedRotationDegrees) > rule.maximumRotationErrorDegrees) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
     }
     if (frame.equipmentScreenSide !== "occluded") {
       const delta = frame.equipmentCentroid.x - frame.subjectCentroid.x;
@@ -198,7 +205,7 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     for (let index = 1; index < frames.length; index += 1) {
       const before = frames[index - 1];
       const after = frames[index];
-      if (angularDistance(before.equipmentRotationDegrees, after.equipmentRotationDegrees) > value.thresholds.maximumFrameRotationDeltaDegrees) issues.push(`${after.frameId}: implausible equipment rotation jump from ${before.frameId}`);
+      if (axisAngularDistance(before.equipmentRotationDegrees, after.equipmentRotationDegrees) > value.thresholds.maximumFrameRotationDeltaDegrees) issues.push(`${after.frameId}: implausible equipment rotation jump from ${before.frameId}`);
       const scaleChange = Math.abs(after.equipmentScaleFraction - before.equipmentScaleFraction) / before.equipmentScaleFraction;
       if (scaleChange > value.thresholds.maximumFrameScaleFractionChange) issues.push(`${after.frameId}: implausible equipment scale jump from ${before.frameId}`);
     }
