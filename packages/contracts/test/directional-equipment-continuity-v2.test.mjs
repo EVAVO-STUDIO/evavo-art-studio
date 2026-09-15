@@ -134,3 +134,21 @@ test("treats opposite signs of the same measured principal axis as equivalent", 
   const issues = validateDirectionalEquipmentContinuityV2(valid);
   assert.ok(!issues.some((issue) => issue.includes("rotation")));
 });
+
+test("does not compare fragment geometry across a reviewed equipment occlusion", () => {
+  const valid = structuredClone(base);
+  valid.directionRules[0].allowedVisibleFaces.push("occluded");
+  valid.directionRules[0].allowedScreenSides.push("occluded");
+  Object.assign(valid.frames[1], {
+    visibleFace: "occluded",
+    equipmentScreenSide: "occluded",
+    equipmentRotationDegrees: 20,
+    equipmentScaleFraction: 0.02,
+    attachmentVisible: false,
+    gripVisible: false,
+    strapRouting: "occluded",
+    occlusion: "body and weapon cover the shield plane; only a small edge fragment remains",
+  });
+  const issues = validateDirectionalEquipmentContinuityV2(valid);
+  assert.ok(!issues.some((issue) => issue.includes("implausible equipment")));
+});

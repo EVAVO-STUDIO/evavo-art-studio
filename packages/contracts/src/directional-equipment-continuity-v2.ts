@@ -205,6 +205,13 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     for (let index = 1; index < frames.length; index += 1) {
       const before = frames[index - 1];
       const after = frames[index];
+      // A reviewed occlusion only measures the surviving visible fragment. Its
+      // PCA axis and area are not comparable with a fully visible equipment
+      // plane, so resume temporal geometry checks at the next visible pair.
+      if (
+        before.visibleFace === "occluded" || after.visibleFace === "occluded" ||
+        before.equipmentScreenSide === "occluded" || after.equipmentScreenSide === "occluded"
+      ) continue;
       if (axisAngularDistance(before.equipmentRotationDegrees, after.equipmentRotationDegrees) > value.thresholds.maximumFrameRotationDeltaDegrees) issues.push(`${after.frameId}: implausible equipment rotation jump from ${before.frameId}`);
       const scaleChange = Math.abs(after.equipmentScaleFraction - before.equipmentScaleFraction) / before.equipmentScaleFraction;
       if (scaleChange > value.thresholds.maximumFrameScaleFractionChange) issues.push(`${after.frameId}: implausible equipment scale jump from ${before.frameId}`);

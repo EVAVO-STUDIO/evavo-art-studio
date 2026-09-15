@@ -15,3 +15,5 @@ The v2 gate rejects camera/plane contradictions, equipment on the wrong side of 
 Image-derived measurements and semantic landmarks serve different purposes. Bounds, centroids, scale, palette, line density, pivot and silhouette evidence should come from exact decoded pixels and masks. A named reviewer must still establish which anatomical hand owns the equipment, which surface is the canonical outer face, what details are legitimately occluded and whether the pose is physically believable. Neither evidence source can silently replace the other.
 
 Mask-derived principal-axis rotation is compared modulo 180 degrees because the measured axis has no intrinsic arrow. Directed face ownership remains independently enforced by the reviewed camera vector and equipment outer-normal vector.
+
+Frame-to-frame rotation and scale comparisons pause across an explicitly reviewed occlusion. A visible fragment cannot provide a comparable full-plane axis or area; the frame must still declare the occlusion, preserve canonical-detail accounting and pass character style and identity checks.
