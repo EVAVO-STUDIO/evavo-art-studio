@@ -64,6 +64,40 @@ test("transparent selected pixels do not punch holes in an opaque destination", 
   }
 });
 
+test("accepts a same-canvas registered repair source without requiring donor geometry", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "masked-component-registered-repair-"));
+  try {
+    const input = path.join(directory, "input.png");
+    const repairInput = path.join(directory, "repair.png");
+    const mask = path.join(directory, "mask.png");
+    const output = path.join(directory, "output.png");
+    const width = 14;
+    const height = 7;
+    const pixels = Buffer.alloc(width * height * 4, 0);
+    const repair = Buffer.from(pixels);
+    for (let i = 0; i < width * height; i += 1) {
+      pixels.set([20, 30, 40, 255], i * 4);
+      repair.set([20, 30, 40, 255], i * 4);
+    }
+    pixels.set([240, 80, 20, 255], (3 * width + 3) * 4);
+    repair.set([70, 90, 110, 128], (3 * width + 3) * 4);
+    const selected = Buffer.alloc(width * height); selected[3 * width + 3] = 255;
+    await sharp(pixels, { raw: { width, height, channels: 4 } }).png().toFile(input);
+    await sharp(repair, { raw: { width, height, channels: 4 } }).png().toFile(repairInput);
+    await sharp(selected, { raw: { width, height, channels: 1 } }).png().toFile(mask);
+
+    const receipt = await maskedRgbaComponentRelocate({ input, repairInput, mask, output, sourceX: 2, sourceY: 2, width: 3, height: 3, destinationX: 8, destinationY: 2 });
+    const after = await sharp(output).ensureAlpha().raw().toBuffer();
+    assert.equal(receipt.donorBounds, null);
+    assert.equal(receipt.repairInput, repairInput);
+    assert.match(receipt.operation, /registered-repair/);
+    assert.deepEqual([...after.subarray((3 * width + 3) * 4, (3 * width + 3) * 4 + 4)], [70, 90, 110, 128]);
+    assert.deepEqual([...after.subarray((3 * width + 9) * 4, (3 * width + 9) * 4 + 4)], [240, 80, 20, 255]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("fails closed on overwrite, overlap, mask spill, and empty masks", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "masked-component-fail-closed-"));
   try {
@@ -79,6 +113,22 @@ test("fails closed on overwrite, overlap, mask spill, and empty masks", async ()
     await assert.rejects(() => maskedRgbaComponentRelocate({ input, mask, output: path.join(directory, "overlap.png"), sourceX: 0, sourceY: 0, width: 4, height: 2, destinationX: 3, destinationY: 0, donorX: 8, donorY: 0 }), /overlap/);
     await assert.rejects(() => maskedRgbaComponentRelocate({ input, mask, output: path.join(directory, "spill.png"), sourceX: 2, sourceY: 2, width: 2, height: 2, destinationX: 6, destinationY: 2, donorX: 10, donorY: 2 }), /outside/);
     await assert.rejects(() => maskedRgbaComponentRelocate({ input, mask: emptyMask, output: path.join(directory, "empty-out.png"), sourceX: 0, sourceY: 0, width: 2, height: 2, destinationX: 4, destinationY: 0, donorX: 8, donorY: 0 }), /no component/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("rejects a registered repair source with a different canvas", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "masked-component-repair-canvas-"));
+  try {
+    const input = path.join(directory, "input.png");
+    const repairInput = path.join(directory, "repair.png");
+    const mask = path.join(directory, "mask.png");
+    await sharp({ create: { width: 12, height: 6, channels: 4, background: "#00000000" } }).png().toFile(input);
+    await sharp({ create: { width: 10, height: 6, channels: 4, background: "#00000000" } }).png().toFile(repairInput);
+    const selected = Buffer.alloc(12 * 6); selected[2 * 12 + 2] = 255;
+    await sharp(selected, { raw: { width: 12, height: 6, channels: 1 } }).png().toFile(mask);
+    await assert.rejects(() => maskedRgbaComponentRelocate({ input, repairInput, mask, output: path.join(directory, "out.png"), sourceX: 1, sourceY: 1, width: 3, height: 3, destinationX: 6, destinationY: 1 }), /repair input dimensions/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

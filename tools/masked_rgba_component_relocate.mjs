@@ -22,8 +22,9 @@ function sourceOver(source, destination, coverage) {
   ];
 }
 
-export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX, sourceY, width, height, destinationX, destinationY, donorX, donorY }) {
-  const integers = [sourceX, sourceY, width, height, destinationX, destinationY, donorX, donorY];
+export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX, sourceY, width, height, destinationX, destinationY, donorX, donorY, repairInput }) {
+  const usingRegisteredRepair = Boolean(repairInput);
+  const integers = [sourceX, sourceY, width, height, destinationX, destinationY, ...(usingRegisteredRepair ? [] : [donorX, donorY])];
   if (!input || !mask || !output || integers.some((value) => !Number.isInteger(value))) throw new Error("input, mask, output and integer geometry are required");
   if (path.resolve(input) === path.resolve(output)) throw new Error("source must remain immutable; output must differ from input");
   if (width < 1 || height < 1) throw new Error("invalid component geometry");
@@ -36,9 +37,13 @@ export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX
 
   const decoded = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const maskDecoded = await sharp(mask).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const repairDecoded = usingRegisteredRepair ? await sharp(repairInput).ensureAlpha().raw().toBuffer({ resolveWithObject: true }) : null;
   const { data, info } = decoded;
   if (maskDecoded.info.width !== info.width || maskDecoded.info.height !== info.height) throw new Error("mask dimensions must match the source canvas");
-  for (const [label, left, top] of [["source", sourceX, sourceY], ["destination", destinationX, destinationY], ["donor", donorX, donorY]]) {
+  if (repairDecoded && (repairDecoded.info.width !== info.width || repairDecoded.info.height !== info.height)) throw new Error("registered repair input dimensions must match the source canvas");
+  const rectangles = [["source", sourceX, sourceY], ["destination", destinationX, destinationY]];
+  if (!usingRegisteredRepair) rectangles.push(["donor", donorX, donorY]);
+  for (const [label, left, top] of rectangles) {
     if (left < 0 || top < 0 || left + width > info.width || top + height > info.height) throw new Error(`${label} rectangle must remain inside the source canvas`);
   }
   if (sourceX < destinationX + width && destinationX < sourceX + width && sourceY < destinationY + height && destinationY < sourceY + height) throw new Error("source and destination rectangles may not overlap");
@@ -55,11 +60,12 @@ export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX
       const localX = x - sourceX;
       const localY = y - sourceY;
       const sourceOffset = (y * info.width + x) * 4;
-      const donorOffset = ((donorY + localY) * info.width + donorX + localX) * 4;
       const destinationOffset = ((destinationY + localY) * info.width + destinationX + localX) * 4;
       const moved = sourceOver(data.subarray(sourceOffset, sourceOffset + 4), data.subarray(destinationOffset, destinationOffset + 4), coverage);
+      const replacementOffset = usingRegisteredRepair ? sourceOffset : ((donorY + localY) * info.width + donorX + localX) * 4;
+      const replacementData = repairDecoded ? repairDecoded.data : data;
       for (let channel = 0; channel < 4; channel += 1) {
-        result[sourceOffset + channel] = data[donorOffset + channel];
+        result[sourceOffset + channel] = replacementData[replacementOffset + channel];
         result[destinationOffset + channel] = moved[channel];
       }
     }
@@ -79,8 +85,9 @@ export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX
     input, mask, output, canvas: [info.width, info.height], selectedPixels,
     sourceBounds: [sourceX, sourceY, sourceX + width, sourceY + height],
     destinationBounds: [destinationX, destinationY, destinationX + width, destinationY + height],
-    donorBounds: [donorX, donorY, donorX + width, donorY + height],
-    operation: "masked-rgba-component-relocate-with-donor-repair-and-source-over",
+    repairInput: repairInput ?? null,
+    donorBounds: usingRegisteredRepair ? null : [donorX, donorY, donorX + width, donorY + height],
+    operation: usingRegisteredRepair ? "masked-rgba-component-relocate-with-registered-repair-and-source-over" : "masked-rgba-component-relocate-with-donor-repair-and-source-over",
     outsideSourceAndDestinationByteIdentical: true,
   };
 }
@@ -94,6 +101,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     input: values.input, mask: values.mask, output: values.output,
     sourceX: Number(values.sourceX), sourceY: Number(values.sourceY), width: Number(values.width), height: Number(values.height),
     destinationX: Number(values.destinationX), destinationY: Number(values.destinationY), donorX: Number(values.donorX), donorY: Number(values.donorY),
+    repairInput: values.repairInput,
   });
   process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
 }
