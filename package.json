@@ -137,7 +137,7 @@
     "sprite-effects": "pnpm --filter @evavo/art-godot-sprite-effects build && pnpm --filter @evavo/art-godot-sprite-effects start --",
     "media:check": "pnpm --filter @evavo/art-delivery-optimizer test && pnpm --filter @evavo/art-audio-delivery test && pnpm --filter @evavo/art-godot-sprite-effects test",
     "sharp-exact-runtime:test": "node scripts/test-sharp-exact-canvas-runtime.mjs",
-    "sprite-sheet:safe-margin:check": "python -m unittest tests/test_sprite_sheet_safe_margin.py",
+    "sprite-sheet:safe-margin:check": "python -m unittest tests/test_sprite_sheet_safe_margin.py tests/test_measure_directional_equipment_frame.py",
     "project-art:workspace:mcp:check": "node scripts/test-project-art-workspace-mcp.mjs",
     "pixel-font:v2:catalog": "python tools/pixel_font_studio_v2.py catalog",
     "pixel-font:v2:audit": "python tools/pixel_font_studio_v2.py audit",

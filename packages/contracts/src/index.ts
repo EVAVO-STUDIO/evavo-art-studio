@@ -28,6 +28,7 @@ export * from "./book-production-promotion-adapter.js";
 export * from "./constants.js";
 export * from "./factual-visual-authority.js";
 export * from "./directional-equipment-continuity.js";
+export * from "./directional-equipment-continuity-v2.js";
 export * from "./models.js";
 export * from "./soundtrack-artwork-brief.js";
 export * from "./sprite-models.js";
