@@ -105,6 +105,27 @@ test("catches wrong placement, rotation and disconnected grip geometry", () => {
   assert.ok(issues.includes("idle-east-00: grip is disconnected from attachment geometry"));
 });
 
+test("uses a reviewed body centroid when a long weapon biases silhouette placement", () => {
+  const valid = structuredClone(base);
+  Object.assign(valid.frames[0], {
+    subjectCentroid: { x: 0.42, y: 0.5 },
+    subjectBodyCentroid: { x: 0.58, y: 0.5 },
+    equipmentCentroid: { x: 0.5, y: 0.48 },
+    equipmentScreenSide: "left",
+  });
+  valid.directionRules[0].allowedScreenSides = ["left", "right"];
+  const issues = validateDirectionalEquipmentContinuityV2(valid);
+  assert.ok(!issues.some((issue) => issue.includes("screen side")));
+});
+
+test("rejects a reviewed body centroid outside the measured subject", () => {
+  const invalid = structuredClone(base);
+  invalid.frames[0].subjectBodyCentroid = { x: 0.95, y: 0.5 };
+  assert.ok(validateDirectionalEquipmentContinuityV2(invalid).includes(
+    "idle-east-00: invalid subject body centroid",
+  ));
+});
+
 test("catches missing construction details and visual-style drift", () => {
   const invalid = structuredClone(base);
   invalid.frames[0].observedDetailIds = ["bronze-rim"];

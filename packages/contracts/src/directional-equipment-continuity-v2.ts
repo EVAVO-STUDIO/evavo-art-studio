@@ -28,6 +28,12 @@ export interface DirectionalEquipmentFrameReviewV2 {
   equipmentScreenSide: MeasuredScreenSide;
   subjectBounds: NormalizedBounds;
   subjectCentroid: NormalizedPoint;
+  /**
+   * Optional reviewed centre of the character's body mass. Use this for
+   * screen-side checks when a long weapon, cape, tail, or detached effect
+   * materially pulls the whole-silhouette centroid away from the torso.
+   */
+  subjectBodyCentroid?: NormalizedPoint;
   equipmentBounds: NormalizedBounds;
   equipmentCentroid: NormalizedPoint;
   attachmentPoint: NormalizedPoint | null;
@@ -157,6 +163,7 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     if (frame.equipmentId !== value.canonicalEquipment.equipmentId) issues.push(`${frame.frameId}: equipment identity changed`);
     if (frame.carryingSide !== value.canonicalEquipment.carryingSide) issues.push(`${frame.frameId}: anatomical carrying side changed`);
     if (!boundsValid(frame.subjectBounds) || !pointValid(frame.subjectCentroid) || !contains(frame.subjectBounds, frame.subjectCentroid)) issues.push(`${frame.frameId}: invalid subject geometry`);
+    if (frame.subjectBodyCentroid && (!pointValid(frame.subjectBodyCentroid) || !contains(frame.subjectBounds, frame.subjectBodyCentroid))) issues.push(`${frame.frameId}: invalid subject body centroid`);
     if (!boundsValid(frame.equipmentBounds) || !pointValid(frame.equipmentCentroid) || !contains(frame.equipmentBounds, frame.equipmentCentroid)) issues.push(`${frame.frameId}: invalid equipment geometry`);
     if (!pointValid(frame.pivot) || !unit(frame.groundLine)) issues.push(`${frame.frameId}: invalid registration geometry`);
     if (!finite(frame.equipmentRotationDegrees) || frame.equipmentRotationDegrees < -180 || frame.equipmentRotationDegrees > 180
@@ -177,7 +184,12 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
       ) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
     }
     if (frame.equipmentScreenSide !== "occluded") {
-      const delta = frame.equipmentCentroid.x - frame.subjectCentroid.x;
+      // Whole-silhouette centroids are reliable for compact figures, but a
+      // long spear or cape can move that centroid across a correctly carried
+      // shield. A reviewed body centroid preserves measurable placement while
+      // keeping appendage extent from producing a false side reversal.
+      const placementReference = frame.subjectBodyCentroid ?? frame.subjectCentroid;
+      const delta = frame.equipmentCentroid.x - placementReference.x;
       const measuredSide: MeasuredScreenSide = Math.abs(delta) <= 0.03 ? "centre" : delta < 0 ? "left" : "right";
       if (measuredSide !== frame.equipmentScreenSide) issues.push(`${frame.frameId}: declared screen side disagrees with measured placement`);
     }
