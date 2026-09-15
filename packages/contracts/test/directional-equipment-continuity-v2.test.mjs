@@ -150,5 +150,5 @@ test("does not compare fragment geometry across a reviewed equipment occlusion",
     occlusion: "body and weapon cover the shield plane; only a small edge fragment remains",
   });
   const issues = validateDirectionalEquipmentContinuityV2(valid);
-  assert.ok(!issues.some((issue) => issue.includes("implausible equipment")));
+  assert.deepEqual(issues, []);
 });

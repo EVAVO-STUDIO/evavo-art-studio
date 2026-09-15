@@ -16,4 +16,4 @@ Image-derived measurements and semantic landmarks serve different purposes. Boun
 
 Mask-derived principal-axis rotation is compared modulo 180 degrees because the measured axis has no intrinsic arrow. Directed face ownership remains independently enforced by the reviewed camera vector and equipment outer-normal vector.
 
-Frame-to-frame rotation and scale comparisons pause across an explicitly reviewed occlusion. A visible fragment cannot provide a comparable full-plane axis or area; the frame must still declare the occlusion, preserve canonical-detail accounting and pass character style and identity checks.
+Per-frame rotation and frame-to-frame rotation/scale comparisons pause across an explicitly reviewed occlusion. A visible fragment cannot provide a comparable full-plane axis or area; the frame must still declare the occlusion, preserve canonical-detail accounting and pass character style and identity checks.

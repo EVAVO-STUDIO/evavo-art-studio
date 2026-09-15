@@ -171,7 +171,10 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
       if (!rule.allowedVisibleFaces.includes(frame.visibleFace)) issues.push(`${frame.frameId}: visible face violates ${frame.cameraDirection} rule`);
       if (!rule.allowedScreenSides.includes(frame.equipmentScreenSide)) issues.push(`${frame.frameId}: screen placement violates ${frame.cameraDirection} rule`);
       if (frame.visibleFace !== "occluded" && inferredFace(frame, rule.minimumFaceDotMagnitude) !== frame.visibleFace) issues.push(`${frame.frameId}: visible face disagrees with camera and equipment plane`);
-      if (axisAngularDistance(frame.equipmentRotationDegrees, rule.expectedRotationDegrees) > rule.maximumRotationErrorDegrees) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
+      if (
+        frame.visibleFace !== "occluded" && frame.equipmentScreenSide !== "occluded" &&
+        axisAngularDistance(frame.equipmentRotationDegrees, rule.expectedRotationDegrees) > rule.maximumRotationErrorDegrees
+      ) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
     }
     if (frame.equipmentScreenSide !== "occluded") {
       const delta = frame.equipmentCentroid.x - frame.subjectCentroid.x;
