@@ -45,6 +45,8 @@ export interface DirectionalEquipmentFrameReviewV2 {
   cameraVector: DirectionVector;
   equipmentOuterNormal: DirectionVector;
   equipmentRotationDegrees: number;
+  /** Mask-derived PCA axis confidence. Required when the contract sets a minimum. */
+  equipmentRotationConfidence?: number;
   equipmentScaleFraction: number;
   pivot: NormalizedPoint;
   groundLine: number;
@@ -89,6 +91,10 @@ export interface DirectionalEquipmentContinuityContractV2 {
     maximumFrameGroundLineDelta?: number;
     /** Reject body-core translation even when a weapon or cape changes silhouette extent. */
     maximumFrameBodyCentroidShift?: number;
+    /** Reject equipment that teleports across the body between adjacent exposures. */
+    maximumFrameEquipmentCentroidShift?: number;
+    /** Reject unreliable PCA rotation evidence when a contract depends on measured axes. */
+    minimumEquipmentRotationConfidence?: number;
   };
   runtimeAuthority: false;
   frames: DirectionalEquipmentFrameReviewV2[];
@@ -141,6 +147,8 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     ["maximumFrameSubjectAreaFractionChange", value.thresholds.maximumFrameSubjectAreaFractionChange],
     ["maximumFrameGroundLineDelta", value.thresholds.maximumFrameGroundLineDelta],
     ["maximumFrameBodyCentroidShift", value.thresholds.maximumFrameBodyCentroidShift],
+    ["maximumFrameEquipmentCentroidShift", value.thresholds.maximumFrameEquipmentCentroidShift],
+    ["minimumEquipmentRotationConfidence", value.thresholds.minimumEquipmentRotationConfidence],
   ] as const) {
     if (threshold !== undefined && (!unit(threshold) || threshold === 0)) issues.push(`${name} must be within (0, 1]`);
   }
@@ -195,6 +203,11 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
         frame.visibleFace !== "occluded" && frame.equipmentScreenSide !== "occluded" &&
         axisAngularDistance(frame.equipmentRotationDegrees, rule.expectedRotationDegrees) > rule.maximumRotationErrorDegrees
       ) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
+    }
+    if (value.thresholds.minimumEquipmentRotationConfidence !== undefined) {
+      const confidence = frame.equipmentRotationConfidence;
+      if (confidence === undefined || !unit(confidence)) issues.push(`${frame.frameId}: valid equipment rotation confidence is required`);
+      else if (confidence < value.thresholds.minimumEquipmentRotationConfidence) issues.push(`${frame.frameId}: equipment rotation evidence is too ambiguous`);
     }
     if (frame.equipmentScreenSide !== "occluded") {
       // Whole-silhouette centroids are reliable for compact figures, but a
@@ -259,6 +272,15 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
       if (value.thresholds.maximumFrameBodyCentroidShift !== undefined
         && distance(beforeBody, afterBody) > value.thresholds.maximumFrameBodyCentroidShift) {
         issues.push(`${after.frameId}: implausible body-core shift from ${before.frameId}`);
+      }
+      if (value.thresholds.maximumFrameEquipmentCentroidShift !== undefined
+        && distance(before.equipmentCentroid, after.equipmentCentroid) > value.thresholds.maximumFrameEquipmentCentroidShift) {
+        issues.push(`${after.frameId}: implausible equipment placement jump from ${before.frameId}`);
+      }
+      const faceFlipped = (before.visibleFace === "outer" && after.visibleFace === "inner")
+        || (before.visibleFace === "inner" && after.visibleFace === "outer");
+      if (faceFlipped && before.shieldPlane !== "transition" && after.shieldPlane !== "transition") {
+        issues.push(`${after.frameId}: equipment face flipped without a declared transition from ${before.frameId}`);
       }
     }
   }

@@ -30,6 +30,7 @@ const frame = (frameId, sequenceIndex, overrides = {}) => ({
   cameraVector: { x: 1, y: 0 },
   equipmentOuterNormal: { x: -1, y: 0 },
   equipmentRotationDegrees: 90,
+  equipmentRotationConfidence: 0.8,
   equipmentScaleFraction: 0.1,
   pivot: { x: 0.5, y: 0.9 },
   groundLine: 0.9,
@@ -78,6 +79,8 @@ const base = {
     maximumFrameSubjectAreaFractionChange: 0.2,
     maximumFrameGroundLineDelta: 0.03,
     maximumFrameBodyCentroidShift: 0.08,
+    maximumFrameEquipmentCentroidShift: 0.08,
+    minimumEquipmentRotationConfidence: 0.25,
   },
   runtimeAuthority: false,
   frames: [frame("idle-east-00", 0), frame("idle-east-01", 1, { equipmentRotationDegrees: 94 })],
@@ -162,6 +165,31 @@ test("catches whole-character scale, floor and body-core registration pops", () 
   assert.ok(issues.includes("idle-east-01: implausible subject scale jump from idle-east-00"));
   assert.ok(issues.includes("idle-east-01: implausible ground-line jump from idle-east-00"));
   assert.ok(issues.includes("idle-east-01: implausible body-core shift from idle-east-00"));
+});
+
+test("catches equipment placement jumps and face flips without a transition pose", () => {
+  const invalid = structuredClone(base);
+  invalid.directionRules[0].allowedVisibleFaces = ["inner", "outer"];
+  Object.assign(invalid.frames[1], {
+    visibleFace: "outer",
+    equipmentCentroid: { x: 0.76, y: 0.48 },
+    equipmentBounds: { x: 0.65, y: 0.25, width: 0.22, height: 0.45 },
+    equipmentOuterNormal: { x: 1, y: 0 },
+    attachmentVisible: false,
+    gripVisible: false,
+    strapRouting: "not-visible",
+  });
+  const issues = validateDirectionalEquipmentContinuityV2(invalid);
+  assert.ok(issues.includes("idle-east-01: implausible equipment placement jump from idle-east-00"));
+  assert.ok(issues.includes("idle-east-01: equipment face flipped without a declared transition from idle-east-00"));
+});
+
+test("requires trustworthy rotation evidence when the contract sets a confidence floor", () => {
+  const invalid = structuredClone(base);
+  invalid.frames[0].equipmentRotationConfidence = 0.1;
+  assert.ok(validateDirectionalEquipmentContinuityV2(invalid).includes(
+    "idle-east-00: equipment rotation evidence is too ambiguous",
+  ));
 });
 
 test("rejects invalid temporal subject thresholds", () => {
