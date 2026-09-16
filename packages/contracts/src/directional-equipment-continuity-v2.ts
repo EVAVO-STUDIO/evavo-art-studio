@@ -13,6 +13,18 @@ export interface DirectionalEquipmentRuleV2 {
   minimumFaceDotMagnitude: number;
   expectedRotationDegrees: number;
   maximumRotationErrorDegrees: number;
+  /** Screen side occupied by the anatomical hand that canonically carries the item. */
+  allowedCarryingHandScreenSides?: Exclude<MeasuredScreenSide, "occluded">[];
+}
+
+export interface EquipmentDetailRuleV2 {
+  detailId: string;
+  allowedVisibleFaces: Exclude<MeasuredEquipmentFace, "occluded">[];
+}
+
+export interface EquipmentDetailObservationV2 {
+  detailId: string;
+  location: NormalizedPoint;
 }
 
 export interface DirectionalEquipmentFrameReviewV2 {
@@ -38,6 +50,11 @@ export interface DirectionalEquipmentFrameReviewV2 {
   equipmentCentroid: NormalizedPoint;
   attachmentPoint: NormalizedPoint | null;
   gripPoint: NormalizedPoint | null;
+  /** Reviewed landmarks bind equipment ownership to the correct anatomical limb. */
+  carryingHandPoint?: NormalizedPoint | null;
+  offHandPoint?: NormalizedPoint | null;
+  carryingShoulderPoint?: NormalizedPoint | null;
+  offShoulderPoint?: NormalizedPoint | null;
   attachmentVisible: boolean;
   gripVisible: boolean;
   strapRouting: "consistent" | "not-visible" | "not-applicable";
@@ -51,6 +68,7 @@ export interface DirectionalEquipmentFrameReviewV2 {
   pivot: NormalizedPoint;
   groundLine: number;
   observedDetailIds: string[];
+  detailObservations?: EquipmentDetailObservationV2[];
   occludedDetailIds: string[];
   styleEvidence: {
     paletteDistanceFromCanonical: number;
@@ -74,6 +92,8 @@ export interface DirectionalEquipmentContinuityContractV2 {
     equipmentId: string;
     carryingSide: "left" | "right" | "both" | "not-applicable";
     requiredDetailIds: string[];
+    /** Prevent face-specific hardware or heraldry from appearing on the wrong plane. */
+    detailRules?: EquipmentDetailRuleV2[];
   };
   directionRules: DirectionalEquipmentRuleV2[];
   thresholds: {
@@ -95,6 +115,10 @@ export interface DirectionalEquipmentContinuityContractV2 {
     maximumFrameEquipmentCentroidShift?: number;
     /** Reject unreliable PCA rotation evidence when a contract depends on measured axes. */
     minimumEquipmentRotationConfidence?: number;
+    /** Grip must remain attached to the canonical carrying hand. */
+    maximumGripToCarryingHandDistance?: number;
+    /** Reject wrong-hand ownership when the off hand is materially closer to the grip. */
+    minimumCarryingHandAdvantage?: number;
   };
   runtimeAuthority: false;
   frames: DirectionalEquipmentFrameReviewV2[];
@@ -149,6 +173,8 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     ["maximumFrameBodyCentroidShift", value.thresholds.maximumFrameBodyCentroidShift],
     ["maximumFrameEquipmentCentroidShift", value.thresholds.maximumFrameEquipmentCentroidShift],
     ["minimumEquipmentRotationConfidence", value.thresholds.minimumEquipmentRotationConfidence],
+    ["maximumGripToCarryingHandDistance", value.thresholds.maximumGripToCarryingHandDistance],
+    ["minimumCarryingHandAdvantage", value.thresholds.minimumCarryingHandAdvantage],
   ] as const) {
     if (threshold !== undefined && (!unit(threshold) || threshold === 0)) issues.push(`${name} must be within (0, 1]`);
   }
@@ -163,6 +189,17 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     if (!unit(rule.minimumFaceDotMagnitude) || rule.minimumFaceDotMagnitude === 0) issues.push(`${rule.cameraDirection}: invalid minimumFaceDotMagnitude`);
     if (!finite(rule.expectedRotationDegrees) || !finite(rule.maximumRotationErrorDegrees)
       || rule.maximumRotationErrorDegrees < 0 || rule.maximumRotationErrorDegrees > 180) issues.push(`${rule.cameraDirection}: invalid rotation rule`);
+    if (rule.allowedCarryingHandScreenSides !== undefined && !rule.allowedCarryingHandScreenSides.length) {
+      issues.push(`${rule.cameraDirection}: allowedCarryingHandScreenSides cannot be empty`);
+    }
+  }
+
+  const detailRules = new Map<string, EquipmentDetailRuleV2>();
+  for (const detailRule of value.canonicalEquipment.detailRules ?? []) {
+    if (!value.canonicalEquipment.requiredDetailIds.includes(detailRule.detailId)) issues.push(`detail rule is not canonical: ${detailRule.detailId}`);
+    if (detailRules.has(detailRule.detailId)) issues.push(`duplicate detail rule: ${detailRule.detailId}`);
+    detailRules.set(detailRule.detailId, detailRule);
+    if (!detailRule.allowedVisibleFaces.length) issues.push(`${detailRule.detailId}: allowedVisibleFaces cannot be empty`);
   }
 
   const ids = new Set<string>();
@@ -185,6 +222,14 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     if (frame.carryingSide !== value.canonicalEquipment.carryingSide) issues.push(`${frame.frameId}: anatomical carrying side changed`);
     if (!boundsValid(frame.subjectBounds) || !pointValid(frame.subjectCentroid) || !contains(frame.subjectBounds, frame.subjectCentroid)) issues.push(`${frame.frameId}: invalid subject geometry`);
     if (frame.subjectBodyCentroid && (!pointValid(frame.subjectBodyCentroid) || !contains(frame.subjectBounds, frame.subjectBodyCentroid))) issues.push(`${frame.frameId}: invalid subject body centroid`);
+    for (const [name, point] of [
+      ["carrying hand", frame.carryingHandPoint],
+      ["off hand", frame.offHandPoint],
+      ["carrying shoulder", frame.carryingShoulderPoint],
+      ["off shoulder", frame.offShoulderPoint],
+    ] as const) {
+      if (point !== undefined && point !== null && (!pointValid(point) || !contains(frame.subjectBounds, point))) issues.push(`${frame.frameId}: invalid ${name} landmark`);
+    }
     if (!boundsValid(frame.equipmentBounds) || !pointValid(frame.equipmentCentroid) || !contains(frame.equipmentBounds, frame.equipmentCentroid)) issues.push(`${frame.frameId}: invalid equipment geometry`);
     if (!pointValid(frame.pivot) || !unit(frame.groundLine)) issues.push(`${frame.frameId}: invalid registration geometry`);
     if (!finite(frame.equipmentRotationDegrees) || frame.equipmentRotationDegrees < -180 || frame.equipmentRotationDegrees > 180
@@ -203,6 +248,12 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
         frame.visibleFace !== "occluded" && frame.equipmentScreenSide !== "occluded" &&
         axisAngularDistance(frame.equipmentRotationDegrees, rule.expectedRotationDegrees) > rule.maximumRotationErrorDegrees
       ) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
+      if (rule.allowedCarryingHandScreenSides !== undefined && frame.carryingHandPoint) {
+        const body = frame.subjectBodyCentroid ?? frame.subjectCentroid;
+        const delta = frame.carryingHandPoint.x - body.x;
+        const handSide: Exclude<MeasuredScreenSide, "occluded"> = Math.abs(delta) <= 0.03 ? "centre" : delta < 0 ? "left" : "right";
+        if (!rule.allowedCarryingHandScreenSides.includes(handSide)) issues.push(`${frame.frameId}: carrying hand is on the wrong screen side for ${frame.cameraDirection}`);
+      }
     }
     if (value.thresholds.minimumEquipmentRotationConfidence !== undefined) {
       const confidence = frame.equipmentRotationConfidence;
@@ -223,6 +274,15 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     if (frame.gripVisible && (!frame.gripPoint || !contains(frame.equipmentBounds, frame.gripPoint))) issues.push(`${frame.frameId}: visible grip point must lie on equipment`);
     if (frame.attachmentVisible && frame.gripVisible && frame.attachmentPoint && frame.gripPoint
       && distance(frame.attachmentPoint, frame.gripPoint) > value.thresholds.maximumGripAttachmentDistance) issues.push(`${frame.frameId}: grip is disconnected from attachment geometry`);
+    if (value.thresholds.maximumGripToCarryingHandDistance !== undefined && frame.gripVisible) {
+      if (!frame.gripPoint || !frame.carryingHandPoint) issues.push(`${frame.frameId}: visible grip requires a carrying-hand landmark`);
+      else if (distance(frame.gripPoint, frame.carryingHandPoint) > value.thresholds.maximumGripToCarryingHandDistance) issues.push(`${frame.frameId}: grip is disconnected from the canonical carrying hand`);
+    }
+    if (value.thresholds.minimumCarryingHandAdvantage !== undefined && frame.gripVisible && frame.gripPoint && frame.carryingHandPoint && frame.offHandPoint) {
+      const carryingDistance = distance(frame.gripPoint, frame.carryingHandPoint);
+      const offHandDistance = distance(frame.gripPoint, frame.offHandPoint);
+      if (offHandDistance - carryingDistance < value.thresholds.minimumCarryingHandAdvantage) issues.push(`${frame.frameId}: grip ownership is ambiguous or assigned to the wrong hand`);
+    }
     if (frame.shieldPlane === "side-carry" && frame.visibleFace === "inner") {
       if (!frame.attachmentVisible) issues.push(`${frame.frameId}: inner side-carry must show arm attachment`);
       if (!frame.gripVisible) issues.push(`${frame.frameId}: inner side-carry must show the controlling grip`);
@@ -233,6 +293,18 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
     const occluded = new Set(frame.occludedDetailIds);
     for (const detail of value.canonicalEquipment.requiredDetailIds) {
       if (!observed.has(detail) && !occluded.has(detail)) issues.push(`${frame.frameId}: missing canonical detail ${detail}`);
+    }
+    const observationIds = new Set<string>();
+    for (const observation of frame.detailObservations ?? []) {
+      if (observationIds.has(observation.detailId)) issues.push(`${frame.frameId}: duplicate detail observation ${observation.detailId}`);
+      observationIds.add(observation.detailId);
+      if (!observed.has(observation.detailId)) issues.push(`${frame.frameId}: detail observation is not declared visible: ${observation.detailId}`);
+      if (!pointValid(observation.location) || !contains(frame.equipmentBounds, observation.location)) issues.push(`${frame.frameId}: detail ${observation.detailId} lies outside equipment geometry`);
+      const detailRule = detailRules.get(observation.detailId);
+      if (detailRule && frame.visibleFace !== "occluded" && !detailRule.allowedVisibleFaces.includes(frame.visibleFace)) issues.push(`${frame.frameId}: detail ${observation.detailId} appears on the wrong equipment face`);
+    }
+    for (const detailId of observed) {
+      if (detailRules.has(detailId) && !observationIds.has(detailId)) issues.push(`${frame.frameId}: face-specific detail requires a measured observation: ${detailId}`);
     }
     const style = frame.styleEvidence;
     if (style.paletteDistanceFromCanonical > value.thresholds.maximumPaletteDistance) issues.push(`${frame.frameId}: palette drift exceeds threshold`);

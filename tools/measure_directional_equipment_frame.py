@@ -110,7 +110,27 @@ def centroid_aligned_iou(first: Image.Image, second: Image.Image) -> float:
     return intersection_count / union_count if union_count else 1.0
 
 
-def measure(canonical_path: Path, frame_path: Path, equipment_mask_path: Path) -> dict[str, Any]:
+def _reviewed_mask_geometry(path: Path, size: tuple[int, int], subject: Image.Image, label: str) -> dict[str, Any]:
+    mask = load_mask(path, size)
+    outside = ImageChops.subtract(mask, subject)
+    outside_count = sum(outside.histogram()[128:])
+    if outside_count:
+        raise ValueError(f"{label} mask contains {outside_count} pixels outside the visible subject")
+    return normalized_geometry(mask)
+
+
+def measure(
+    canonical_path: Path,
+    frame_path: Path,
+    equipment_mask_path: Path,
+    *,
+    body_mask_path: Path | None = None,
+    carrying_hand_mask_path: Path | None = None,
+    off_hand_mask_path: Path | None = None,
+    carrying_shoulder_mask_path: Path | None = None,
+    off_shoulder_mask_path: Path | None = None,
+    detail_masks: dict[str, Path] | None = None,
+) -> dict[str, Any]:
     canonical = load_rgba(canonical_path)
     frame = load_rgba(frame_path)
     if canonical.size != frame.size:
@@ -140,7 +160,7 @@ def measure(canonical_path: Path, frame_path: Path, equipment_mask_path: Path) -
         "x": canonical_geometry["centroid"]["x"],
         "y": canonical_geometry["bounds"]["y"] + canonical_geometry["bounds"]["height"],
     }
-    return {
+    result = {
         "schema": "evavo.directional-equipment-frame-measurement.v1",
         "source": {"path": str(frame_path), "sha256": digest(frame_path)},
         "canonical": {"path": str(canonical_path), "sha256": digest(canonical_path)},
@@ -171,6 +191,25 @@ def measure(canonical_path: Path, frame_path: Path, equipment_mask_path: Path) -
         ],
         "runtimeAuthority": False,
     }
+    reviewed_masks = {
+        "subjectBodyCentroid": body_mask_path,
+        "carryingHandPoint": carrying_hand_mask_path,
+        "offHandPoint": off_hand_mask_path,
+        "carryingShoulderPoint": carrying_shoulder_mask_path,
+        "offShoulderPoint": off_shoulder_mask_path,
+    }
+    for output_name, path in reviewed_masks.items():
+        if path is not None:
+            result[output_name] = _reviewed_mask_geometry(path, frame.size, subject, output_name)["centroid"]
+    observations = []
+    for detail_id, path in sorted((detail_masks or {}).items()):
+        if not detail_id.strip():
+            raise ValueError("detail mask id cannot be empty")
+        geometry = _reviewed_mask_geometry(path, frame.size, equipment, f"detail {detail_id}")
+        observations.append({"detailId": detail_id, "location": geometry["centroid"], "maskSha256": digest(path)})
+    if observations:
+        result["detailObservations"] = observations
+    return result
 
 
 def main() -> None:
@@ -178,11 +217,35 @@ def main() -> None:
     parser.add_argument("--canonical", type=Path, required=True)
     parser.add_argument("--frame", type=Path, required=True)
     parser.add_argument("--equipment-mask", type=Path, required=True)
+    parser.add_argument("--body-mask", type=Path)
+    parser.add_argument("--carrying-hand-mask", type=Path)
+    parser.add_argument("--off-hand-mask", type=Path)
+    parser.add_argument("--carrying-shoulder-mask", type=Path)
+    parser.add_argument("--off-shoulder-mask", type=Path)
+    parser.add_argument("--detail-mask", action="append", default=[], metavar="DETAIL_ID=PATH")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
         raise SystemExit(f"refusing to overwrite existing measurement: {args.output}")
-    result = measure(args.canonical, args.frame, args.equipment_mask)
+    detail_masks: dict[str, Path] = {}
+    for declaration in args.detail_mask:
+        if "=" not in declaration:
+            raise SystemExit("--detail-mask must use DETAIL_ID=PATH")
+        detail_id, path = declaration.split("=", 1)
+        if detail_id in detail_masks:
+            raise SystemExit(f"duplicate --detail-mask id: {detail_id}")
+        detail_masks[detail_id] = Path(path)
+    result = measure(
+        args.canonical,
+        args.frame,
+        args.equipment_mask,
+        body_mask_path=args.body_mask,
+        carrying_hand_mask_path=args.carrying_hand_mask,
+        off_hand_mask_path=args.off_hand_mask,
+        carrying_shoulder_mask_path=args.carrying_shoulder_mask,
+        off_shoulder_mask_path=args.off_shoulder_mask,
+        detail_masks=detail_masks,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"status": "measured", "output": str(args.output), "sourceSha256": result["source"]["sha256"]}))

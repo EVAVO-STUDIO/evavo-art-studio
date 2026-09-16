@@ -123,4 +123,18 @@ A sprite cannot be approved until the required evidence passes:
 
 Automatic approval never lowers thresholds. If bounded repair cannot pass a blocking gate, the run stops with a decision packet rather than accepting a weak frame.
 
+### Directional equipment and anatomical ownership
+
+Held equipment must be reviewed as geometry, not inferred from a filename or a plausible silhouette. Use `tools/measure_directional_equipment_frame.py` with reviewed masks for the body core, carrying hand, off hand, shoulders, equipment and face-specific details. The v2 continuity contract can then block:
+
+- a shield or weapon attached to the wrong anatomical hand;
+- a carrying hand that crosses to an impossible screen side for the declared camera direction;
+- a grip separated from the carrying hand or closer to the off hand;
+- front heraldry, a boss or blade decoration appearing on the rear face;
+- rear grips, straps or enarmes appearing on the outer face;
+- misplaced details outside the measured equipment silhouette;
+- rotation, scale, placement, ground-line, palette, line-density and silhouette jumps.
+
+Direction rules are character-specific. A profile view can legitimately show the back of a side-carried shield even when the opposite profile shows its heraldic face. Record face ownership with the camera vector and equipment outer normal, and record every legitimate transition pose; mirroring pixels is not evidence that handed equipment remains anatomically correct.
+
 `createImageSequenceFinishingReview` records these geometry measures for every frame. They are triage evidence: an extreme action pose may legitimately change its bounds, but the change must be visually adjudicated against the canonical identity and adjacent approved poses. A common canvas alone is never evidence of stable character scale or registration.

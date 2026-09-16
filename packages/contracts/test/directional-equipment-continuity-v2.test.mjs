@@ -23,6 +23,10 @@ const frame = (frameId, sequenceIndex, overrides = {}) => ({
   equipmentCentroid: { x: 0.61, y: 0.48 },
   attachmentPoint: { x: 0.57, y: 0.48 },
   gripPoint: { x: 0.6, y: 0.5 },
+  carryingHandPoint: { x: 0.6, y: 0.5 },
+  offHandPoint: { x: 0.38, y: 0.5 },
+  carryingShoulderPoint: { x: 0.55, y: 0.28 },
+  offShoulderPoint: { x: 0.42, y: 0.28 },
   attachmentVisible: true,
   gripVisible: true,
   strapRouting: "consistent",
@@ -35,6 +39,10 @@ const frame = (frameId, sequenceIndex, overrides = {}) => ({
   pivot: { x: 0.5, y: 0.9 },
   groundLine: 0.9,
   observedDetailIds: ["bronze-rim", "wood-back", "vertical-grip", "paired-enarmes"],
+  detailObservations: [
+    { detailId: "vertical-grip", location: { x: 0.6, y: 0.5 } },
+    { detailId: "paired-enarmes", location: { x: 0.57, y: 0.48 } },
+  ],
   occludedDetailIds: ["pawn-heraldry"],
   styleEvidence: {
     paletteDistanceFromCanonical: 8,
@@ -58,6 +66,11 @@ const base = {
     equipmentId: "round-shield",
     carryingSide: "left",
     requiredDetailIds: ["bronze-rim", "wood-back", "vertical-grip", "paired-enarmes", "pawn-heraldry"],
+    detailRules: [
+      { detailId: "vertical-grip", allowedVisibleFaces: ["inner"] },
+      { detailId: "paired-enarmes", allowedVisibleFaces: ["inner"] },
+      { detailId: "pawn-heraldry", allowedVisibleFaces: ["outer"] },
+    ],
   },
   directionRules: [{
     cameraDirection: "east-profile",
@@ -66,6 +79,7 @@ const base = {
     minimumFaceDotMagnitude: 0.5,
     expectedRotationDegrees: 90,
     maximumRotationErrorDegrees: 12,
+    allowedCarryingHandScreenSides: ["right"],
   }],
   thresholds: {
     maximumGripAttachmentDistance: 0.08,
@@ -81,6 +95,8 @@ const base = {
     maximumFrameBodyCentroidShift: 0.08,
     maximumFrameEquipmentCentroidShift: 0.08,
     minimumEquipmentRotationConfidence: 0.25,
+    maximumGripToCarryingHandDistance: 0.04,
+    minimumCarryingHandAdvantage: 0.06,
   },
   runtimeAuthority: false,
   frames: [frame("idle-east-00", 0), frame("idle-east-01", 1, { equipmentRotationDegrees: 94 })],
@@ -111,6 +127,26 @@ test("catches wrong placement, rotation and disconnected grip geometry", () => {
   assert.ok(issues.includes("idle-east-00: grip is disconnected from attachment geometry"));
 });
 
+test("catches a shield assigned to the wrong anatomical hand", () => {
+  const invalid = structuredClone(base);
+  invalid.frames[0].carryingHandPoint = { x: 0.38, y: 0.5 };
+  invalid.frames[0].offHandPoint = { x: 0.6, y: 0.5 };
+  const issues = validateDirectionalEquipmentContinuityV2(invalid);
+  assert.ok(issues.includes("idle-east-00: carrying hand is on the wrong screen side for east-profile"));
+  assert.ok(issues.includes("idle-east-00: grip is disconnected from the canonical carrying hand"));
+  assert.ok(issues.includes("idle-east-00: grip ownership is ambiguous or assigned to the wrong hand"));
+});
+
+test("catches front heraldry or rear straps drawn on the wrong shield face", () => {
+  const invalid = structuredClone(base);
+  invalid.frames[0].observedDetailIds.push("pawn-heraldry");
+  invalid.frames[0].occludedDetailIds = [];
+  invalid.frames[0].detailObservations.push({ detailId: "pawn-heraldry", location: { x: 0.62, y: 0.46 } });
+  assert.ok(validateDirectionalEquipmentContinuityV2(invalid).includes(
+    "idle-east-00: detail pawn-heraldry appears on the wrong equipment face",
+  ));
+});
+
 test("uses a reviewed body centroid when a long weapon biases silhouette placement", () => {
   const valid = structuredClone(base);
   Object.assign(valid.frames[0], {
@@ -120,6 +156,7 @@ test("uses a reviewed body centroid when a long weapon biases silhouette placeme
     equipmentScreenSide: "left",
   });
   valid.directionRules[0].allowedScreenSides = ["left", "right"];
+  valid.directionRules[0].allowedCarryingHandScreenSides = ["centre", "right"];
   const issues = validateDirectionalEquipmentContinuityV2(valid);
   assert.ok(!issues.some((issue) => issue.includes("screen side")));
 });
