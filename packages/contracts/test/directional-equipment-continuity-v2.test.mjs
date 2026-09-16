@@ -137,6 +137,24 @@ test("catches a shield assigned to the wrong anatomical hand", () => {
   assert.ok(issues.includes("idle-east-00: grip ownership is ambiguous or assigned to the wrong hand"));
 });
 
+test("cannot bypass direction and ownership checks by omitting hand landmarks", () => {
+  const invalid = structuredClone(base);
+  delete invalid.frames[0].carryingHandPoint;
+  delete invalid.frames[0].offHandPoint;
+  const issues = validateDirectionalEquipmentContinuityV2(invalid);
+  assert.ok(issues.includes("idle-east-00: direction rule requires a carrying-hand landmark"));
+  assert.ok(issues.includes("idle-east-00: visible grip requires a carrying-hand landmark"));
+  assert.ok(issues.includes("idle-east-00: grip ownership comparison requires carrying-hand and off-hand landmarks"));
+});
+
+test("requires the comparison hand when anatomical ownership is gated", () => {
+  const invalid = structuredClone(base);
+  delete invalid.frames[0].offHandPoint;
+  assert.ok(validateDirectionalEquipmentContinuityV2(invalid).includes(
+    "idle-east-00: grip ownership comparison requires carrying-hand and off-hand landmarks",
+  ));
+});
+
 test("catches front heraldry or rear straps drawn on the wrong shield face", () => {
   const invalid = structuredClone(base);
   invalid.frames[0].observedDetailIds.push("pawn-heraldry");

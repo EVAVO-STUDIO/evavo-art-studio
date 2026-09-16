@@ -248,11 +248,14 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
         frame.visibleFace !== "occluded" && frame.equipmentScreenSide !== "occluded" &&
         axisAngularDistance(frame.equipmentRotationDegrees, rule.expectedRotationDegrees) > rule.maximumRotationErrorDegrees
       ) issues.push(`${frame.frameId}: equipment rotation violates ${frame.cameraDirection} rule`);
-      if (rule.allowedCarryingHandScreenSides !== undefined && frame.carryingHandPoint) {
-        const body = frame.subjectBodyCentroid ?? frame.subjectCentroid;
-        const delta = frame.carryingHandPoint.x - body.x;
-        const handSide: Exclude<MeasuredScreenSide, "occluded"> = Math.abs(delta) <= 0.03 ? "centre" : delta < 0 ? "left" : "right";
-        if (!rule.allowedCarryingHandScreenSides.includes(handSide)) issues.push(`${frame.frameId}: carrying hand is on the wrong screen side for ${frame.cameraDirection}`);
+      if (rule.allowedCarryingHandScreenSides !== undefined && frame.equipmentScreenSide !== "occluded") {
+        if (!frame.carryingHandPoint) issues.push(`${frame.frameId}: direction rule requires a carrying-hand landmark`);
+        else {
+          const body = frame.subjectBodyCentroid ?? frame.subjectCentroid;
+          const delta = frame.carryingHandPoint.x - body.x;
+          const handSide: Exclude<MeasuredScreenSide, "occluded"> = Math.abs(delta) <= 0.03 ? "centre" : delta < 0 ? "left" : "right";
+          if (!rule.allowedCarryingHandScreenSides.includes(handSide)) issues.push(`${frame.frameId}: carrying hand is on the wrong screen side for ${frame.cameraDirection}`);
+        }
       }
     }
     if (value.thresholds.minimumEquipmentRotationConfidence !== undefined) {
@@ -278,10 +281,13 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
       if (!frame.gripPoint || !frame.carryingHandPoint) issues.push(`${frame.frameId}: visible grip requires a carrying-hand landmark`);
       else if (distance(frame.gripPoint, frame.carryingHandPoint) > value.thresholds.maximumGripToCarryingHandDistance) issues.push(`${frame.frameId}: grip is disconnected from the canonical carrying hand`);
     }
-    if (value.thresholds.minimumCarryingHandAdvantage !== undefined && frame.gripVisible && frame.gripPoint && frame.carryingHandPoint && frame.offHandPoint) {
-      const carryingDistance = distance(frame.gripPoint, frame.carryingHandPoint);
-      const offHandDistance = distance(frame.gripPoint, frame.offHandPoint);
-      if (offHandDistance - carryingDistance < value.thresholds.minimumCarryingHandAdvantage) issues.push(`${frame.frameId}: grip ownership is ambiguous or assigned to the wrong hand`);
+    if (value.thresholds.minimumCarryingHandAdvantage !== undefined && frame.gripVisible) {
+      if (!frame.carryingHandPoint || !frame.offHandPoint) issues.push(`${frame.frameId}: grip ownership comparison requires carrying-hand and off-hand landmarks`);
+      else if (frame.gripPoint) {
+        const carryingDistance = distance(frame.gripPoint, frame.carryingHandPoint);
+        const offHandDistance = distance(frame.gripPoint, frame.offHandPoint);
+        if (offHandDistance - carryingDistance < value.thresholds.minimumCarryingHandAdvantage) issues.push(`${frame.frameId}: grip ownership is ambiguous or assigned to the wrong hand`);
+      }
     }
     if (frame.shieldPlane === "side-carry" && frame.visibleFace === "inner") {
       if (!frame.attachmentVisible) issues.push(`${frame.frameId}: inner side-carry must show arm attachment`);
