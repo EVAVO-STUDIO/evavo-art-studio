@@ -22,8 +22,9 @@ function sourceOver(source, destination, coverage) {
   ];
 }
 
-export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX, sourceY, width, height, destinationX, destinationY, donorX, donorY, repairInput }) {
+export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX, sourceY, width, height, destinationX, destinationY, donorX, donorY, repairInput, repairMask }) {
   const usingRegisteredRepair = Boolean(repairInput);
+  if (repairMask && !usingRegisteredRepair) throw new Error("repairMask requires a registered repairInput");
   const integers = [sourceX, sourceY, width, height, destinationX, destinationY, ...(usingRegisteredRepair ? [] : [donorX, donorY])];
   if (!input || !mask || !output || integers.some((value) => !Number.isInteger(value))) throw new Error("input, mask, output and integer geometry are required");
   if (path.resolve(input) === path.resolve(output)) throw new Error("source must remain immutable; output must differ from input");
@@ -38,9 +39,11 @@ export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX
   const decoded = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const maskDecoded = await sharp(mask).greyscale().raw().toBuffer({ resolveWithObject: true });
   const repairDecoded = usingRegisteredRepair ? await sharp(repairInput).ensureAlpha().raw().toBuffer({ resolveWithObject: true }) : null;
+  const repairMaskDecoded = repairMask ? await sharp(repairMask).greyscale().raw().toBuffer({ resolveWithObject: true }) : null;
   const { data, info } = decoded;
   if (maskDecoded.info.width !== info.width || maskDecoded.info.height !== info.height) throw new Error("mask dimensions must match the source canvas");
   if (repairDecoded && (repairDecoded.info.width !== info.width || repairDecoded.info.height !== info.height)) throw new Error("registered repair input dimensions must match the source canvas");
+  if (repairMaskDecoded && (repairMaskDecoded.info.width !== info.width || repairMaskDecoded.info.height !== info.height)) throw new Error("repair mask dimensions must match the source canvas");
   const rectangles = [["source", sourceX, sourceY], ["destination", destinationX, destinationY]];
   if (!usingRegisteredRepair) rectangles.push(["donor", donorX, donorY]);
   for (const [label, left, top] of rectangles) {
@@ -50,6 +53,7 @@ export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX
 
   const result = Buffer.from(data);
   let selectedPixels = 0;
+  let repairSelectedPixels = 0;
   let outsideMaskChangedPixels = 0;
   for (let y = 0; y < info.height; y += 1) {
     for (let x = 0; x < info.width; x += 1) {
@@ -62,15 +66,34 @@ export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX
       const sourceOffset = (y * info.width + x) * 4;
       const destinationOffset = ((destinationY + localY) * info.width + destinationX + localX) * 4;
       const moved = sourceOver(data.subarray(sourceOffset, sourceOffset + 4), data.subarray(destinationOffset, destinationOffset + 4), coverage);
-      const replacementOffset = usingRegisteredRepair ? sourceOffset : ((donorY + localY) * info.width + donorX + localX) * 4;
-      const replacementData = repairDecoded ? repairDecoded.data : data;
       for (let channel = 0; channel < 4; channel += 1) {
-        result[sourceOffset + channel] = replacementData[replacementOffset + channel];
+        if (!repairMaskDecoded) {
+          const replacementOffset = usingRegisteredRepair ? sourceOffset : ((donorY + localY) * info.width + donorX + localX) * 4;
+          const replacementData = repairDecoded ? repairDecoded.data : data;
+          result[sourceOffset + channel] = replacementData[replacementOffset + channel];
+        }
         result[destinationOffset + channel] = moved[channel];
       }
     }
   }
   if (!selectedPixels) throw new Error("mask selects no component pixels");
+
+  if (repairMaskDecoded) {
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        const coverage = repairMaskDecoded.data[y * info.width + x];
+        if (!coverage) continue;
+        if (!inside(x, y, sourceX, sourceY, width, height)) throw new Error("repair mask contains selected pixels outside the declared source rectangle");
+        repairSelectedPixels += 1;
+        const offset = (y * info.width + x) * 4;
+        const blend = coverage / 255;
+        for (let channel = 0; channel < 4; channel += 1) {
+          result[offset + channel] = Math.round(data[offset + channel] * (1 - blend) + repairDecoded.data[offset + channel] * blend);
+        }
+      }
+    }
+    if (!repairSelectedPixels) throw new Error("repair mask selects no source pixels");
+  }
 
   for (let y = 0; y < info.height; y += 1) {
     for (let x = 0; x < info.width; x += 1) {
@@ -85,7 +108,7 @@ export async function maskedRgbaComponentRelocate({ input, mask, output, sourceX
     input, mask, output, canvas: [info.width, info.height], selectedPixels,
     sourceBounds: [sourceX, sourceY, sourceX + width, sourceY + height],
     destinationBounds: [destinationX, destinationY, destinationX + width, destinationY + height],
-    repairInput: repairInput ?? null,
+    repairInput: repairInput ?? null, repairMask: repairMask ?? null, repairSelectedPixels,
     donorBounds: usingRegisteredRepair ? null : [donorX, donorY, donorX + width, donorY + height],
     operation: usingRegisteredRepair ? "masked-rgba-component-relocate-with-registered-repair-and-source-over" : "masked-rgba-component-relocate-with-donor-repair-and-source-over",
     outsideSourceAndDestinationByteIdentical: true,
@@ -101,7 +124,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     input: values.input, mask: values.mask, output: values.output,
     sourceX: Number(values.sourceX), sourceY: Number(values.sourceY), width: Number(values.width), height: Number(values.height),
     destinationX: Number(values.destinationX), destinationY: Number(values.destinationY), donorX: Number(values.donorX), donorY: Number(values.donorY),
-    repairInput: values.repairInput,
+    repairInput: values.repairInput, repairMask: values.repairMask,
   });
   process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
 }

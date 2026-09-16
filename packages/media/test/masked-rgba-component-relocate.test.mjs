@@ -98,6 +98,47 @@ test("accepts a same-canvas registered repair source without requiring donor geo
   }
 });
 
+test("supports a wider registered repair mask without moving those extra repair pixels", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "masked-component-independent-repair-mask-"));
+  try {
+    const input = path.join(directory, "input.png");
+    const repairInput = path.join(directory, "repair.png");
+    const mask = path.join(directory, "component-mask.png");
+    const repairMask = path.join(directory, "repair-mask.png");
+    const output = path.join(directory, "output.png");
+    const width = 16;
+    const height = 8;
+    const pixels = Buffer.alloc(width * height * 4);
+    const repair = Buffer.alloc(width * height * 4);
+    for (let i = 0; i < width * height; i += 1) {
+      pixels.set([20, 30, 40, 255], i * 4);
+      repair.set([20, 30, 40, 255], i * 4);
+    }
+    pixels.set([240, 80, 20, 255], (3 * width + 3) * 4);
+    pixels.set([210, 70, 15, 255], (3 * width + 4) * 4);
+    repair.set([70, 90, 110, 255], (3 * width + 3) * 4);
+    repair.set([80, 100, 120, 255], (3 * width + 4) * 4);
+    const component = Buffer.alloc(width * height); component[3 * width + 3] = 255;
+    const repairSelection = Buffer.alloc(width * height); repairSelection[3 * width + 3] = 255; repairSelection[3 * width + 4] = 255;
+    await sharp(pixels, { raw: { width, height, channels: 4 } }).png().toFile(input);
+    await sharp(repair, { raw: { width, height, channels: 4 } }).png().toFile(repairInput);
+    await sharp(component, { raw: { width, height, channels: 1 } }).png().toFile(mask);
+    await sharp(repairSelection, { raw: { width, height, channels: 1 } }).png().toFile(repairMask);
+
+    const receipt = await maskedRgbaComponentRelocate({ input, repairInput, repairMask, mask, output, sourceX: 2, sourceY: 2, width: 4, height: 3, destinationX: 9, destinationY: 2 });
+    const after = await sharp(output).ensureAlpha().raw().toBuffer();
+    assert.equal(receipt.selectedPixels, 1);
+    assert.equal(receipt.repairSelectedPixels, 2);
+    assert.equal(receipt.repairMask, repairMask);
+    assert.deepEqual([...after.subarray((3 * width + 3) * 4, (3 * width + 3) * 4 + 4)], [70, 90, 110, 255]);
+    assert.deepEqual([...after.subarray((3 * width + 4) * 4, (3 * width + 4) * 4 + 4)], [80, 100, 120, 255]);
+    assert.deepEqual([...after.subarray((3 * width + 10) * 4, (3 * width + 10) * 4 + 4)], [240, 80, 20, 255]);
+    assert.deepEqual([...after.subarray((3 * width + 11) * 4, (3 * width + 11) * 4 + 4)], [20, 30, 40, 255]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("fails closed on overwrite, overlap, mask spill, and empty masks", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "masked-component-fail-closed-"));
   try {
