@@ -83,6 +83,12 @@ export interface DirectionalEquipmentContinuityContractV2 {
     minimumCentroidAlignedSilhouetteIoU: number;
     maximumFrameRotationDeltaDegrees: number;
     maximumFrameScaleFractionChange: number;
+    /** Reject whole-character scale pops between adjacent exposures. */
+    maximumFrameSubjectAreaFractionChange?: number;
+    /** Reject registration changes that make a character hop above the floor. */
+    maximumFrameGroundLineDelta?: number;
+    /** Reject body-core translation even when a weapon or cape changes silhouette extent. */
+    maximumFrameBodyCentroidShift?: number;
   };
   runtimeAuthority: false;
   frames: DirectionalEquipmentFrameReviewV2[];
@@ -131,6 +137,13 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
   if (!value.frames.length) issues.push("at least one frame review is required");
   if (!value.canonicalEquipment.equipmentId.trim()) issues.push("canonical equipmentId is required");
   if (!value.canonicalEquipment.requiredDetailIds.length) issues.push("canonical equipment requires identity details");
+  for (const [name, threshold] of [
+    ["maximumFrameSubjectAreaFractionChange", value.thresholds.maximumFrameSubjectAreaFractionChange],
+    ["maximumFrameGroundLineDelta", value.thresholds.maximumFrameGroundLineDelta],
+    ["maximumFrameBodyCentroidShift", value.thresholds.maximumFrameBodyCentroidShift],
+  ] as const) {
+    if (threshold !== undefined && (!unit(threshold) || threshold === 0)) issues.push(`${name} must be within (0, 1]`);
+  }
 
   const rules = new Map<string, DirectionalEquipmentRuleV2>();
   for (const rule of value.directionRules) {
@@ -230,6 +243,23 @@ export function validateDirectionalEquipmentContinuityV2(value: DirectionalEquip
       if (axisAngularDistance(before.equipmentRotationDegrees, after.equipmentRotationDegrees) > value.thresholds.maximumFrameRotationDeltaDegrees) issues.push(`${after.frameId}: implausible equipment rotation jump from ${before.frameId}`);
       const scaleChange = Math.abs(after.equipmentScaleFraction - before.equipmentScaleFraction) / before.equipmentScaleFraction;
       if (scaleChange > value.thresholds.maximumFrameScaleFractionChange) issues.push(`${after.frameId}: implausible equipment scale jump from ${before.frameId}`);
+      const beforeArea = before.subjectBounds.width * before.subjectBounds.height;
+      const afterArea = after.subjectBounds.width * after.subjectBounds.height;
+      const subjectAreaChange = Math.abs(afterArea - beforeArea) / beforeArea;
+      if (value.thresholds.maximumFrameSubjectAreaFractionChange !== undefined
+        && subjectAreaChange > value.thresholds.maximumFrameSubjectAreaFractionChange) {
+        issues.push(`${after.frameId}: implausible subject scale jump from ${before.frameId}`);
+      }
+      if (value.thresholds.maximumFrameGroundLineDelta !== undefined
+        && Math.abs(after.groundLine - before.groundLine) > value.thresholds.maximumFrameGroundLineDelta) {
+        issues.push(`${after.frameId}: implausible ground-line jump from ${before.frameId}`);
+      }
+      const beforeBody = before.subjectBodyCentroid ?? before.subjectCentroid;
+      const afterBody = after.subjectBodyCentroid ?? after.subjectCentroid;
+      if (value.thresholds.maximumFrameBodyCentroidShift !== undefined
+        && distance(beforeBody, afterBody) > value.thresholds.maximumFrameBodyCentroidShift) {
+        issues.push(`${after.frameId}: implausible body-core shift from ${before.frameId}`);
+      }
     }
   }
   return issues;

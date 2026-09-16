@@ -75,6 +75,9 @@ const base = {
     minimumCentroidAlignedSilhouetteIoU: 0.65,
     maximumFrameRotationDeltaDegrees: 18,
     maximumFrameScaleFractionChange: 0.2,
+    maximumFrameSubjectAreaFractionChange: 0.2,
+    maximumFrameGroundLineDelta: 0.03,
+    maximumFrameBodyCentroidShift: 0.08,
   },
   runtimeAuthority: false,
   frames: [frame("idle-east-00", 0), frame("idle-east-01", 1, { equipmentRotationDegrees: 94 })],
@@ -145,6 +148,28 @@ test("catches implausible frame-to-frame rotation and scale pops", () => {
   const issues = validateDirectionalEquipmentContinuityV2(invalid);
   assert.ok(issues.includes("idle-east-01: implausible equipment rotation jump from idle-east-00"));
   assert.ok(issues.includes("idle-east-01: implausible equipment scale jump from idle-east-00"));
+});
+
+test("catches whole-character scale, floor and body-core registration pops", () => {
+  const invalid = structuredClone(base);
+  Object.assign(invalid.frames[1], {
+    subjectBounds: { x: 0.3, y: 0.2, width: 0.4, height: 0.55 },
+    subjectCentroid: { x: 0.5, y: 0.48 },
+    subjectBodyCentroid: { x: 0.62, y: 0.55 },
+    groundLine: 0.84,
+  });
+  const issues = validateDirectionalEquipmentContinuityV2(invalid);
+  assert.ok(issues.includes("idle-east-01: implausible subject scale jump from idle-east-00"));
+  assert.ok(issues.includes("idle-east-01: implausible ground-line jump from idle-east-00"));
+  assert.ok(issues.includes("idle-east-01: implausible body-core shift from idle-east-00"));
+});
+
+test("rejects invalid temporal subject thresholds", () => {
+  const invalid = structuredClone(base);
+  invalid.thresholds.maximumFrameGroundLineDelta = -0.1;
+  assert.ok(validateDirectionalEquipmentContinuityV2(invalid).includes(
+    "maximumFrameGroundLineDelta must be within (0, 1]",
+  ));
 });
 
 test("treats opposite signs of the same measured principal axis as equivalent", () => {
