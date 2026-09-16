@@ -129,6 +129,8 @@ def measure(
     off_hand_mask_path: Path | None = None,
     carrying_shoulder_mask_path: Path | None = None,
     off_shoulder_mask_path: Path | None = None,
+    grip_mask_path: Path | None = None,
+    attachment_mask_path: Path | None = None,
     detail_masks: dict[str, Path] | None = None,
 ) -> dict[str, Any]:
     canonical = load_rgba(canonical_path)
@@ -201,6 +203,23 @@ def measure(
     for output_name, path in reviewed_masks.items():
         if path is not None:
             result[output_name] = _reviewed_mask_geometry(path, frame.size, subject, output_name)["centroid"]
+    equipment_landmarks = {
+        "gripPoint": grip_mask_path,
+        "attachmentPoint": attachment_mask_path,
+    }
+    for output_name, path in equipment_landmarks.items():
+        if path is not None:
+            result[output_name] = _reviewed_mask_geometry(path, frame.size, equipment, output_name)["centroid"]
+    result["evidenceCoverage"] = {
+        "bodyCore": body_mask_path is not None,
+        "carryingHand": carrying_hand_mask_path is not None,
+        "offHand": off_hand_mask_path is not None,
+        "carryingShoulder": carrying_shoulder_mask_path is not None,
+        "offShoulder": off_shoulder_mask_path is not None,
+        "grip": grip_mask_path is not None,
+        "attachment": attachment_mask_path is not None,
+        "faceSpecificDetails": bool(detail_masks),
+    }
     observations = []
     for detail_id, path in sorted((detail_masks or {}).items()):
         if not detail_id.strip():
@@ -222,6 +241,8 @@ def main() -> None:
     parser.add_argument("--off-hand-mask", type=Path)
     parser.add_argument("--carrying-shoulder-mask", type=Path)
     parser.add_argument("--off-shoulder-mask", type=Path)
+    parser.add_argument("--grip-mask", type=Path)
+    parser.add_argument("--attachment-mask", type=Path)
     parser.add_argument("--detail-mask", action="append", default=[], metavar="DETAIL_ID=PATH")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -244,6 +265,8 @@ def main() -> None:
         off_hand_mask_path=args.off_hand_mask,
         carrying_shoulder_mask_path=args.carrying_shoulder_mask,
         off_shoulder_mask_path=args.off_shoulder_mask,
+        grip_mask_path=args.grip_mask,
+        attachment_mask_path=args.attachment_mask,
         detail_masks=detail_masks,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)

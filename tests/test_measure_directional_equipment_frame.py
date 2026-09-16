@@ -53,6 +53,8 @@ class DirectionalEquipmentMeasurementTests(unittest.TestCase):
             body_path = root / "body.png"
             hand_path = root / "carrying-hand.png"
             detail_path = root / "rear-grip.png"
+            grip_path = root / "grip.png"
+            attachment_path = root / "attachment.png"
             image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
             draw = ImageDraw.Draw(image)
             draw.rectangle((16, 8, 46, 58), fill=(180, 130, 70, 255))
@@ -66,6 +68,8 @@ class DirectionalEquipmentMeasurementTests(unittest.TestCase):
                 (body_path, (18, 10, 40, 56)),
                 (hand_path, (38, 31, 42, 35)),
                 (detail_path, (40, 30, 43, 38)),
+                (grip_path, (39, 31, 43, 36)),
+                (attachment_path, (36, 30, 42, 37)),
             ):
                 mask = Image.new("L", (64, 64), 0)
                 ImageDraw.Draw(mask).rectangle(bounds, fill=255)
@@ -77,10 +81,16 @@ class DirectionalEquipmentMeasurementTests(unittest.TestCase):
                 equipment_path,
                 body_mask_path=body_path,
                 carrying_hand_mask_path=hand_path,
+                grip_mask_path=grip_path,
+                attachment_mask_path=attachment_path,
                 detail_masks={"vertical-grip": detail_path},
             )
             self.assertIn("subjectBodyCentroid", result)
             self.assertIn("carryingHandPoint", result)
+            self.assertIn("gripPoint", result)
+            self.assertIn("attachmentPoint", result)
+            self.assertTrue(result["evidenceCoverage"]["grip"])
+            self.assertFalse(result["evidenceCoverage"]["offHand"])
             self.assertEqual(result["detailObservations"][0]["detailId"], "vertical-grip")
             self.assertEqual(len(result["detailObservations"][0]["maskSha256"]), 64)
 
@@ -101,6 +111,24 @@ class DirectionalEquipmentMeasurementTests(unittest.TestCase):
             detail.save(detail_path)
             with self.assertRaisesRegex(ValueError, "detail heraldry mask contains"):
                 measure(sprite, sprite, equipment_path, detail_masks={"heraldry": detail_path})
+
+    def test_rejects_grip_mask_outside_equipment(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sprite = root / "sprite.png"
+            equipment_path = root / "equipment.png"
+            grip_path = root / "grip.png"
+            image = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
+            ImageDraw.Draw(image).rectangle((4, 4, 28, 28), fill=(255, 255, 255, 255))
+            image.save(sprite)
+            equipment = Image.new("L", (32, 32), 0)
+            ImageDraw.Draw(equipment).rectangle((16, 8, 27, 24), fill=255)
+            equipment.save(equipment_path)
+            grip = Image.new("L", (32, 32), 0)
+            ImageDraw.Draw(grip).rectangle((6, 8, 10, 12), fill=255)
+            grip.save(grip_path)
+            with self.assertRaisesRegex(ValueError, "gripPoint mask contains"):
+                measure(sprite, sprite, equipment_path, grip_mask_path=grip_path)
 
 
 if __name__ == "__main__":

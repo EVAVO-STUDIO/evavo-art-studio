@@ -135,6 +135,8 @@ Held equipment must be reviewed as geometry, not inferred from a filename or a p
 - misplaced details outside the measured equipment silhouette;
 - rotation, scale, placement, ground-line, palette, line-density and silhouette jumps.
 
+Supply reviewed grip and attachment masks whenever those points are visible. The measurement emits an explicit evidence-coverage map; a missing mask means the semantic check did not run and must not be represented as a pass.
+
 Direction rules are character-specific. A profile view can legitimately show the back of a side-carried shield even when the opposite profile shows its heraldic face. Record face ownership with the camera vector and equipment outer normal, and record every legitimate transition pose; mirroring pixels is not evidence that handed equipment remains anatomically correct.
 
 `createImageSequenceFinishingReview` records these geometry measures for every frame. They are triage evidence: an extreme action pose may legitimately change its bounds, but the change must be visually adjudicated against the canonical identity and adjacent approved poses. A common canvas alone is never evidence of stable character scale or registration.

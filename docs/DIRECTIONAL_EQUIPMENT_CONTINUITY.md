@@ -16,6 +16,8 @@ Image-derived measurements and semantic landmarks serve different purposes. Boun
 
 Direction rules that constrain the carrying hand now fail closed: every non-occluded equipment frame must include its carrying-hand landmark. When grip ownership is compared, the frame must also include the off-hand landmark. Omitting either landmark is a validation failure, so a wrong-side shield, reversed weapon grip or ambiguous hand assignment cannot pass by leaving the semantic evidence blank.
 
+`tools/measure_directional_equipment_frame.py` accepts reviewed `--grip-mask` and `--attachment-mask` inputs in addition to body, hand, shoulder, equipment and face-detail masks. The measurement records each point inside the equipment silhouette and emits an `evidenceCoverage` map. Downstream review must use that map to distinguish a passed check from a check that was never supplied; absent evidence is never proof of correct placement.
+
 Mask-derived principal-axis rotation is compared modulo 180 degrees because the measured axis has no intrinsic arrow. Directed face ownership remains independently enforced by the reviewed camera vector and equipment outer-normal vector.
 
 Per-frame rotation and frame-to-frame rotation/scale comparisons pause across an explicitly reviewed occlusion. A visible fragment cannot provide a comparable full-plane axis or area; the frame must still declare the occlusion, preserve canonical-detail accounting and pass character style and identity checks.
