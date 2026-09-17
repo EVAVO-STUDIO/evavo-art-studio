@@ -23,3 +23,6 @@ __pycache__/
 
 # Scratch recovery workspace for sprite continuity runs. Never shipped.
 tmp/
+
+# Generated overlay sources. The tool that emits them is tracked; its output is not.
+assets/**/generated-sources/
