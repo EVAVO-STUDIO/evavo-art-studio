@@ -18,7 +18,7 @@ const files = [
   "scripts/layered-godot-repository-review/contract.mjs",
   "config/layered-production-godot-git-operator.v1.json",
   "docs/LAYERED_GODOT_GIT_OPERATOR.md",
-  ".github/workflows-retired/layered-godot-workspace-writer.yml",
+  ".github/workflows/layered-godot-workspace-writer.yml",
 ];
 const source = new Map();
 for (const relative of files) {
@@ -201,7 +201,7 @@ for (const token of [
   assert.ok(docs.includes(token), `Git operator docs missing ${token}`);
 }
 
-const workflow = source.get(".github/workflows-retired/layered-godot-workspace-writer.yml");
+const workflow = source.get(".github/workflows/layered-godot-workspace-writer.yml");
 for (const token of [
   "scripts/layered-godot-git-operator.mjs",
   "scripts/layered-godot-git-operator/**",

@@ -8,7 +8,7 @@ on:
       - "scripts/test-project-art-eva-dense-motion-ten-master.mjs"
       - "scripts/project-art/eva-dense-motion-work-order*.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_TEN_MASTER_PROGRAM.md"
-      - ".github/workflows-retired/eva-dense-motion-ten-master.yml"
+      - ".github/workflows/eva-dense-motion-ten-master.yml"
   push:
     branches: [main]
     paths:
@@ -17,7 +17,7 @@ on:
       - "scripts/test-project-art-eva-dense-motion-ten-master.mjs"
       - "scripts/project-art/eva-dense-motion-work-order*.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_TEN_MASTER_PROGRAM.md"
-      - ".github/workflows-retired/eva-dense-motion-ten-master.yml"
+      - ".github/workflows/eva-dense-motion-ten-master.yml"
   workflow_dispatch:
 
 permissions:

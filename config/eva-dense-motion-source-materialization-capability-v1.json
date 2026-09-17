@@ -13,7 +13,7 @@
   "implementation": "scripts/project-art/eva-dense-motion-source-materialization.mjs",
   "cli": "scripts/run-project-art-eva-dense-motion-source-materialization.mjs",
   "test": "scripts/test-project-art-eva-dense-motion-source-materialization.mjs",
-  "workflow": ".github/workflows-retired/eva-dense-motion-source-materialization.yml",
+  "workflow": ".github/workflows/eva-dense-motion-source-materialization.yml",
   "execution": {
     "exactTenSourceCampaign": true,
     "allTenSourcesPreflightBeforeFirstWrite": true,

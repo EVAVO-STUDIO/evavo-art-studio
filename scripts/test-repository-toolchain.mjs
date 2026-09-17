@@ -199,13 +199,13 @@ try {
 
   if (discoverWorkflows().length > 0) {
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "pnpm install --frozen-lockfile", "pnpm install --no-frozen-lockfile"),
   );
   expectFailure(run(), "non-frozen mainline install must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "          git diff --exit-code -- pnpm-lock.yaml\n",
@@ -215,7 +215,7 @@ try {
   expectFailure(run(), "lockfile deletion must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       '"installedWithoutCommittedLockfile": false',
@@ -225,7 +225,7 @@ try {
   expectFailure(run(), "mainline receipt lock authority drift must fail");
 
   const secondaryWorkflow = discoverWorkflows().find((relativePath) => {
-    if (relativePath === ".github/workflows-retired/ci.yml") return false;
+    if (relativePath === ".github/workflows/ci.yml") return false;
     return readFileSync(path.join(sourceRoot, relativePath), "utf8").includes(
       "pnpm install --frozen-lockfile",
     );
@@ -238,7 +238,7 @@ try {
   expectFailure(run(), "non-frozen secondary workflow install must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -248,7 +248,7 @@ try {
   expectFailure(run(), "mutable action reference must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
@@ -258,7 +258,7 @@ try {
   expectFailure(run(), "mutable Python action reference must fail");
 
   reset();
-  mutateText(".github/workflows-retired/repository-toolchain-authority.yml", (value) =>
+  mutateText(".github/workflows/repository-toolchain-authority.yml", (value) =>
     replaceRequired(
       value,
       "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
@@ -268,7 +268,7 @@ try {
   expectFailure(run(), "mutable repository-toolchain action reference must fail");
 
   reset();
-  mutateText(".github/workflows-retired/repository-toolchain-authority.yml", (value) =>
+  mutateText(".github/workflows/repository-toolchain-authority.yml", (value) =>
     replaceRequired(
       value,
       "      - name: Run adversarial toolchain fixtures\n        run: node scripts/test-repository-toolchain.mjs\n",
@@ -278,25 +278,25 @@ try {
   expectFailure(run(), "repository-toolchain adversarial gate removal must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "persist-credentials: false", "persist-credentials: true"),
   );
   expectFailure(run(), "persisted checkout credentials must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, 'node-version: "22.14.0"', 'node-version: "22"'),
   );
   expectFailure(run(), "floating workflow Node.js must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, 'python-version: "3.13.5"', 'python-version: "3.13"'),
   );
   expectFailure(run(), "floating workflow Python must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "      - name: Verify Brass exact-byte evidence and create-only publication\n        run: python tools/verify_brass_creative_evaluation.py\n",
@@ -306,7 +306,7 @@ try {
   expectFailure(run(), "Brass exact-byte adversarial verification removal must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "  push:\n    branches:\n      - main\n  workflow_dispatch:",
@@ -316,13 +316,13 @@ try {
   expectFailure(run(), "missing automatic main validation must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "      - main\n", "      - main\n      - work/**\n"),
   );
   expectFailure(run(), "non-main push scope must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "  workflow_dispatch:\n",
@@ -332,7 +332,7 @@ try {
   expectFailure(run(), "pull-request validation must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "default: evavo-development-studio",
@@ -342,19 +342,19 @@ try {
   expectFailure(run(), "manual dispatcher identity drift must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "'github-main-push'", "'untrusted-main-push'"),
   );
   expectFailure(run(), "automatic dispatcher identity drift must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, "cancel-in-progress: true", "cancel-in-progress: false"),
   );
   expectFailure(run(), "superseded-run cancellation drift must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       '[[ "$(git rev-parse refs/remotes/origin/main)" == "${ART_STUDIO_EXPECTED_SHA}" ]]',
@@ -364,7 +364,7 @@ try {
   expectFailure(run(), "initial current-main equality weakening must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main",
@@ -374,13 +374,13 @@ try {
   expectFailure(run(), "final current-main refresh removal must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(value, '"currentMainAtReceipt": true', '"currentMainAtReceipt": false'),
   );
   expectFailure(run(), "current-main receipt assertion drift must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       '"decodedPixelsFromRetainedSourceBytes": true',
@@ -390,7 +390,7 @@ try {
   expectFailure(run(), "Brass exact-byte receipt assertion drift must fail");
 
   reset();
-  mutateText(".github/workflows-retired/ci.yml", (value) =>
+  mutateText(".github/workflows/ci.yml", (value) =>
     replaceRequired(
       value,
       "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
@@ -400,7 +400,7 @@ try {
   expectFailure(run(), "floating artifact action must fail");
   } else {
     reset();
-    writeFileSync(path.join(fixtureRoot, ".github/workflows-retired/forbidden.yml"), "name: forbidden\n", "utf8");
+    writeFileSync(path.join(fixtureRoot, ".github/workflows/forbidden.yml"), "name: forbidden\n", "utf8");
     expectFailure(run(), "active workflow YAML must fail under zero-cost policy");
   }
 

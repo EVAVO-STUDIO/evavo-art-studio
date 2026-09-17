@@ -20,7 +20,7 @@ const files = [
   "scripts/test-layered-godot-workspace-writer.mjs",
   "config/layered-production-godot-workspace-writer.v1.json",
   "docs/LAYERED_GODOT_WORKSPACE_WRITER.md",
-  ".github/workflows-retired/layered-godot-workspace-writer.yml",
+  ".github/workflows/layered-godot-workspace-writer.yml",
 ];
 
 const source = new Map();
@@ -132,7 +132,7 @@ for (const token of [
   assert.ok(documentation.includes(token), `documentation is missing ${token}`);
 }
 
-const workflow = source.get(".github/workflows-retired/layered-godot-workspace-writer.yml");
+const workflow = source.get(".github/workflows/layered-godot-workspace-writer.yml");
 for (const token of [
   "permissions:\n  contents: read",
   "fetch-depth: 1",

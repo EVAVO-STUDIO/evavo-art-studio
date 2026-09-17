@@ -7,13 +7,13 @@ on:
       - "docs/CREATIVE_ASSET_PUBLISHER.md"
       - "tools/creative-asset-publisher/**"
       - "evavo.tasks.json"
-      - ".github/workflows-retired/creative-asset-publisher.yml"
+      - ".github/workflows/creative-asset-publisher.yml"
   pull_request:
     paths:
       - "docs/CREATIVE_ASSET_PUBLISHER.md"
       - "tools/creative-asset-publisher/**"
       - "evavo.tasks.json"
-      - ".github/workflows-retired/creative-asset-publisher.yml"
+      - ".github/workflows/creative-asset-publisher.yml"
   workflow_dispatch:
 
 permissions:

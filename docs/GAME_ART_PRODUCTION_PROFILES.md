@@ -291,7 +291,7 @@ node scripts/game-art-production/profile-cli.mjs work-order `
 Generic profile changes use one focused workflow:
 
 ```text
-.github/workflows-retired/game-art-production-profiles.yml
+.github/workflows/game-art-production-profiles.yml
 ```
 
 It performs syntax checks, runs the profile discovery/parity/platformer/3D/extensibility suite, proves a clean source tree and uploads one compact verification artifact. The existing HMF workflow continues to validate HMF-specific production changes, while the repository-wide mainline workflow remains the final integration gate. This avoids adding a second full-repository job for every profile edit.

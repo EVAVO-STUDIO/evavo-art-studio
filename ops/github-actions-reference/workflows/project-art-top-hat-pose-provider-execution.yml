@@ -22,7 +22,7 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-candidate-admission.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-provider-execution.yml"
+      - ".github/workflows/project-art-top-hat-pose-provider-execution.yml"
   push:
     branches: [main]
     paths:
@@ -45,7 +45,7 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-candidate-admission.mjs"
       - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_EXECUTION.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-provider-execution.yml"
+      - ".github/workflows/project-art-top-hat-pose-provider-execution.yml"
   workflow_dispatch:
 
 permissions:

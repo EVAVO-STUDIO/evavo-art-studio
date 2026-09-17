@@ -13,7 +13,7 @@ on:
       - "scripts/test-eva-dense-motion-workstation-task.mjs"
       - "docs/AUTOMATION_FABRIC_V5.md"
       - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
-      - ".github/workflows-retired/art-studio-workstation-v5-contract.yml"
+      - ".github/workflows/art-studio-workstation-v5-contract.yml"
   pull_request:
     paths:
       - "config/automation-fabric-client-v5.json"
@@ -25,7 +25,7 @@ on:
       - "scripts/test-eva-dense-motion-workstation-task.mjs"
       - "docs/AUTOMATION_FABRIC_V5.md"
       - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
-      - ".github/workflows-retired/art-studio-workstation-v5-contract.yml"
+      - ".github/workflows/art-studio-workstation-v5-contract.yml"
   workflow_dispatch:
 
 permissions:

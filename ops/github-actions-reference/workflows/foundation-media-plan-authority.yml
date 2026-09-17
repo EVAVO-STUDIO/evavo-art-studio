@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths: &foundation_media_paths
-      - ".github/workflows-retired/foundation-media-plan-authority.yml"
+      - ".github/workflows/foundation-media-plan-authority.yml"
       - "scripts/compile-foundation-media-plan.mjs"
       - "scripts/test-foundation-media-plan.mjs"
       - "scripts/check-foundation-media-plan.mjs"

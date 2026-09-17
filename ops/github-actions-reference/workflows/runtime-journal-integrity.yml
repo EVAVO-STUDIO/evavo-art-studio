@@ -7,7 +7,7 @@ on:
       - "packages/runtime/src/journal-integrity.ts"
       - "packages/runtime/test/journal-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/runtime-journal-integrity.yml"
+      - ".github/workflows/runtime-journal-integrity.yml"
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
       - "packages/runtime/src/journal-integrity.ts"
       - "packages/runtime/test/journal-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/runtime-journal-integrity.yml"
+      - ".github/workflows/runtime-journal-integrity.yml"
 
 permissions:
   contents: read

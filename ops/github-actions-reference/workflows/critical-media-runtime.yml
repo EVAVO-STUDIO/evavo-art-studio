@@ -6,7 +6,7 @@ on:
       - main
       - agent/critical-media-runtime-gate-20260804
     paths: &critical_media_paths
-      - ".github/workflows-retired/critical-media-runtime.yml"
+      - ".github/workflows/critical-media-runtime.yml"
       - "apps/worker/src/sprite-supervisor-guarded-handlers.ts"
       - "apps/worker/src/sprite-supervisor-handlers.ts"
       - "apps/worker/test/sprite-supervisor-continuation-recovery.test.mjs"

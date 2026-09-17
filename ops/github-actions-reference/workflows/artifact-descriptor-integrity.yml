@@ -7,7 +7,7 @@ on:
       - "packages/artifacts/test/descriptor-integrity-security.test.mjs"
       - "packages/artifacts/test/descriptor-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/artifact-descriptor-integrity.yml"
+      - ".github/workflows/artifact-descriptor-integrity.yml"
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
       - "packages/artifacts/test/descriptor-integrity-security.test.mjs"
       - "packages/artifacts/test/descriptor-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/artifact-descriptor-integrity.yml"
+      - ".github/workflows/artifact-descriptor-integrity.yml"
 
 permissions:
   contents: read

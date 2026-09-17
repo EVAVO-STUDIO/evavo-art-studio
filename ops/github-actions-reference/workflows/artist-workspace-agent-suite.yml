@@ -67,7 +67,7 @@ on:
       - "tools/project_art_workspace_catalog_mcp.mjs"
       - "tools/project_art_workspace_jobs_mcp.mjs"
       - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
-      - ".github/workflows-retired/artist-workspace-agent-suite.yml"
+      - ".github/workflows/artist-workspace-agent-suite.yml"
   push:
     branches:
       - main
@@ -136,7 +136,7 @@ on:
       - "tools/project_art_workspace_catalog_mcp.mjs"
       - "tools/project_art_workspace_jobs_mcp.mjs"
       - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
-      - ".github/workflows-retired/artist-workspace-agent-suite.yml"
+      - ".github/workflows/artist-workspace-agent-suite.yml"
   workflow_dispatch:
 
 permissions:

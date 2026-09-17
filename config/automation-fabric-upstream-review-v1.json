@@ -18,7 +18,7 @@
     "workstationAcceptanceCommand": "evavo-local-storage-workstation-accept",
     "repositoryTaskPlanAction": "storage.repository_task_plan",
     "repositoryTaskRunAction": "storage.repository_task_run",
-    "repositoryPlanWakeWorkflow": ".github/workflows-retired/repository-plan-command-wake.yml",
+    "repositoryPlanWakeWorkflow": ".github/workflows/repository-plan-command-wake.yml",
     "poolId": "windows-local",
     "primaryNodeId": "windows-primary"
   },

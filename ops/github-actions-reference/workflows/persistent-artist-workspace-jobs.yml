@@ -11,7 +11,7 @@ on:
       - "tools/project_art_workspace_jobs_mcp.mjs"
       - "docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md"
       - "config/mcp.persistent-artist-workspace-jobs.windows.example.json"
-      - ".github/workflows-retired/persistent-artist-workspace-jobs.yml"
+      - ".github/workflows/persistent-artist-workspace-jobs.yml"
   push:
     branches:
       - main
@@ -24,7 +24,7 @@ on:
       - "tools/project_art_workspace_jobs_mcp.mjs"
       - "docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md"
       - "config/mcp.persistent-artist-workspace-jobs.windows.example.json"
-      - ".github/workflows-retired/persistent-artist-workspace-jobs.yml"
+      - ".github/workflows/persistent-artist-workspace-jobs.yml"
   workflow_dispatch:
 
 permissions:

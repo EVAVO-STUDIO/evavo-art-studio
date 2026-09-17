@@ -12,8 +12,8 @@ on:
       - "scripts/test-project-art-top-hat-pose-bank-release-approval*.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_PLAN.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_APPROVAL.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-release-plan.yml"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-release-approval.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-plan.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-approval.yml"
   pull_request:
     paths:
       - "scripts/project-art/top-hat-pose-bank-release-plan*.mjs"
@@ -24,8 +24,8 @@ on:
       - "scripts/test-project-art-top-hat-pose-bank-release-approval*.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_PLAN.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_APPROVAL.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-release-plan.yml"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-release-approval.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-plan.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-approval.yml"
   workflow_dispatch:
 
 permissions:

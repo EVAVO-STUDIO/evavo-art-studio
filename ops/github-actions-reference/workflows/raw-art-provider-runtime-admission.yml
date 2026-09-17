@@ -18,7 +18,7 @@ on:
       - "scripts/check-raw-art-provider-runtime-admission.mjs"
       - "docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md"
       - "package.json"
-      - ".github/workflows-retired/raw-art-provider-runtime-admission.yml"
+      - ".github/workflows/raw-art-provider-runtime-admission.yml"
   push:
     branches:
       - main
@@ -38,7 +38,7 @@ on:
       - "scripts/check-raw-art-provider-runtime-admission.mjs"
       - "docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md"
       - "package.json"
-      - ".github/workflows-retired/raw-art-provider-runtime-admission.yml"
+      - ".github/workflows/raw-art-provider-runtime-admission.yml"
 
 permissions:
   contents: read

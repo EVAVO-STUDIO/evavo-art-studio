@@ -9,7 +9,7 @@ on:
       - "scripts/project-art/eva-dense-motion-reviewed-frame-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_CLOUDINARY_ADMISSION.md"
-      - ".github/workflows-retired/eva-dense-motion-cloudinary-admission.yml"
+      - ".github/workflows/eva-dense-motion-cloudinary-admission.yml"
   push:
     branches: [main]
     paths:
@@ -19,7 +19,7 @@ on:
       - "scripts/project-art/eva-dense-motion-reviewed-frame-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_CLOUDINARY_ADMISSION.md"
-      - ".github/workflows-retired/eva-dense-motion-cloudinary-admission.yml"
+      - ".github/workflows/eva-dense-motion-cloudinary-admission.yml"
   workflow_dispatch:
 
 permissions:

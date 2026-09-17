@@ -406,7 +406,7 @@
       ],
       "properties": {
         "workflow": {
-          "const": ".github/workflows-retired/ci.yml"
+          "const": ".github/workflows/ci.yml"
         },
         "runId": {
           "const": "30544861146"

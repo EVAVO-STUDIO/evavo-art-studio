@@ -21,8 +21,8 @@ on:
       - "docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md"
       - "docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md"
       - "package.json"
-      - ".github/workflows-retired/raw-art-provider-runtime-admission.yml"
-      - ".github/workflows-retired/raw-art-provider-runtime-execution.yml"
+      - ".github/workflows/raw-art-provider-runtime-admission.yml"
+      - ".github/workflows/raw-art-provider-runtime-execution.yml"
   push:
     branches:
       - main
@@ -45,8 +45,8 @@ on:
       - "docs/RAW_ART_PROVIDER_RUNTIME_ADMISSION.md"
       - "docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md"
       - "package.json"
-      - ".github/workflows-retired/raw-art-provider-runtime-admission.yml"
-      - ".github/workflows-retired/raw-art-provider-runtime-execution.yml"
+      - ".github/workflows/raw-art-provider-runtime-admission.yml"
+      - ".github/workflows/raw-art-provider-runtime-execution.yml"
 
 permissions:
   contents: read

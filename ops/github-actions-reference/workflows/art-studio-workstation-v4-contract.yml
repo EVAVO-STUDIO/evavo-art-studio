@@ -8,14 +8,14 @@ on:
       - "scripts/check-art-studio-workstation-v4-contract.mjs"
       - "scripts/test-art-studio-workstation-v4-contract.mjs"
       - "docs/AUTOMATION_FABRIC_V4.md"
-      - ".github/workflows-retired/art-studio-workstation-v4-contract.yml"
+      - ".github/workflows/art-studio-workstation-v4-contract.yml"
   pull_request:
     paths:
       - "config/automation-fabric-client-v4.json"
       - "scripts/check-art-studio-workstation-v4-contract.mjs"
       - "scripts/test-art-studio-workstation-v4-contract.mjs"
       - "docs/AUTOMATION_FABRIC_V4.md"
-      - ".github/workflows-retired/art-studio-workstation-v4-contract.yml"
+      - ".github/workflows/art-studio-workstation-v4-contract.yml"
   workflow_dispatch:
 
 permissions:

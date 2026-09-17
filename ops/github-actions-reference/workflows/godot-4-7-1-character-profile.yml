@@ -8,13 +8,13 @@ on:
       - "packages/art-direction/src/**"
       - "packages/art-direction/test/**"
       - "apps/cli/src/**"
-      - ".github/workflows-retired/godot-4-7-1-character-profile.yml"
+      - ".github/workflows/godot-4-7-1-character-profile.yml"
   pull_request:
     paths:
       - "packages/art-direction/src/**"
       - "packages/art-direction/test/**"
       - "apps/cli/src/**"
-      - ".github/workflows-retired/godot-4-7-1-character-profile.yml"
+      - ".github/workflows/godot-4-7-1-character-profile.yml"
   workflow_dispatch:
 
 permissions:

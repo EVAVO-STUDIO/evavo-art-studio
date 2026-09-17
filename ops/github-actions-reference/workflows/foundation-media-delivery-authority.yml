@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths: &foundation_delivery_paths
-      - ".github/workflows-retired/foundation-media-delivery-authority.yml"
+      - ".github/workflows/foundation-media-delivery-authority.yml"
       - "scripts/compile-foundation-delivery-manifest.mjs"
       - "scripts/test-foundation-delivery-manifest.mjs"
       - "scripts/test-foundation-delivery-production-contract.mjs"

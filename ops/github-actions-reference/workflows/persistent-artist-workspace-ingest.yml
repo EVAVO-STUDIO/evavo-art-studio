@@ -11,7 +11,7 @@ on:
       - "tools/project_art_workspace_ingest_mcp.mjs"
       - "docs/PERSISTENT_ARTIST_WORKSPACE_INGEST.md"
       - "config/mcp.persistent-artist-workspace-ingest.windows.example.json"
-      - ".github/workflows-retired/persistent-artist-workspace-ingest.yml"
+      - ".github/workflows/persistent-artist-workspace-ingest.yml"
   push:
     branches:
       - main
@@ -24,7 +24,7 @@ on:
       - "tools/project_art_workspace_ingest_mcp.mjs"
       - "docs/PERSISTENT_ARTIST_WORKSPACE_INGEST.md"
       - "config/mcp.persistent-artist-workspace-ingest.windows.example.json"
-      - ".github/workflows-retired/persistent-artist-workspace-ingest.yml"
+      - ".github/workflows/persistent-artist-workspace-ingest.yml"
   workflow_dispatch:
 
 permissions:

@@ -9,7 +9,7 @@ on:
       - "scripts/project-art/eva-dense-motion-release-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-alpha-mastering.mjs"
       - "scripts/project-art/eva-dense-motion-identity-continuity.mjs"
-      - ".github/workflows-retired/eva-dense-motion-runtime-admission-handoff.yml"
+      - ".github/workflows/eva-dense-motion-runtime-admission-handoff.yml"
   push:
     branches: [main]
     paths:
@@ -19,7 +19,7 @@ on:
       - "scripts/project-art/eva-dense-motion-release-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-alpha-mastering.mjs"
       - "scripts/project-art/eva-dense-motion-identity-continuity.mjs"
-      - ".github/workflows-retired/eva-dense-motion-runtime-admission-handoff.yml"
+      - ".github/workflows/eva-dense-motion-runtime-admission-handoff.yml"
   workflow_dispatch:
 
 permissions:

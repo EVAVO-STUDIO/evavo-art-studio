@@ -10,7 +10,7 @@ on:
       - "scripts/test-project-art-top-hat-pose-*.mjs"
       - "scripts/test-project-art-top-hat-anchor-source-truth.mjs"
       - "config/production/top-hat-pose-bank-provider-human-authorization-v1.json"
-      - ".github/workflows-retired/project-art-top-hat-real-provider-preflight.yml"
+      - ".github/workflows/project-art-top-hat-real-provider-preflight.yml"
   workflow_dispatch:
 
 permissions:

@@ -9,7 +9,7 @@ on:
       - "scripts/test-project-art-top-hat-pose-bank-release-plan-writer.mjs"
       - "scripts/write-project-art-top-hat-pose-bank-release-plan.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_PLAN.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-release-plan.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-plan.yml"
   pull_request:
     paths:
       - "scripts/project-art/**"
@@ -17,7 +17,7 @@ on:
       - "scripts/test-project-art-top-hat-pose-bank-release-plan-writer.mjs"
       - "scripts/write-project-art-top-hat-pose-bank-release-plan.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_RELEASE_PLAN.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-release-plan.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-release-plan.yml"
   workflow_dispatch:
 
 permissions:

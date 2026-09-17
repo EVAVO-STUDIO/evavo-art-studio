@@ -13,7 +13,7 @@ on:
       - "scripts/project-art/eva-dense-motion-**"
       - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_**"
-      - ".github/workflows-retired/eva-dense-motion-workstation-task.yml"
+      - ".github/workflows/eva-dense-motion-workstation-task.yml"
   pull_request:
     paths:
       - "config/eva-dense-motion-workstation-task-v1.json"
@@ -25,7 +25,7 @@ on:
       - "scripts/project-art/eva-dense-motion-**"
       - "docs/EVA_DENSE_MOTION_WORKSTATION_TASK.md"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_**"
-      - ".github/workflows-retired/eva-dense-motion-workstation-task.yml"
+      - ".github/workflows/eva-dense-motion-workstation-task.yml"
   workflow_dispatch:
 
 permissions:

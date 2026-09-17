@@ -15,7 +15,7 @@ on:
       - "examples/pixel-font-universal/**"
       - "docs/PIXEL_FONT_STUDIO_UNIVERSAL_STYLES.md"
       - "requirements/pixel-font-universal.txt"
-      - ".github/workflows-retired/pixel-font-studio-universal.yml"
+      - ".github/workflows/pixel-font-studio-universal.yml"
   push:
     branches: [main]
     paths:
@@ -31,7 +31,7 @@ on:
       - "examples/pixel-font-universal/**"
       - "docs/PIXEL_FONT_STUDIO_UNIVERSAL_STYLES.md"
       - "requirements/pixel-font-universal.txt"
-      - ".github/workflows-retired/pixel-font-studio-universal.yml"
+      - ".github/workflows/pixel-font-studio-universal.yml"
   workflow_dispatch:
 
 permissions:

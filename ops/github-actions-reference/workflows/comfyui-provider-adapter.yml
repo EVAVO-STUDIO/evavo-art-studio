@@ -16,7 +16,7 @@ on:
       - ".env.example"
       - "README.md"
       - "package.json"
-      - ".github/workflows-retired/comfyui-provider-adapter.yml"
+      - ".github/workflows/comfyui-provider-adapter.yml"
   push:
     branches:
       - main
@@ -34,7 +34,7 @@ on:
       - ".env.example"
       - "README.md"
       - "package.json"
-      - ".github/workflows-retired/comfyui-provider-adapter.yml"
+      - ".github/workflows/comfyui-provider-adapter.yml"
 
 permissions:
   contents: read

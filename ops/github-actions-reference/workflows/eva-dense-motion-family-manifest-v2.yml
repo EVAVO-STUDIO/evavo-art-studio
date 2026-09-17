@@ -7,7 +7,7 @@ on:
       - "scripts/run-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
       - "scripts/test-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
       - "scripts/project-art/eva-dense-motion-family-release-assembly-v2.mjs"
-      - ".github/workflows-retired/eva-dense-motion-family-manifest-v2.yml"
+      - ".github/workflows/eva-dense-motion-family-manifest-v2.yml"
   push:
     branches: [main]
     paths:
@@ -15,7 +15,7 @@ on:
       - "scripts/run-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
       - "scripts/test-project-art-eva-dense-motion-family-release-manifest-v2.mjs"
       - "scripts/project-art/eva-dense-motion-family-release-assembly-v2.mjs"
-      - ".github/workflows-retired/eva-dense-motion-family-manifest-v2.yml"
+      - ".github/workflows/eva-dense-motion-family-manifest-v2.yml"
   workflow_dispatch:
 
 permissions:

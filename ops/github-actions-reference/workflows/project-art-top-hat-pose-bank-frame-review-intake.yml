@@ -19,7 +19,7 @@ on:
       - "scripts/test-project-art-top-hat-frame-review-decision-manifest.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_FRAME_REVIEW_INTAKE.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-frame-review-intake.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-frame-review-intake.yml"
   push:
     branches: [main]
     paths:
@@ -39,7 +39,7 @@ on:
       - "scripts/test-project-art-top-hat-frame-review-decision-manifest.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-frame-review-intake-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_FRAME_REVIEW_INTAKE.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-frame-review-intake.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-frame-review-intake.yml"
   workflow_dispatch:
 
 permissions:

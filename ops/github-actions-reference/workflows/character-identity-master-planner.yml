@@ -6,12 +6,12 @@ on:
     paths:
       - "scripts/character-identity-master-plan.mjs"
       - "scripts/test-character-identity-master-plan.mjs"
-      - ".github/workflows-retired/character-identity-master-planner.yml"
+      - ".github/workflows/character-identity-master-planner.yml"
   pull_request:
     paths:
       - "scripts/character-identity-master-plan.mjs"
       - "scripts/test-character-identity-master-plan.mjs"
-      - ".github/workflows-retired/character-identity-master-planner.yml"
+      - ".github/workflows/character-identity-master-planner.yml"
   workflow_dispatch:
 
 permissions:

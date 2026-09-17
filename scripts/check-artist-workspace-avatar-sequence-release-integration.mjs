@@ -17,7 +17,7 @@ const files = Object.freeze({
   cli: 'scripts/avatar-sequence-release-cli.mjs',
   mcp: 'tools/project_art_avatar_sequence_release_mcp.mjs',
   suite: 'scripts/check-project-art-avatar-sequence-release-suite.mjs',
-  workflow: '.github/workflows-retired/artist-workspace-agent-suite.yml',
+  workflow: '.github/workflows/artist-workspace-agent-suite.yml',
 });
 const content = new Map();
 for (const [label, relative] of Object.entries(files)) {

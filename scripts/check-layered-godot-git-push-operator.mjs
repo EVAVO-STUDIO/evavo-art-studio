@@ -23,7 +23,7 @@ const files = [
   "scripts/check-layered-godot-git-push-operator.mjs",
   "config/layered-production-godot-git-push-operator.v1.json",
   "docs/LAYERED_GODOT_GIT_PUSH_OPERATOR.md",
-  ".github/workflows-retired/layered-godot-workspace-writer.yml",
+  ".github/workflows/layered-godot-workspace-writer.yml",
 ];
 const source = new Map();
 for (const relative of files) {
@@ -182,7 +182,7 @@ for (const token of [
   "owns push-result status and buffers before later dependency mutation",
 ]) assert.ok(adversarial.includes(token), `push adversarial tests missing ${token}`);
 
-const workflow = source.get(".github/workflows-retired/layered-godot-workspace-writer.yml");
+const workflow = source.get(".github/workflows/layered-godot-workspace-writer.yml");
 for (const token of [
   "scripts/layered-godot-git-push-operator.mjs",
   "scripts/layered-godot-git-push-operator/**",

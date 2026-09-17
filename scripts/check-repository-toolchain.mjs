@@ -449,7 +449,7 @@ if (workflowPaths.length > 0) {
 // It becomes relevant only if a future, explicit budget decision restores an
 // active workflow; the normal local-first checkout must never enter this block.
 if (workflowPaths.length > 0) {
-const workflow = read(".github/workflows-retired/ci.yml");
+const workflow = read(".github/workflows/ci.yml");
 const events = workflowEvents(workflow);
 if (JSON.stringify(events) !== JSON.stringify(["push", "workflow_dispatch"])) {
   errors.push(`CI workflow must use only main push and workflow_dispatch; found ${JSON.stringify(events)}`);
@@ -604,7 +604,7 @@ for (const action of workflowActions(workflow)) {
   }
 }
 
-const toolchainWorkflow = read(".github/workflows-retired/repository-toolchain-authority.yml");
+const toolchainWorkflow = read(".github/workflows/repository-toolchain-authority.yml");
 const toolchainEvents = workflowEvents(toolchainWorkflow);
 if (JSON.stringify(toolchainEvents) !== JSON.stringify(["pull_request", "workflow_dispatch"])) {
   errors.push(
@@ -621,8 +621,8 @@ for (const token of [
   '      - "schemas/repository-owned-reliability-profile.schema.json"',
   '      - "scripts/check-repository-toolchain.mjs"',
   '      - "scripts/test-repository-toolchain.mjs"',
-  '      - ".github/workflows-retired/ci.yml"',
-  '      - ".github/workflows-retired/repository-toolchain-authority.yml"',
+  '      - ".github/workflows/ci.yml"',
+  '      - ".github/workflows/repository-toolchain-authority.yml"',
   "permissions:\n  contents: read",
   "cancel-in-progress: true",
   "runs-on: ubuntu-24.04",

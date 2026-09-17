@@ -10,7 +10,7 @@ on:
       - "tools/evaluate_brass_animation_sequence.py"
       - "tools/verify_brass_creative_evaluation.py"
       - "docs/BRASS_CREATIVE_ANIMATION_EVALUATION.md"
-      - ".github/workflows-retired/brass-creative-animation-evaluation.yml"
+      - ".github/workflows/brass-creative-animation-evaluation.yml"
   workflow_dispatch:
 
 permissions:

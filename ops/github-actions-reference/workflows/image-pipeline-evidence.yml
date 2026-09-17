@@ -13,7 +13,7 @@ on:
       - "tools/verify_image_pipeline_evidence.py"
       - "tools/verify_image_pipeline_evidence_contract.py"
       - "tools/verify_executable_image_pipeline.py"
-      - ".github/workflows-retired/image-pipeline-evidence.yml"
+      - ".github/workflows/image-pipeline-evidence.yml"
   workflow_dispatch:
 
 permissions:

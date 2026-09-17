@@ -7,7 +7,7 @@ on:
       - "scripts/test-council-avatar-worker-task-contract.mjs"
       - "config/automation-fabric-client-v5.json"
       - "evavo.tasks.json"
-      - ".github/workflows-retired/council-avatar-worker-stack.yml"
+      - ".github/workflows/council-avatar-worker-stack.yml"
   push:
     branches: [main]
     paths:
@@ -15,7 +15,7 @@ on:
       - "scripts/test-council-avatar-worker-task-contract.mjs"
       - "config/automation-fabric-client-v5.json"
       - "evavo.tasks.json"
-      - ".github/workflows-retired/council-avatar-worker-stack.yml"
+      - ".github/workflows/council-avatar-worker-stack.yml"
 
 permissions:
   contents: read

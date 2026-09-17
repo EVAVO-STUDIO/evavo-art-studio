@@ -18,7 +18,7 @@ on:
       - "scripts/run-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-candidate-materialization-*.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-candidate-materialization-campaign.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-candidate-materialization-campaign.yml"
   push:
     branches: [main]
     paths:
@@ -37,7 +37,7 @@ on:
       - "scripts/run-project-art-top-hat-pose-bank-candidate-materialization-campaign.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-candidate-materialization-*.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_CANDIDATE_MATERIALIZATION_CAMPAIGN.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-candidate-materialization-campaign.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-candidate-materialization-campaign.yml"
   workflow_dispatch:
 
 permissions:

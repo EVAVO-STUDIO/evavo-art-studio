@@ -11,7 +11,7 @@ on:
       - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/avatar-final-pass-provider-frame-finisher.mjs"
       - "scripts/project-art/png-structure-v1.mjs"
-      - ".github/workflows-retired/eva-dense-motion-reviewed-frame-evidence.yml"
+      - ".github/workflows/eva-dense-motion-reviewed-frame-evidence.yml"
   push:
     branches: [main]
     paths:
@@ -23,7 +23,7 @@ on:
       - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/avatar-final-pass-provider-frame-finisher.mjs"
       - "scripts/project-art/png-structure-v1.mjs"
-      - ".github/workflows-retired/eva-dense-motion-reviewed-frame-evidence.yml"
+      - ".github/workflows/eva-dense-motion-reviewed-frame-evidence.yml"
   workflow_dispatch:
 
 permissions:

@@ -30,7 +30,7 @@ const ENABLED_CHECKOUT_CREDENTIALS =
   /\bpersist-credentials:\s*["']?true["']?(?=[ \t]*(?:[,}#]|$))/mu;
 const PERSISTED_CHECKOUT_ALLOWLIST = new Map([
   [
-    ".github/workflows-retired/finalize-pixel-typography-review.yml",
+    ".github/workflows/finalize-pixel-typography-review.yml",
     [
       "permissions:\n  contents: write",
       "git push origin HEAD:main",
@@ -38,7 +38,7 @@ const PERSISTED_CHECKOUT_ALLOWLIST = new Map([
     ],
   ],
   [
-    ".github/workflows-retired/pixel-font-repository-publish.yml",
+    ".github/workflows/pixel-font-repository-publish.yml",
     [
       "TARGET_TOKEN: ${{ secrets.repository_token || secrets.EVAVO_PIXEL_FONT_REPOSITORY_TOKEN }}",
       "--confirm-publish",
@@ -46,7 +46,7 @@ const PERSISTED_CHECKOUT_ALLOWLIST = new Map([
     ],
   ],
   [
-    ".github/workflows-retired/repair-pixel-typography-review.yml",
+    ".github/workflows/repair-pixel-typography-review.yml",
     [
       "permissions:\n  contents: write",
       "git push origin HEAD:main",
@@ -260,19 +260,19 @@ hostedWorkflowTest("checkout credentials are disabled except for exact reviewed 
 
 hostedWorkflowTest("critical media workflows use the shared bounded bootstrap", async () => {
   const required = new Set([
-    ".github/workflows-retired/artifact-descriptor-integrity.yml",
-    ".github/workflows-retired/artifact-json-canonicalization.yml",
-    ".github/workflows-retired/artifact-reference-integrity.yml",
-    ".github/workflows-retired/book-art-docs-release.yml",
-    ".github/workflows-retired/book-art-provider-runtime.yml",
-    ".github/workflows-retired/book-creative-direction.yml",
-    ".github/workflows-retired/book-illustration-intelligence.yml",
-    ".github/workflows-retired/ci.yml",
-    ".github/workflows-retired/provider-control-capabilities.yml",
-    ".github/workflows-retired/runtime-journal-integrity.yml",
-    ".github/workflows-retired/runtime-submission-integrity.yml",
-    ".github/workflows-retired/runtime-worker-options-integrity.yml",
-    ".github/workflows-retired/sprite-motion-topology.yml",
+    ".github/workflows/artifact-descriptor-integrity.yml",
+    ".github/workflows/artifact-json-canonicalization.yml",
+    ".github/workflows/artifact-reference-integrity.yml",
+    ".github/workflows/book-art-docs-release.yml",
+    ".github/workflows/book-art-provider-runtime.yml",
+    ".github/workflows/book-creative-direction.yml",
+    ".github/workflows/book-illustration-intelligence.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/provider-control-capabilities.yml",
+    ".github/workflows/runtime-journal-integrity.yml",
+    ".github/workflows/runtime-submission-integrity.yml",
+    ".github/workflows/runtime-worker-options-integrity.yml",
+    ".github/workflows/sprite-motion-topology.yml",
   ]);
   const sources = new Map(
     (await workflowSources()).map((workflow) => [workflow.path, workflow.source]),

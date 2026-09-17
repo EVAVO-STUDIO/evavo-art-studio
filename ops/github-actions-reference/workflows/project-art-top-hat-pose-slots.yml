@@ -37,7 +37,7 @@ on:
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_RUNTIME_ADAPTER.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_CANDIDATE_ADMISSION.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-slots.yml"
+      - ".github/workflows/project-art-top-hat-pose-slots.yml"
   pull_request:
     paths:
       - "scripts/project-art/top-hat-pose-slot-production.mjs"
@@ -73,7 +73,7 @@ on:
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_PACKAGE.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_PROVIDER_RUNTIME_ADAPTER.md"
       - "docs/PROJECT_ART_TOP_HAT_POSE_SLOT_CANDIDATE_ADMISSION.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-slots.yml"
+      - ".github/workflows/project-art-top-hat-pose-slots.yml"
   workflow_dispatch:
 
 permissions:

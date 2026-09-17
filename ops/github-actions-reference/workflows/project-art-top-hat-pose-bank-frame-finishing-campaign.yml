@@ -17,7 +17,7 @@ on:
       - "scripts/test-project-art-avatar-frame-finisher-preflight.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-frame-finishing-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_FRAME_FINISHING_CAMPAIGN.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-frame-finishing-campaign.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-frame-finishing-campaign.yml"
   push:
     branches: [main]
     paths:
@@ -35,7 +35,7 @@ on:
       - "scripts/test-project-art-avatar-frame-finisher-preflight.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-frame-finishing-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_FRAME_FINISHING_CAMPAIGN.md"
-      - ".github/workflows-retired/project-art-top-hat-pose-bank-frame-finishing-campaign.yml"
+      - ".github/workflows/project-art-top-hat-pose-bank-frame-finishing-campaign.yml"
   workflow_dispatch:
 
 permissions:

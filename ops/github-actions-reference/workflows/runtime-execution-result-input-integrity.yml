@@ -6,7 +6,7 @@ on:
       - "packages/runtime/src/local-repository.ts"
       - "packages/runtime/test/execution-result-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/runtime-execution-result-input-integrity.yml"
+      - ".github/workflows/runtime-execution-result-input-integrity.yml"
   push:
     branches:
       - main
@@ -14,7 +14,7 @@ on:
       - "packages/runtime/src/local-repository.ts"
       - "packages/runtime/test/execution-result-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/runtime-execution-result-input-integrity.yml"
+      - ".github/workflows/runtime-execution-result-input-integrity.yml"
 
 permissions:
   contents: read

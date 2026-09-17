@@ -19,7 +19,7 @@ const REQUIRED_FILES = [
   "scripts/check-art-studio-capability-contract.mjs",
   "scripts/test-art-studio-capability-contract.mjs",
   "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md",
-  ".github/workflows-retired/art-studio-capability-contract.yml",
+  ".github/workflows/art-studio-capability-contract.yml",
 ];
 const SHA = /^[a-f0-9]{40}$/u;
 const fail = (condition, message) => { if (!condition) throw new Error(message); };
@@ -218,7 +218,7 @@ export async function checkRepository(root = ROOT) {
     fail(stat.isFile() && !stat.isSymbolicLink(), `Required capability-contract file is missing or linked: ${relative}`);
   }
   const [workflow,documentation,evaWorkerScript] = await Promise.all([
-    readFile(path.join(root, ".github/workflows-retired/art-studio-capability-contract.yml"), "utf8"),
+    readFile(path.join(root, ".github/workflows/art-studio-capability-contract.yml"), "utf8"),
     readFile(path.join(root, "docs/CAPABILITY_DISCOVERY_AND_AUTOMATION_FABRIC.md"), "utf8"),
     readFile(path.join(root, "scripts/Test-EvaAvatarWorkerStack.ps1"), "utf8"),
   ]);

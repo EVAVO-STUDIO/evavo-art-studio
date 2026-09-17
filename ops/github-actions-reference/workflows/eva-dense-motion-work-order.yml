@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows-retired/eva-dense-motion-work-order.yml"
+      - ".github/workflows/eva-dense-motion-work-order.yml"
       - "scripts/project-art/eva-dense-motion-work-order-data.mjs"
       - "scripts/project-art/eva-dense-motion-work-order-common.mjs"
       - "scripts/project-art/eva-dense-motion-work-order.mjs"
@@ -24,7 +24,7 @@ on:
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_RELEASE_EVIDENCE.md"
   pull_request:
     paths:
-      - ".github/workflows-retired/eva-dense-motion-work-order.yml"
+      - ".github/workflows/eva-dense-motion-work-order.yml"
       - "scripts/project-art/eva-dense-motion-work-order-data.mjs"
       - "scripts/project-art/eva-dense-motion-work-order-common.mjs"
       - "scripts/project-art/eva-dense-motion-work-order.mjs"

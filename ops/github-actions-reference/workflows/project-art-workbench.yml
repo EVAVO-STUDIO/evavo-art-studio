@@ -51,7 +51,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "requirements-image-pipeline.txt"
-      - ".github/workflows-retired/project-art-workbench.yml"
+      - ".github/workflows/project-art-workbench.yml"
   push:
     branches:
       - main
@@ -104,7 +104,7 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "requirements-image-pipeline.txt"
-      - ".github/workflows-retired/project-art-workbench.yml"
+      - ".github/workflows/project-art-workbench.yml"
 
 permissions:
   contents: read

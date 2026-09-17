@@ -20,7 +20,7 @@ const files = Object.freeze({
   mcp: 'tools/project_art_avatar_sequence_bundle_mcp.mjs',
   documentation: 'docs/PROJECT_ART_AVATAR_SEQUENCE_BUNDLES.md',
   config: 'config/mcp.project-art-avatar-sequence-bundle.windows.example.json',
-  workflow: '.github/workflows-retired/project-art-avatar-sequence-bundle.yml',
+  workflow: '.github/workflows/project-art-avatar-sequence-bundle.yml',
 });
 
 function snapshot(metadata) {
@@ -246,7 +246,7 @@ const workflowPaths = [
   'tools/project_art_avatar_sequence_bundle_mcp.mjs',
   'docs/PROJECT_ART_AVATAR_SEQUENCE_BUNDLES.md',
   'config/mcp.project-art-avatar-sequence-bundle.windows.example.json',
-  '.github/workflows-retired/project-art-avatar-sequence-bundle.yml',
+  '.github/workflows/project-art-avatar-sequence-bundle.yml',
   'scripts/compile-project-art-avatar-sequence.mjs',
   'scripts/check-project-art-avatar-sequence.mjs',
 ];

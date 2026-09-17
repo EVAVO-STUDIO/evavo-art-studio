@@ -221,7 +221,7 @@ Each write call still requires `confirmWrite=true`; each publication call requir
 
 ## GitHub Actions publisher
 
-`.github/workflows-retired/pixel-font-repository-publish.yml` is deliberately manual-only and reusable through `workflow_call`. It does not run on every push, conserving the GitHub Actions allowance.
+`.github/workflows/pixel-font-repository-publish.yml` is deliberately manual-only and reusable through `workflow_call`. It does not run on every push, conserving the GitHub Actions allowance.
 
 The workflow requires a fine-grained token with contents write access to the intended target repository. Store it as:
 

@@ -21,7 +21,7 @@ const files = Object.freeze({
   mcp: 'tools/project_art_avatar_sequence_mcp.mjs',
   documentation: 'docs/PROJECT_ART_AVATAR_SEQUENCE_MASTERING.md',
   config: 'config/mcp.project-art-avatar-sequence.windows.example.json',
-  workflow: '.github/workflows-retired/project-art-avatar-sequence.yml',
+  workflow: '.github/workflows/project-art-avatar-sequence.yml',
   loopCompiler: 'scripts/compile-project-art-loop-closure.mjs',
 });
 
@@ -295,7 +295,7 @@ const workflowPaths = [
   'tools/project_art_avatar_sequence_mcp.mjs',
   'docs/PROJECT_ART_AVATAR_SEQUENCE_MASTERING.md',
   'config/mcp.project-art-avatar-sequence.windows.example.json',
-  '.github/workflows-retired/project-art-avatar-sequence.yml',
+  '.github/workflows/project-art-avatar-sequence.yml',
 ];
 for (const workflowPath of workflowPaths) {
   if (count(source.workflow, `- "${workflowPath}"`) !== 2) {

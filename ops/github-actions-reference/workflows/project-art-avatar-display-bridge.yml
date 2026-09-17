@@ -7,13 +7,13 @@ on:
       - "scripts/project-art/avatar-display-bridge.mjs"
       - "scripts/test-project-art-avatar-display-bridge.mjs"
       - "docs/PROJECT_ART_AVATAR_DISPLAY_BRIDGE.md"
-      - ".github/workflows-retired/project-art-avatar-display-bridge.yml"
+      - ".github/workflows/project-art-avatar-display-bridge.yml"
   pull_request:
     paths:
       - "scripts/project-art/avatar-display-bridge.mjs"
       - "scripts/test-project-art-avatar-display-bridge.mjs"
       - "docs/PROJECT_ART_AVATAR_DISPLAY_BRIDGE.md"
-      - ".github/workflows-retired/project-art-avatar-display-bridge.yml"
+      - ".github/workflows/project-art-avatar-display-bridge.yml"
   workflow_dispatch:
 
 permissions:

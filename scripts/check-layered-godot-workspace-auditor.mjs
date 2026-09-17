@@ -12,7 +12,7 @@ const files = [
   "scripts/test-layered-godot-workspace-auditor.mjs",
   "config/layered-production-godot-workspace-auditor.v1.json",
   "docs/LAYERED_GODOT_WORKSPACE_AUDITOR.md",
-  ".github/workflows-retired/layered-godot-workspace-writer.yml",
+  ".github/workflows/layered-godot-workspace-writer.yml",
 ];
 
 const source = new Map();
@@ -99,7 +99,7 @@ for (const token of [
   assert.ok(documentation.includes(token), `auditor documentation is missing ${token}`);
 }
 
-const workflow = source.get(".github/workflows-retired/layered-godot-workspace-writer.yml");
+const workflow = source.get(".github/workflows/layered-godot-workspace-writer.yml");
 for (const token of [
   "scripts/layered-godot-workspace-auditor.mjs",
   "scripts/test-layered-godot-workspace-auditor.mjs",

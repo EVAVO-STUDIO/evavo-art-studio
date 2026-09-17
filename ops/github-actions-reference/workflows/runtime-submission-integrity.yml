@@ -6,7 +6,7 @@ on:
       - "packages/runtime/src/normalize.ts"
       - "packages/runtime/test/submission-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/runtime-submission-integrity.yml"
+      - ".github/workflows/runtime-submission-integrity.yml"
   push:
     branches:
       - main
@@ -14,7 +14,7 @@ on:
       - "packages/runtime/src/normalize.ts"
       - "packages/runtime/test/submission-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows-retired/runtime-submission-integrity.yml"
+      - ".github/workflows/runtime-submission-integrity.yml"
 
 permissions:
   contents: read

@@ -48,7 +48,7 @@ on:
       - "docs/LAYERED_GODOT_GIT_OPERATOR.md"
       - "docs/LAYERED_GODOT_GIT_PUSH_OPERATOR.md"
       - "docs/LAYERED_GODOT_GIT_PUSH_VERIFIER.md"
-      - ".github/workflows-retired/layered-godot-workspace-writer.yml"
+      - ".github/workflows/layered-godot-workspace-writer.yml"
   push:
     branches:
       - main
@@ -98,7 +98,7 @@ on:
       - "docs/LAYERED_GODOT_GIT_OPERATOR.md"
       - "docs/LAYERED_GODOT_GIT_PUSH_OPERATOR.md"
       - "docs/LAYERED_GODOT_GIT_PUSH_VERIFIER.md"
-      - ".github/workflows-retired/layered-godot-workspace-writer.yml"
+      - ".github/workflows/layered-godot-workspace-writer.yml"
   workflow_dispatch:
 
 permissions:

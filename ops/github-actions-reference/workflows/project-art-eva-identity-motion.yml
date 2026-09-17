@@ -7,13 +7,13 @@ on:
       - "scripts/project-art/eva-identity-motion-release.mjs"
       - "scripts/test-project-art-eva-identity-motion-release.mjs"
       - "docs/PROJECT_ART_EVA_IDENTITY_MOTION.md"
-      - ".github/workflows-retired/project-art-eva-identity-motion.yml"
+      - ".github/workflows/project-art-eva-identity-motion.yml"
   pull_request:
     paths:
       - "scripts/project-art/eva-identity-motion-release.mjs"
       - "scripts/test-project-art-eva-identity-motion-release.mjs"
       - "docs/PROJECT_ART_EVA_IDENTITY_MOTION.md"
-      - ".github/workflows-retired/project-art-eva-identity-motion.yml"
+      - ".github/workflows/project-art-eva-identity-motion.yml"
   workflow_dispatch:
 
 permissions:

@@ -25,7 +25,7 @@ const requiredFiles = [
   'scripts/check-persistent-artist-workspace-ingest.mjs',
   'scripts/check-persistent-artist-workspace-catalog.mjs',
   'scripts/check-persistent-artist-workspace-jobs.mjs',
-  '.github/workflows-retired/artist-workspace-agent-suite.yml',
+  '.github/workflows/artist-workspace-agent-suite.yml',
 ];
 
 const content = new Map();
@@ -218,7 +218,7 @@ for (const token of [
   assert.equal(docs.toLowerCase().includes(token.toLowerCase()), true, `Agent-suite documentation is missing ${token}`);
 }
 
-const workflow = content.get('.github/workflows-retired/artist-workspace-agent-suite.yml');
+const workflow = content.get('.github/workflows/artist-workspace-agent-suite.yml');
 for (const token of [
   'pull_request:',
   'push:',

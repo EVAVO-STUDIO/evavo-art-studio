@@ -6,12 +6,12 @@ on:
     paths:
       - "scripts/character-identity-candidate-review-plan.mjs"
       - "scripts/test-character-identity-candidate-review-plan.mjs"
-      - ".github/workflows-retired/character-identity-candidate-review.yml"
+      - ".github/workflows/character-identity-candidate-review.yml"
   pull_request:
     paths:
       - "scripts/character-identity-candidate-review-plan.mjs"
       - "scripts/test-character-identity-candidate-review-plan.mjs"
-      - ".github/workflows-retired/character-identity-candidate-review.yml"
+      - ".github/workflows/character-identity-candidate-review.yml"
   workflow_dispatch:
 
 permissions:

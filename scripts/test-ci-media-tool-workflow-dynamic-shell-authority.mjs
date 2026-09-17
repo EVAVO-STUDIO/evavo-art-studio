@@ -238,7 +238,7 @@ test("workflow dynamic shell execution surfaces are exact-reviewed", async () =>
 
 test("dynamic shell primitives remain visible to the inventory", () => {
   const workflow = {
-    path: ".github/workflows-retired/adversarial-dynamic-shell.yml",
+    path: ".github/workflows/adversarial-dynamic-shell.yml",
     source: [
       "name: adversarial",
       "on: workflow_dispatch",

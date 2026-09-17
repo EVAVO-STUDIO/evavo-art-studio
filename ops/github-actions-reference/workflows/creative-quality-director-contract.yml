@@ -16,7 +16,7 @@ on:
       - "scripts/test-creative-quality-director-contract.mjs"
       - "scripts/test-creative-quality-director-v2.mjs"
       - "scripts/test-creative-quality-director.mjs"
-      - ".github/workflows-retired/creative-quality-director-contract.yml"
+      - ".github/workflows/creative-quality-director-contract.yml"
   workflow_dispatch:
 
 permissions:

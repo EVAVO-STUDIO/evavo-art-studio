@@ -111,12 +111,12 @@ jobs:
           grep -F 'CI_MEDIA_APT_INSTALL_TIMEOUT_SECONDS:-180' scripts/bootstrap-ci-media-tools.sh
           grep -F -- '--kill-after=15s' scripts/bootstrap-ci-media-tools.sh
           grep -F 'Acquire::Retries=3' scripts/bootstrap-ci-media-tools.sh
-          grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows-retired/ci.yml
-          grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows-retired/book-art-provider-runtime.yml
+          grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows/ci.yml
+          grep -F 'bash scripts/bootstrap-ci-media-tools.sh' .github/workflows/book-art-provider-runtime.yml
           grep -F 'critical workflows permanently use the bounded bootstrap contract' scripts/test-ci-media-tool-bootstrap.mjs
           grep -F 'workflows never perform unbounded apt or direct FFmpeg installation' scripts/test-ci-media-tool-workflows.mjs
           grep -F 'media bootstrap fails after the configured bounded attempts' scripts/test-ci-media-tool-bootstrap.mjs
-          grep -F 'python -B scripts/safe_extract_archive.py' .github/workflows-retired/pixel-font-studio-v2.yml
+          grep -F 'python -B scripts/safe_extract_archive.py' .github/workflows/pixel-font-studio-v2.yml
           python -B scripts/test_safe_extract_archive.py
           node --test scripts/test-ci-media-tool-*.mjs
 

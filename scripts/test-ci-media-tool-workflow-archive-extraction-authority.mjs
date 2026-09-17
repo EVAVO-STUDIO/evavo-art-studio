@@ -335,7 +335,7 @@ test("workflow archive extraction surfaces are exact-reviewed", async () => {
 
 test("archive extraction primitives remain visible to the inventory", () => {
   const workflow = {
-    path: ".github/workflows-retired/adversarial-archive-extraction.yml",
+    path: ".github/workflows/adversarial-archive-extraction.yml",
     source: [
       "name: adversarial",
       "on: workflow_dispatch",

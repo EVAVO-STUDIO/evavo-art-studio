@@ -15,7 +15,7 @@ on:
       - "scripts/test-mobile-identity-raster-review.mjs"
       - "scripts/test-mobile-identity-focused.mjs"
       - "evavo.tasks.json"
-      - ".github/workflows-retired/mobile-identity-contract.yml"
+      - ".github/workflows/mobile-identity-contract.yml"
   pull_request:
     paths:
       - "scripts/mobile-identity-contract.mjs"
@@ -29,7 +29,7 @@ on:
       - "scripts/test-mobile-identity-raster-review.mjs"
       - "scripts/test-mobile-identity-focused.mjs"
       - "evavo.tasks.json"
-      - ".github/workflows-retired/mobile-identity-contract.yml"
+      - ".github/workflows/mobile-identity-contract.yml"
   workflow_dispatch:
 
 permissions:

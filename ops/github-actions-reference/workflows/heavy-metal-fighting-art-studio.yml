@@ -23,7 +23,7 @@ on:
       - "tools/build_heavy_metal_fighting_frame_atlas_v3.py"
       - "docs/HEAVY_METAL_FIGHTING_*.md"
       - "package.json"
-      - ".github/workflows-retired/heavy-metal-fighting-art-studio.yml"
+      - ".github/workflows/heavy-metal-fighting-art-studio.yml"
   push:
     branches:
       - main
@@ -49,7 +49,7 @@ on:
       - "tools/build_heavy_metal_fighting_frame_atlas_v3.py"
       - "docs/HEAVY_METAL_FIGHTING_*.md"
       - "package.json"
-      - ".github/workflows-retired/heavy-metal-fighting-art-studio.yml"
+      - ".github/workflows/heavy-metal-fighting-art-studio.yml"
   workflow_dispatch:
 
 permissions:

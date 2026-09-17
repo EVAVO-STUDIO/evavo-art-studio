@@ -53,11 +53,11 @@ const NETWORK_PRIMITIVES = [
 ].map(([kind, pattern]) => ({ kind, pattern }));
 
 const FINALIZER_SURFACE =
-  ".github/workflows-retired/finalize-pixel-typography-review.yml#Materialize exact reviewed source overlay::python-urllib";
+  ".github/workflows/finalize-pixel-typography-review.yml#Materialize exact reviewed source overlay::python-urllib";
 const GODOT_SURFACE =
-  ".github/workflows-retired/pixel-font-studio-v2.yml#Download and verify official Godot 4.6.2::curl";
+  ".github/workflows/pixel-font-studio-v2.yml#Download and verify official Godot 4.6.2::curl";
 const RECONCILIATION_SURFACE =
-  ".github/workflows-retired/repair-pixel-typography-review.yml#Reconcile exact reviewed native-review source::python-urllib";
+  ".github/workflows/repair-pixel-typography-review.yml#Reconcile exact reviewed native-review source::python-urllib";
 
 function githubBlobContract(confirmation) {
   return {

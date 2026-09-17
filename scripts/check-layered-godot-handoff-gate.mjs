@@ -16,7 +16,7 @@ const files = [
   "scripts/check-layered-godot-handoff-gate.mjs",
   "config/layered-production-godot-handoff-gate.v1.json",
   "docs/LAYERED_GODOT_HANDOFF_GATE.md",
-  ".github/workflows-retired/layered-godot-workspace-writer.yml",
+  ".github/workflows/layered-godot-workspace-writer.yml",
 ];
 
 const source = new Map();
@@ -158,7 +158,7 @@ for (const token of [
 }
 
 const workflow = source.get(
-  ".github/workflows-retired/layered-godot-workspace-writer.yml",
+  ".github/workflows/layered-godot-workspace-writer.yml",
 );
 for (const token of [
   "scripts/layered-godot-handoff-gate.mjs",

@@ -16,7 +16,7 @@ on:
       - "scripts/test-eva-dense-motion-workstation-task.mjs"
       - "scripts/test-project-art-png-structure-v1.mjs"
       - "scripts/test-project-art-eva-dense-motion-source-materialization*.mjs"
-      - ".github/workflows-retired/eva-dense-motion-source-materialization.yml"
+      - ".github/workflows/eva-dense-motion-source-materialization.yml"
   push:
     branches: [main]
     paths:
@@ -33,7 +33,7 @@ on:
       - "scripts/test-eva-dense-motion-workstation-task.mjs"
       - "scripts/test-project-art-png-structure-v1.mjs"
       - "scripts/test-project-art-eva-dense-motion-source-materialization*.mjs"
-      - ".github/workflows-retired/eva-dense-motion-source-materialization.yml"
+      - ".github/workflows/eva-dense-motion-source-materialization.yml"
   workflow_dispatch:
 
 permissions:
