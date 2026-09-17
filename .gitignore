@@ -20,3 +20,6 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Scratch recovery workspace for sprite continuity runs. Never shipped.
+tmp/
