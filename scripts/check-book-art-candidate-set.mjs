@@ -21,7 +21,7 @@ const required = {
   providerPrompt: "packages/providers/src/prompt.ts",
   providerTest: "packages/providers/test/providers.test.mjs",
   recipeCheck: "scripts/check-image-processing-recipes.mjs",
-  workflow: ".github/workflows/book-art-candidate-set.yml",
+  workflow: ".github/workflows-retired/book-art-candidate-set.yml",
   docs: "docs/book-art-candidate-set.md",
 };
 const failures = [];

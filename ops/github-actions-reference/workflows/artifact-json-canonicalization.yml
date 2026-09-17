@@ -6,7 +6,7 @@ on:
       - "packages/artifacts/src/hash.ts"
       - "packages/artifacts/test/json-canonicalization-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/artifact-json-canonicalization.yml"
+      - ".github/workflows-retired/artifact-json-canonicalization.yml"
   push:
     branches:
       - main
@@ -14,7 +14,7 @@ on:
       - "packages/artifacts/src/hash.ts"
       - "packages/artifacts/test/json-canonicalization-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/artifact-json-canonicalization.yml"
+      - ".github/workflows-retired/artifact-json-canonicalization.yml"
 
 permissions:
   contents: read

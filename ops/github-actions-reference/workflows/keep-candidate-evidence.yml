@@ -11,7 +11,7 @@ on:
       - "tools/verify_image_style_reference_bank.py"
       - "tools/verify_image_pipeline_evidence_v2.py"
       - "tools/verify_keep_image_pipeline_evidence_contract.py"
-      - ".github/workflows/keep-candidate-evidence.yml"
+      - ".github/workflows-retired/keep-candidate-evidence.yml"
   workflow_dispatch:
 
 permissions:

@@ -13,7 +13,7 @@ on:
       - "config/mcp.game-art-campaign-planner.windows.example.json"
       - "docs/GAME_ART_CAMPAIGN_PLANNER.md"
       - "package.json"
-      - ".github/workflows/game-art-campaign-planner.yml"
+      - ".github/workflows-retired/game-art-campaign-planner.yml"
   push:
     branches:
       - main
@@ -28,7 +28,7 @@ on:
       - "config/mcp.game-art-campaign-planner.windows.example.json"
       - "docs/GAME_ART_CAMPAIGN_PLANNER.md"
       - "package.json"
-      - ".github/workflows/game-art-campaign-planner.yml"
+      - ".github/workflows-retired/game-art-campaign-planner.yml"
   workflow_dispatch:
 
 permissions:

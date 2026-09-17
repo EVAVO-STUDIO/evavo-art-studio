@@ -19,7 +19,7 @@ const files = {
   mcp: "apps/mcp/src/book-art-tools.ts",
   mcpTest: "apps/mcp/test/book-art-tools-contract.test.mjs",
   docs: "docs/book-art-docs-release.md",
-  workflow: ".github/workflows/book-art-docs-release.yml",
+  workflow: ".github/workflows-retired/book-art-docs-release.yml",
 };
 const source = {};
 const problems = [];

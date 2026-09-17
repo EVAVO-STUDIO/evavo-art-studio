@@ -19,7 +19,7 @@ on:
       - "requirements/pixel-font-studio-v2.txt"
       - "package.json"
       - "evavo.reliability.json"
-      - ".github/workflows/pixel-font-studio-v2.yml"
+      - ".github/workflows-retired/pixel-font-studio-v2.yml"
   push:
     branches:
       - main
@@ -40,7 +40,7 @@ on:
       - "requirements/pixel-font-studio-v2.txt"
       - "package.json"
       - "evavo.reliability.json"
-      - ".github/workflows/pixel-font-studio-v2.yml"
+      - ".github/workflows-retired/pixel-font-studio-v2.yml"
   workflow_dispatch:
 
 permissions:

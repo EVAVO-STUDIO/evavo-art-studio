@@ -8,13 +8,13 @@ on:
       - "scripts/execute-raw-art-runtime-cycle.mjs"
       - "scripts/check-raw-art-runtime-cycle.mjs"
       - "docs/RAW_ART_RUNTIME_CYCLE.md"
-      - ".github/workflows/raw-art-runtime-cycle.yml"
+      - ".github/workflows-retired/raw-art-runtime-cycle.yml"
   pull_request:
     paths:
       - "scripts/execute-raw-art-runtime-cycle.mjs"
       - "scripts/check-raw-art-runtime-cycle.mjs"
       - "docs/RAW_ART_RUNTIME_CYCLE.md"
-      - ".github/workflows/raw-art-runtime-cycle.yml"
+      - ".github/workflows-retired/raw-art-runtime-cycle.yml"
   workflow_dispatch:
 
 permissions:

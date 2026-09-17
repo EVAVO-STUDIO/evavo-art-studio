@@ -6,7 +6,7 @@ on:
       - "config/game-art-production/**"
       - "scripts/game-art-production/**"
       - "docs/GAME_ART_PRODUCTION_PROFILES.md"
-      - ".github/workflows/game-art-production-profiles.yml"
+      - ".github/workflows-retired/game-art-production-profiles.yml"
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
       - "config/game-art-production/**"
       - "scripts/game-art-production/**"
       - "docs/GAME_ART_PRODUCTION_PROFILES.md"
-      - ".github/workflows/game-art-production-profiles.yml"
+      - ".github/workflows-retired/game-art-production-profiles.yml"
   workflow_dispatch:
 
 permissions:

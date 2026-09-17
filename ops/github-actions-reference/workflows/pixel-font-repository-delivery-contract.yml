@@ -40,8 +40,8 @@ on:
       - "examples/pixel-font-repository-delivery/**"
       - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
       - "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md"
-      - ".github/workflows/pixel-font-repository-delivery-contract.yml"
-      - ".github/workflows/pixel-font-repository-publish.yml"
+      - ".github/workflows-retired/pixel-font-repository-delivery-contract.yml"
+      - ".github/workflows-retired/pixel-font-repository-publish.yml"
   push:
     branches: [main]
     paths:
@@ -82,8 +82,8 @@ on:
       - "examples/pixel-font-repository-delivery/**"
       - "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md"
       - "docs/PIXEL_FONT_REPOSITORY_DELIVERY.md"
-      - ".github/workflows/pixel-font-repository-delivery-contract.yml"
-      - ".github/workflows/pixel-font-repository-publish.yml"
+      - ".github/workflows-retired/pixel-font-repository-delivery-contract.yml"
+      - ".github/workflows-retired/pixel-font-repository-publish.yml"
   workflow_dispatch:
 
 permissions:

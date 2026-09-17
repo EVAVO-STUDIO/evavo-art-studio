@@ -9,7 +9,7 @@ on:
       - "scripts/project-art/eva-dense-motion-release-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-runtime-frame-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-identity-continuity.mjs"
-      - ".github/workflows/eva-dense-motion-family-release-v2.yml"
+      - ".github/workflows-retired/eva-dense-motion-family-release-v2.yml"
   push:
     branches: [main]
     paths:
@@ -19,7 +19,7 @@ on:
       - "scripts/project-art/eva-dense-motion-release-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-runtime-frame-evidence.mjs"
       - "scripts/project-art/eva-dense-motion-identity-continuity.mjs"
-      - ".github/workflows/eva-dense-motion-family-release-v2.yml"
+      - ".github/workflows-retired/eva-dense-motion-family-release-v2.yml"
   workflow_dispatch:
 
 permissions:

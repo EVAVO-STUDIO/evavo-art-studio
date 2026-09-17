@@ -68,5 +68,5 @@
     "automaticPublication": false,
     "automaticDeployment": false
   },
-  "ciWorkflow": ".github/workflows/studio-production-v2.yml"
+  "ciWorkflow": ".github/workflows-retired/studio-production-v2.yml"
 }

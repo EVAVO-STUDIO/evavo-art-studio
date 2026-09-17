@@ -14,7 +14,7 @@ on:
       - "docs/PROJECT_ART_REVIEW_STUDIO.md"
       - "package.json"
       - "requirements-image-pipeline.txt"
-      - ".github/workflows/project-art-review-studio.yml"
+      - ".github/workflows-retired/project-art-review-studio.yml"
   push:
     branches:
       - main
@@ -30,7 +30,7 @@ on:
       - "docs/PROJECT_ART_REVIEW_STUDIO.md"
       - "package.json"
       - "requirements-image-pipeline.txt"
-      - ".github/workflows/project-art-review-studio.yml"
+      - ".github/workflows-retired/project-art-review-studio.yml"
 
 permissions:
   contents: read

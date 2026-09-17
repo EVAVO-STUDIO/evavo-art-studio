@@ -179,7 +179,7 @@ test("workflow runtime code never writes GitHub command files", async () => {
 
 test("runtime command-file write forms remain visible to the inventory", () => {
   const workflow = {
-    path: ".github/workflows/adversarial-command-files.yml",
+    path: ".github/workflows-retired/adversarial-command-files.yml",
     source: `name: adversarial
 on: workflow_dispatch
 jobs:

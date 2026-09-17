@@ -16,7 +16,7 @@ const files = {
   persistentDocumentation: 'docs/PERSISTENT_ARTIST_WORKSPACE.md',
   mcp: 'tools/project_art_workspace_mcp.mjs',
   package: 'package.json',
-  hostedAutomationPolicy: '.github/workflows/README.md',
+  hostedAutomationPolicy: '.github/workflows-retired/README.md',
 };
 const contents = new Map();
 for (const [label, relative] of Object.entries(files)) {

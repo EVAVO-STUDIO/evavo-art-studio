@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths: &candidate_set_paths
-      - ".github/workflows/book-art-candidate-set.yml"
+      - ".github/workflows-retired/book-art-candidate-set.yml"
       - "packages/contracts/src/book-art-candidate-set*.ts"
       - "packages/contracts/src/index.ts"
       - "packages/contracts/test/book-art-candidate-set.test.mjs"

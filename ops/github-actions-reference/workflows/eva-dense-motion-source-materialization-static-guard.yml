@@ -7,7 +7,7 @@ on:
       - "docs/eva-dense-motion-source-materialization.md"
       - "scripts/check-project-art-eva-dense-motion-source-materialization.mjs"
       - "scripts/test-project-art-eva-dense-motion-source-materialization-static-guard.mjs"
-      - ".github/workflows/eva-dense-motion-source-materialization-static-guard.yml"
+      - ".github/workflows-retired/eva-dense-motion-source-materialization-static-guard.yml"
   push:
     branches: [main]
     paths:
@@ -15,7 +15,7 @@ on:
       - "docs/eva-dense-motion-source-materialization.md"
       - "scripts/check-project-art-eva-dense-motion-source-materialization.mjs"
       - "scripts/test-project-art-eva-dense-motion-source-materialization-static-guard.mjs"
-      - ".github/workflows/eva-dense-motion-source-materialization-static-guard.yml"
+      - ".github/workflows-retired/eva-dense-motion-source-materialization-static-guard.yml"
   workflow_dispatch:
 
 permissions:

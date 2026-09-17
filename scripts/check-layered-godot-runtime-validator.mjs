@@ -13,7 +13,7 @@ const files = [
   "scripts/check-layered-godot-runtime-validator.mjs",
   "config/layered-production-godot-runtime-validator.v1.json",
   "docs/LAYERED_GODOT_RUNTIME_VALIDATOR.md",
-  ".github/workflows/layered-godot-workspace-writer.yml",
+  ".github/workflows-retired/layered-godot-workspace-writer.yml",
 ];
 
 const source = new Map();
@@ -115,7 +115,7 @@ for (const token of [
   assert.ok(documentation.includes(token), `runtime validator documentation is missing ${token}`);
 }
 
-const workflow = source.get(".github/workflows/layered-godot-workspace-writer.yml");
+const workflow = source.get(".github/workflows-retired/layered-godot-workspace-writer.yml");
 for (const token of [
   "scripts/layered-godot-runtime-validator.mjs",
   "scripts/test-layered-godot-runtime-validator.mjs",

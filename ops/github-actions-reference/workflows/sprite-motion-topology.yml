@@ -16,7 +16,7 @@ on:
       - "packages/sprite-supervisor/test/deterministic-mirroring.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "docs/SPRITE_MOTION_TOPOLOGY.md"
-      - ".github/workflows/sprite-motion-topology.yml"
+      - ".github/workflows-retired/sprite-motion-topology.yml"
   push:
     branches:
       - main
@@ -34,7 +34,7 @@ on:
       - "packages/sprite-supervisor/test/deterministic-mirroring.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "docs/SPRITE_MOTION_TOPOLOGY.md"
-      - ".github/workflows/sprite-motion-topology.yml"
+      - ".github/workflows-retired/sprite-motion-topology.yml"
 
 permissions:
   contents: read

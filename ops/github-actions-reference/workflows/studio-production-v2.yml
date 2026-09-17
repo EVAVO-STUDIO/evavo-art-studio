@@ -14,7 +14,7 @@ on:
       - "tools/character-performance-bank-v1.mjs"
       - "tools/character-performance-delivery-v1.mjs"
       - "test/character-performance-bank-v1.test.mjs"
-      - ".github/workflows/studio-production-v2.yml"
+      - ".github/workflows-retired/studio-production-v2.yml"
   push:
     branches: [main]
     paths:
@@ -29,7 +29,7 @@ on:
       - "tools/character-performance-bank-v1.mjs"
       - "tools/character-performance-delivery-v1.mjs"
       - "test/character-performance-bank-v1.test.mjs"
-      - ".github/workflows/studio-production-v2.yml"
+      - ".github/workflows-retired/studio-production-v2.yml"
   workflow_dispatch:
 
 permissions:

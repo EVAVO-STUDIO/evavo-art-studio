@@ -7,7 +7,7 @@ on:
       - "packages/runtime/test/control-options-integrity-security.test.mjs"
       - "packages/runtime/test/transition-clock-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-control-options-integrity.yml"
+      - ".github/workflows-retired/runtime-control-options-integrity.yml"
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
       - "packages/runtime/test/control-options-integrity-security.test.mjs"
       - "packages/runtime/test/transition-clock-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-control-options-integrity.yml"
+      - ".github/workflows-retired/runtime-control-options-integrity.yml"
 
 permissions:
   contents: read

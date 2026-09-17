@@ -20,7 +20,7 @@ on:
       - 'scripts/test-mobile-identity-provider-runner.mjs'
       - 'scripts/test-mobile-identity-focused.mjs'
       - 'evavo.tasks.json'
-      - '.github/workflows/mobile-design-production-contract.yml'
+      - '.github/workflows-retired/mobile-design-production-contract.yml'
   push:
     branches: [main]
     paths:
@@ -41,7 +41,7 @@ on:
       - 'scripts/test-mobile-identity-provider-runner.mjs'
       - 'scripts/test-mobile-identity-focused.mjs'
       - 'evavo.tasks.json'
-      - '.github/workflows/mobile-design-production-contract.yml'
+      - '.github/workflows-retired/mobile-design-production-contract.yml'
   workflow_dispatch:
 
 permissions:

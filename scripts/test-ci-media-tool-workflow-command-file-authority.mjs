@@ -49,7 +49,7 @@ function shellContract({ writeLines, evidence = [], forbidden = [] }) {
 
 const APPROVED_COMMAND_FILE_WRITES = new Map([
   [
-    ".github/workflows/ci-media-tool-bootstrap.yml#Route Python bytecode to runner-temporary storage::environment",
+    ".github/workflows-retired/ci-media-tool-bootstrap.yml#Route Python bytecode to runner-temporary storage::environment",
     shellContract({
       writeLines: [
         'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
@@ -62,7 +62,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/ci.yml#Route Python bytecode to runner-temporary storage::environment",
+    ".github/workflows-retired/ci.yml#Route Python bytecode to runner-temporary storage::environment",
     shellContract({
       writeLines: [
         'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
@@ -75,7 +75,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/ci.yml#Verify committed lockfile identity::environment",
+    ".github/workflows-retired/ci.yml#Verify committed lockfile identity::environment",
     shellContract({
       writeLines: [
         'echo "ART_STUDIO_LOCKFILE_SHA256=${LOCKFILE_SHA256}" >> "${GITHUB_ENV}"',
@@ -88,7 +88,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/ci.yml#Verify exact Python image toolchain::environment",
+    ".github/workflows-retired/ci.yml#Verify exact Python image toolchain::environment",
     shellContract({
       writeLines: [
         'echo "ART_STUDIO_PYTHON_VERSION=${PYTHON_VERSION}" >> "${GITHUB_ENV}"',
@@ -101,7 +101,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/comfyui-provider-adapter.yml#Route Python bytecode to runner-temporary storage::environment",
+    ".github/workflows-retired/comfyui-provider-adapter.yml#Route Python bytecode to runner-temporary storage::environment",
     shellContract({
       writeLines: [
         'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
@@ -114,7 +114,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/pixel-font-repository-publish.yml#Require explicit publication confirmation and token::output",
+    ".github/workflows-retired/pixel-font-repository-publish.yml#Require explicit publication confirmation and token::output",
     shellContract({
       writeLines: [
         'printf \'target_slug=%s\\n\' "$target_slug" >> "$GITHUB_OUTPUT"',
@@ -133,7 +133,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/pixel-font-studio-v2.yml#Verify native virtual-display runtime::environment",
+    ".github/workflows-retired/pixel-font-studio-v2.yml#Verify native virtual-display runtime::environment",
     shellContract({
       writeLines: [
         'echo "EVAVO_PIXEL_FONT_XVFB_RUN=${XVFB_RUN}" >> "${GITHUB_ENV}"',
@@ -147,7 +147,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/pixel-font-studio.yml#Route Python bytecode to runner-temporary storage::environment",
+    ".github/workflows-retired/pixel-font-studio.yml#Route Python bytecode to runner-temporary storage::environment",
     shellContract({
       writeLines: [
         'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
@@ -160,7 +160,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/project-art-review-studio.yml#Route Python bytecode outside the repository::environment",
+    ".github/workflows-retired/project-art-review-studio.yml#Route Python bytecode outside the repository::environment",
     shellContract({
       writeLines: [
         'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',
@@ -173,7 +173,7 @@ const APPROVED_COMMAND_FILE_WRITES = new Map([
     }),
   ],
   [
-    ".github/workflows/project-art-workbench.yml#Route Python bytecode outside the repository::environment",
+    ".github/workflows-retired/project-art-workbench.yml#Route Python bytecode outside the repository::environment",
     shellContract({
       writeLines: [
         'echo "PYTHONPYCACHEPREFIX=${PYTHON_CACHE_ROOT}" >> "${GITHUB_ENV}"',

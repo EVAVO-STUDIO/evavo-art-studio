@@ -12,7 +12,7 @@ const packageJson = json("packages/book-art-runtime/package.json");
 const tsconfig = json("packages/book-art-runtime/tsconfig.json");
 const cli = read("apps/cli/src/book-art-commands.ts");
 const cliTests = read("apps/cli/test/book-art-cli-legacy-registration.test.mjs");
-const workflow = read(".github/workflows/book-art-provider-runtime.yml");
+const workflow = read(".github/workflows-retired/book-art-provider-runtime.yml");
 const docs = read("docs/book-art-provider-runtime.md");
 const problems = [];
 

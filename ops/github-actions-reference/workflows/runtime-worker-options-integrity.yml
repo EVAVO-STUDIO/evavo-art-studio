@@ -8,7 +8,7 @@ on:
       - "packages/runtime/test/worker-options-integrity-security.test.mjs"
       - "scripts/check-provider-runtime-capability-profiles.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-worker-options-integrity.yml"
+      - ".github/workflows-retired/runtime-worker-options-integrity.yml"
   push:
     branches:
       - main
@@ -18,7 +18,7 @@ on:
       - "packages/runtime/test/worker-options-integrity-security.test.mjs"
       - "scripts/check-provider-runtime-capability-profiles.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-worker-options-integrity.yml"
+      - ".github/workflows-retired/runtime-worker-options-integrity.yml"
 
 permissions:
   contents: read

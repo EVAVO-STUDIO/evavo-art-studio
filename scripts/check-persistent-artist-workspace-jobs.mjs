@@ -14,7 +14,7 @@ const requiredFiles = [
   'tools/project_art_workspace_jobs_mcp.mjs',
   'docs/PERSISTENT_ARTIST_WORKSPACE_JOBS.md',
   'config/mcp.persistent-artist-workspace-jobs.windows.example.json',
-  '.github/workflows/persistent-artist-workspace-jobs.yml',
+  '.github/workflows-retired/persistent-artist-workspace-jobs.yml',
 ];
 
 const content = new Map();
@@ -105,7 +105,7 @@ for (const token of ['ChatGPT', 'Claude', 'crash-resumable', 'stale-lease recove
   assert.equal(docs.toLowerCase().includes(token.toLowerCase()), true, `Job documentation is missing ${token}`);
 }
 
-const workflow = content.get('.github/workflows/persistent-artist-workspace-jobs.yml');
+const workflow = content.get('.github/workflows-retired/persistent-artist-workspace-jobs.yml');
 for (const token of ['pull_request:', 'push:', '- main', 'contents: read', 'persist-credentials: false', 'node scripts/check-persistent-artist-workspace-jobs.mjs']) {
   assert.equal(workflow.includes(token), true, `Job workflow is missing ${token}`);
 }

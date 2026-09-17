@@ -75,7 +75,7 @@ jobs:
           import subprocess
 
           expected = {
-              ".github/workflows/pixel-font-repository-delivery-contract.yml": "f74393b1e2c249ce1da8ba1807a9f4e7ef97a315",
+              ".github/workflows-retired/pixel-font-repository-delivery-contract.yml": "f74393b1e2c249ce1da8ba1807a9f4e7ef97a315",
               "config/mcp.pixel-font-automation.windows.example.json": "0d7304610a2262698bef59e8b133c8362f25ba31",
               "config/pixel-font-automation-suite.v1.json": "b0d136a349509a815e9c453f537521c139a598de",
               "docs/PIXEL_TYPOGRAPHY_AUTOMATION.md": "fe59e9c2639465ef1e8fe0d04d98afed7c04f27b",
@@ -114,7 +114,7 @@ jobs:
           repository = os.environ["GITHUB_REPOSITORY"]
           token = os.environ["GH_TOKEN"]
           blobs = {
-              ".github/workflows/pixel-font-repository-delivery-contract.yml": "ac67e9274c4e612c7db11773e3c21330797140f0",
+              ".github/workflows-retired/pixel-font-repository-delivery-contract.yml": "ac67e9274c4e612c7db11773e3c21330797140f0",
               "config/mcp.pixel-font-automation.windows.example.json": "58ce08f365f7c06fa55da8d2e6ca966edbd3ddce",
               "config/pixel-font-automation-suite.v1.json": "708b6cc0104ade1ac75eb9921303908657c7aaa9",
               "config/pixel-typography-review.v1.json": "07f52678542ca022eafb559bb2c13530e6530856",
@@ -246,7 +246,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .github/workflows/finalize-pixel-typography-review.yml
+          rm -f .github/workflows-retired/finalize-pixel-typography-review.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
@@ -254,8 +254,8 @@ jobs:
           import subprocess
 
           expected = sorted([
-              ".github/workflows/finalize-pixel-typography-review.yml",
-              ".github/workflows/pixel-font-repository-delivery-contract.yml",
+              ".github/workflows-retired/finalize-pixel-typography-review.yml",
+              ".github/workflows-retired/pixel-font-repository-delivery-contract.yml",
               "config/mcp.pixel-font-automation.windows.example.json",
               "config/pixel-font-automation-suite.v1.json",
               "config/pixel-typography-review.v1.json",

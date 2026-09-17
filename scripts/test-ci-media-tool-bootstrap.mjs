@@ -16,14 +16,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BOOTSTRAP = path.join(ROOT, "scripts/bootstrap-ci-media-tools.sh");
-const MAINLINE_WORKFLOW = path.join(ROOT, ".github/workflows/ci.yml");
+const MAINLINE_WORKFLOW = path.join(ROOT, ".github/workflows-retired/ci.yml");
 const BOOK_ART_WORKFLOW = path.join(
   ROOT,
-  ".github/workflows/book-art-provider-runtime.yml",
+  ".github/workflows-retired/book-art-provider-runtime.yml",
 );
 const BOOTSTRAP_WORKFLOW = path.join(
   ROOT,
-  ".github/workflows/ci-media-tool-bootstrap.yml",
+  ".github/workflows-retired/ci-media-tool-bootstrap.yml",
 );
 
 async function executable(filePath, content) {

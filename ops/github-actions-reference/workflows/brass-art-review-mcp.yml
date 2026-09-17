@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths: &brass_art_review_paths
-      - ".github/workflows/brass-art-review-mcp.yml"
+      - ".github/workflows-retired/brass-art-review-mcp.yml"
       - "apps/mcp/src/batch-review-*.ts"
       - "apps/mcp/src/review.ts"
       - "apps/mcp/test/brass-batch-review-mcp.test.mjs"

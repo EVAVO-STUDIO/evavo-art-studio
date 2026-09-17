@@ -16,7 +16,7 @@ on:
       - "tools/project_art_council_identity_anchor_runtime_adapters_mcp.mjs"
       - "tools/project_art_council_avatar_production_mcp.mjs"
       - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTERS.md"
-      - ".github/workflows/council-identity-anchor-runtime-adapters.yml"
+      - ".github/workflows-retired/council-identity-anchor-runtime-adapters.yml"
   push:
     branches: [main]
     paths:
@@ -33,7 +33,7 @@ on:
       - "tools/project_art_council_identity_anchor_runtime_adapters_mcp.mjs"
       - "tools/project_art_council_avatar_production_mcp.mjs"
       - "docs/PROJECT_ART_COUNCIL_IDENTITY_ANCHOR_RUNTIME_ADAPTERS.md"
-      - ".github/workflows/council-identity-anchor-runtime-adapters.yml"
+      - ".github/workflows-retired/council-identity-anchor-runtime-adapters.yml"
   workflow_dispatch:
 
 permissions:

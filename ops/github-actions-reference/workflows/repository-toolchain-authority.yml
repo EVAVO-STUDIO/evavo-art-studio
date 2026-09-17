@@ -12,8 +12,8 @@ on:
       - "schemas/repository-owned-reliability-profile.schema.json"
       - "scripts/check-repository-toolchain.mjs"
       - "scripts/test-repository-toolchain.mjs"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/repository-toolchain-authority.yml"
+      - ".github/workflows-retired/ci.yml"
+      - ".github/workflows-retired/repository-toolchain-authority.yml"
   workflow_dispatch:
 
 permissions:

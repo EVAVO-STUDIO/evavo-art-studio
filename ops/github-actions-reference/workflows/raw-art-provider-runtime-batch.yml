@@ -18,7 +18,7 @@ on:
       - "config/raw-art-production-orchestrator.v1.json"
       - "docs/RAW_ART_AGENT_WORKSHOP.md"
       - "package.json"
-      - ".github/workflows/raw-art-provider-runtime-batch.yml"
+      - ".github/workflows-retired/raw-art-provider-runtime-batch.yml"
   push:
     branches:
       - main
@@ -38,7 +38,7 @@ on:
       - "config/raw-art-production-orchestrator.v1.json"
       - "docs/RAW_ART_AGENT_WORKSHOP.md"
       - "package.json"
-      - ".github/workflows/raw-art-provider-runtime-batch.yml"
+      - ".github/workflows-retired/raw-art-provider-runtime-batch.yml"
 
 permissions:
   contents: read

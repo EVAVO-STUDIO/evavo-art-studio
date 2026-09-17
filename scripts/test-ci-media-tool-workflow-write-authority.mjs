@@ -12,7 +12,7 @@ const hostedWorkflowTest = (await readdir(WORKFLOW_ROOT, { withFileTypes: true }
 
 const WRITE_PERMISSION_ALLOWLIST = new Map([
   [
-    ".github/workflows/finalize-pixel-typography-review.yml",
+    ".github/workflows-retired/finalize-pixel-typography-review.yml",
     {
       events: ["workflow_dispatch"],
       writes: ["contents"],
@@ -28,7 +28,7 @@ const WRITE_PERMISSION_ALLOWLIST = new Map([
     },
   ],
   [
-    ".github/workflows/repair-pixel-typography-review.yml",
+    ".github/workflows-retired/repair-pixel-typography-review.yml",
     {
       events: ["workflow_dispatch"],
       writes: ["contents"],
@@ -47,7 +47,7 @@ const WRITE_PERMISSION_ALLOWLIST = new Map([
 
 const PRIVILEGED_WORKFLOW_ALLOWLIST = new Map([
   [
-    ".github/workflows/finalize-pixel-typography-review.yml",
+    ".github/workflows-retired/finalize-pixel-typography-review.yml",
     {
       events: ["workflow_dispatch"],
       requiredEvidence: [
@@ -62,7 +62,7 @@ const PRIVILEGED_WORKFLOW_ALLOWLIST = new Map([
     },
   ],
   [
-    ".github/workflows/repair-pixel-typography-review.yml",
+    ".github/workflows-retired/repair-pixel-typography-review.yml",
     {
       events: ["workflow_dispatch"],
       requiredEvidence: [
@@ -77,7 +77,7 @@ const PRIVILEGED_WORKFLOW_ALLOWLIST = new Map([
     },
   ],
   [
-    ".github/workflows/pixel-font-repository-publish.yml",
+    ".github/workflows-retired/pixel-font-repository-publish.yml",
     {
       events: ["workflow_call", "workflow_dispatch"],
       requiredEvidence: [

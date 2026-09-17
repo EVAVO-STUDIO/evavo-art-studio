@@ -393,7 +393,7 @@ test("workflow failure-suppression surfaces are exact-reviewed", async () => {
 
 test("failure-suppression primitives remain visible to the inventory", () => {
   const workflow = {
-    path: ".github/workflows/adversarial-failure-suppression.yml",
+    path: ".github/workflows-retired/adversarial-failure-suppression.yml",
     source: [
       "name: adversarial",
       "on: workflow_dispatch",

@@ -7,7 +7,7 @@ on:
       - "packages/artifacts/test/reference-integrity-security.test.mjs"
       - "packages/artifacts/test/reference-update-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/artifact-reference-integrity.yml"
+      - ".github/workflows-retired/artifact-reference-integrity.yml"
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
       - "packages/artifacts/test/reference-integrity-security.test.mjs"
       - "packages/artifacts/test/reference-update-input-integrity-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/artifact-reference-integrity.yml"
+      - ".github/workflows-retired/artifact-reference-integrity.yml"
 
 permissions:
   contents: read

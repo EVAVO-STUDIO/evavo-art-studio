@@ -35,7 +35,7 @@ on:
       - "packages/providers/test/**"
       - "docs/governed-provider-candidates.md"
       - "docs/automatic-sprite-finalization.md"
-      - ".github/workflows/provider-control-capabilities.yml"
+      - ".github/workflows-retired/provider-control-capabilities.yml"
   push:
     branches:
       - main
@@ -72,7 +72,7 @@ on:
       - "packages/providers/test/**"
       - "docs/governed-provider-candidates.md"
       - "docs/automatic-sprite-finalization.md"
-      - ".github/workflows/provider-control-capabilities.yml"
+      - ".github/workflows-retired/provider-control-capabilities.yml"
 
 permissions:
   contents: read

@@ -7,7 +7,7 @@ on:
       - "packages/runtime/test/delivery-input-integrity-security.test.mjs"
       - "packages/runtime/test/runtime.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-delivery-input-integrity.yml"
+      - ".github/workflows-retired/runtime-delivery-input-integrity.yml"
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
       - "packages/runtime/test/delivery-input-integrity-security.test.mjs"
       - "packages/runtime/test/runtime.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-delivery-input-integrity.yml"
+      - ".github/workflows-retired/runtime-delivery-input-integrity.yml"
 
 permissions:
   contents: read

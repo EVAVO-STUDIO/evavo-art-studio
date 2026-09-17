@@ -7,7 +7,7 @@ on:
       - agent/book-print-illustration-intelligence-20260805
       - agent/book-candidate-set-quality-20260806
     paths:
-      - ".github/workflows/book-illustration-intelligence.yml"
+      - ".github/workflows-retired/book-illustration-intelligence.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "packages/contracts/src/book-illustration-intelligence.ts"
       - "packages/contracts/src/book-art-candidate-set*.ts"
@@ -20,7 +20,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - ".github/workflows/book-illustration-intelligence.yml"
+      - ".github/workflows-retired/book-illustration-intelligence.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "packages/contracts/src/book-illustration-intelligence.ts"
       - "packages/contracts/src/book-art-candidate-set*.ts"

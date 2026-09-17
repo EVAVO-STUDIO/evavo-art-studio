@@ -6,7 +6,7 @@ on:
       - main
       - agent/sprite-supervisor-continuation-safety-ready-20260804
     paths: &continuation_paths
-      - ".github/workflows/sprite-supervisor-continuation-safety.yml"
+      - ".github/workflows-retired/sprite-supervisor-continuation-safety.yml"
       - "apps/worker/src/sprite-supervisor-guarded-handlers.ts"
       - "apps/worker/src/sprite-supervisor-handlers.ts"
       - "apps/worker/test/sprite-supervisor-continuation-recovery.test.mjs"

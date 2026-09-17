@@ -14,7 +14,7 @@ on:
       - "tools/project_art_avatar_sequence_mcp.mjs"
       - "docs/PROJECT_ART_AVATAR_SEQUENCE_MASTERING.md"
       - "config/mcp.project-art-avatar-sequence.windows.example.json"
-      - ".github/workflows/project-art-avatar-sequence.yml"
+      - ".github/workflows-retired/project-art-avatar-sequence.yml"
   push:
     branches:
       - main
@@ -30,7 +30,7 @@ on:
       - "tools/project_art_avatar_sequence_mcp.mjs"
       - "docs/PROJECT_ART_AVATAR_SEQUENCE_MASTERING.md"
       - "config/mcp.project-art-avatar-sequence.windows.example.json"
-      - ".github/workflows/project-art-avatar-sequence.yml"
+      - ".github/workflows-retired/project-art-avatar-sequence.yml"
 
 permissions:
   contents: read

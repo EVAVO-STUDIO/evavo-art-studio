@@ -20,7 +20,7 @@ const mcp = read("apps/mcp/src/book-art-tools.ts");
 const mcpTests = read("apps/mcp/test/book-art-tools-contract.test.mjs");
 const workerTests = read("apps/worker/test/book-art-provider-inspection.test.mjs");
 const docs = read("docs/book-art-provider-runtime.md");
-const workflow = read(".github/workflows/book-art-provider-runtime.yml");
+const workflow = read(".github/workflows-retired/book-art-provider-runtime.yml");
 const problems = [];
 
 function assert(condition, message) {

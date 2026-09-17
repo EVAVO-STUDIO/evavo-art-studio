@@ -11,7 +11,7 @@ on:
       - "tools/process_image_work_order_system_drawing.ps1"
       - "tools/evaluate_image_candidate.py"
       - "tools/verify_executable_image_pipeline.py"
-      - ".github/workflows/executable-image-pipeline.yml"
+      - ".github/workflows-retired/executable-image-pipeline.yml"
   workflow_dispatch:
 
 permissions:

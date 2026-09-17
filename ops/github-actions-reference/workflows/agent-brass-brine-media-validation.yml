@@ -6,7 +6,7 @@ on:
       - agent/brass-brine-media-plan-20260804
   pull_request:
     paths:
-      - ".github/workflows/agent-brass-brine-media-validation.yml"
+      - ".github/workflows-retired/agent-brass-brine-media-validation.yml"
       - "packages/delivery-optimizer/**"
       - "docs/delivery-image-optimization.md"
   workflow_dispatch:

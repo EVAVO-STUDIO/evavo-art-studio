@@ -8,9 +8,9 @@
 *.yaml text eol=lf
 *.cmd text eol=crlf
 .githooks/* text eol=lf
-.github/workflows/*.yml text eol=lf
+.github/workflows-retired/*.yml text eol=lf
 ops/github-actions-reference/workflows/*.yaml text eol=lf
-.github/workflows/README.md text eol=lf
+.github/workflows-retired/README.md text eol=lf
 ops/github-actions-reference/workflows/*.yml text eol=lf
 config/*.payload.b64.part-* text eol=lf
 tools/raw_art_visual_catalog.py text eol=lf

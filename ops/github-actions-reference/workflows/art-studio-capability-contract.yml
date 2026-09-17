@@ -22,7 +22,7 @@ on:
       - "tools/**"
       - "apps/**"
       - "packages/**"
-      - ".github/workflows/art-studio-capability-contract.yml"
+      - ".github/workflows-retired/art-studio-capability-contract.yml"
   pull_request:
     paths:
       - "evavo.capabilities.json"
@@ -42,7 +42,7 @@ on:
       - "tools/**"
       - "apps/**"
       - "packages/**"
-      - ".github/workflows/art-studio-capability-contract.yml"
+      - ".github/workflows-retired/art-studio-capability-contract.yml"
   workflow_dispatch:
 
 permissions:

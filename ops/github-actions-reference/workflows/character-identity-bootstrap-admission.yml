@@ -8,14 +8,14 @@ on:
       - "scripts/test-character-identity-master-plan.mjs"
       - "scripts/character-identity-bootstrap-admission.mjs"
       - "scripts/test-character-identity-bootstrap-admission.mjs"
-      - ".github/workflows/character-identity-bootstrap-admission.yml"
+      - ".github/workflows-retired/character-identity-bootstrap-admission.yml"
   pull_request:
     paths:
       - "scripts/character-identity-master-plan.mjs"
       - "scripts/test-character-identity-master-plan.mjs"
       - "scripts/character-identity-bootstrap-admission.mjs"
       - "scripts/test-character-identity-bootstrap-admission.mjs"
-      - ".github/workflows/character-identity-bootstrap-admission.yml"
+      - ".github/workflows-retired/character-identity-bootstrap-admission.yml"
   workflow_dispatch:
 
 permissions:

@@ -10,7 +10,7 @@ const files = {
   cli: "scripts/evavo-art-book-illustration-cli.mjs",
   cliTest: "packages/contracts/test/book-illustration-intelligence-cli.test.mjs",
   docs: "docs/book-illustration-intelligence.md",
-  workflow: ".github/workflows/book-illustration-intelligence.yml",
+  workflow: ".github/workflows-retired/book-illustration-intelligence.yml",
 };
 const content = Object.fromEntries(
   await Promise.all(

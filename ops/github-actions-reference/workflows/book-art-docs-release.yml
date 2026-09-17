@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/book-art-docs-release.yml"
+      - ".github/workflows-retired/book-art-docs-release.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "packages/contracts/src/book-production-docs-release.ts"
       - "packages/contracts/src/index.ts"
@@ -25,7 +25,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - ".github/workflows/book-art-docs-release.yml"
+      - ".github/workflows-retired/book-art-docs-release.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "packages/contracts/src/book-production-docs-release.ts"
       - "packages/contracts/src/index.ts"

@@ -17,7 +17,7 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-provider-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_PROVIDER_CAMPAIGN.md"
-      - ".github/workflows/project-art-top-hat-pose-bank-provider-campaign.yml"
+      - ".github/workflows-retired/project-art-top-hat-pose-bank-provider-campaign.yml"
   push:
     branches: [main]
     paths:
@@ -35,7 +35,7 @@ on:
       - "scripts/test-project-art-top-hat-pose-slot-provider-execution.mjs"
       - "scripts/test-project-art-top-hat-pose-bank-provider-campaign.mjs"
       - "docs/PROJECT_ART_TOP_HAT_POSE_BANK_PROVIDER_CAMPAIGN.md"
-      - ".github/workflows/project-art-top-hat-pose-bank-provider-campaign.yml"
+      - ".github/workflows-retired/project-art-top-hat-pose-bank-provider-campaign.yml"
   workflow_dispatch:
 
 permissions:

@@ -22,9 +22,9 @@ on:
       - "docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md"
       - "docs/RAW_ART_PROVIDER_REVIEW_AND_REPAIR.md"
       - "package.json"
-      - ".github/workflows/raw-art-provider-runtime-admission.yml"
-      - ".github/workflows/raw-art-provider-runtime-execution.yml"
-      - ".github/workflows/raw-art-provider-review.yml"
+      - ".github/workflows-retired/raw-art-provider-runtime-admission.yml"
+      - ".github/workflows-retired/raw-art-provider-runtime-execution.yml"
+      - ".github/workflows-retired/raw-art-provider-review.yml"
   push:
     branches:
       - main
@@ -48,9 +48,9 @@ on:
       - "docs/RAW_ART_PROVIDER_RUNTIME_EXECUTION.md"
       - "docs/RAW_ART_PROVIDER_REVIEW_AND_REPAIR.md"
       - "package.json"
-      - ".github/workflows/raw-art-provider-runtime-admission.yml"
-      - ".github/workflows/raw-art-provider-runtime-execution.yml"
-      - ".github/workflows/raw-art-provider-review.yml"
+      - ".github/workflows-retired/raw-art-provider-runtime-admission.yml"
+      - ".github/workflows-retired/raw-art-provider-runtime-execution.yml"
+      - ".github/workflows-retired/raw-art-provider-review.yml"
 
 permissions:
   contents: read
@@ -122,8 +122,8 @@ jobs:
           grep -F 'independentApprovalPerformed: false' scripts/raw-art-provider/review.mjs
           grep -F 'raw-art:provider-review' package.json
           grep -F 'raw-art:provider-review:check' package.json
-          grep -F 'check-raw-art-provider-review.mjs' .github/workflows/raw-art-provider-review.yml
-          grep -F 'pnpm check' .github/workflows/raw-art-provider-review.yml
+          grep -F 'check-raw-art-provider-review.mjs' .github/workflows-retired/raw-art-provider-review.yml
+          grep -F 'pnpm check' .github/workflows-retired/raw-art-provider-review.yml
           grep -F 'ComfyUI' docs/RAW_ART_PROVIDER_REVIEW_AND_REPAIR.md
           ! grep -F 'candidateApproval: true' scripts/raw-art-provider/review.mjs
           ! grep -F 'candidatePromotion: true' scripts/raw-art-provider/review.mjs

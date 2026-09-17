@@ -10,7 +10,7 @@ on:
       - "scripts/test-mobile-app-asset-plan.mjs"
       - "docs/MOBILE_APP_ASSET_WORKFLOW.md"
       - ".claude/commands/evavo-mobile-app-assets.md"
-      - ".github/workflows/mobile-app-asset-contract.yml"
+      - ".github/workflows-retired/mobile-app-asset-contract.yml"
   pull_request:
     paths:
       - "config/mobile-app-asset-capability-v1.json"
@@ -19,7 +19,7 @@ on:
       - "scripts/test-mobile-app-asset-plan.mjs"
       - "docs/MOBILE_APP_ASSET_WORKFLOW.md"
       - ".claude/commands/evavo-mobile-app-assets.md"
-      - ".github/workflows/mobile-app-asset-contract.yml"
+      - ".github/workflows-retired/mobile-app-asset-contract.yml"
   workflow_dispatch:
 
 permissions:

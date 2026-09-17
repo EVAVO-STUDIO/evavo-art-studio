@@ -6,7 +6,7 @@ on:
       - main
       - agent/book-creative-direction-runtime-20260807
     paths: &book_creative_direction_paths
-      - ".github/workflows/book-creative-direction.yml"
+      - ".github/workflows-retired/book-creative-direction.yml"
       - "scripts/bootstrap-ci-media-tools.sh"
       - "package.json"
       - "packages/contracts/src/book-creative-direction*.ts"

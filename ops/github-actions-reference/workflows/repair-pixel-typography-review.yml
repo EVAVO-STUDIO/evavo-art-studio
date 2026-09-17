@@ -90,7 +90,7 @@ jobs:
           repository = os.environ["GITHUB_REPOSITORY"]
           token = os.environ["GH_TOKEN"]
           blobs = {
-              ".github/workflows/pixel-font-repository-delivery-contract.yml": "ac67e9274c4e612c7db11773e3c21330797140f0",
+              ".github/workflows-retired/pixel-font-repository-delivery-contract.yml": "ac67e9274c4e612c7db11773e3c21330797140f0",
               "config/mcp.pixel-font-automation.windows.example.json": "58ce08f365f7c06fa55da8d2e6ca966edbd3ddce",
               "config/pixel-font-automation-suite.v1.json": "708b6cc0104ade1ac75eb9921303908657c7aaa9",
               "config/pixel-typography-review.v1.json": "07f52678542ca022eafb559bb2c13530e6530856",
@@ -106,7 +106,7 @@ jobs:
               "tools/pixel_typography_review.py": "0a0a6abb65d7cd6f651511c35dd170bfea941e07",
           }
           accepted_existing = {
-              ".github/workflows/pixel-font-repository-delivery-contract.yml": {
+              ".github/workflows-retired/pixel-font-repository-delivery-contract.yml": {
                   "f74393b1e2c249ce1da8ba1807a9f4e7ef97a315",
                   "ac67e9274c4e612c7db11773e3c21330797140f0",
               },
@@ -244,8 +244,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .github/workflows/finalize-pixel-typography-review.yml
-          rm -f .github/workflows/repair-pixel-typography-review.yml
+          rm -f .github/workflows-retired/finalize-pixel-typography-review.yml
+          rm -f .github/workflows-retired/repair-pixel-typography-review.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
@@ -253,9 +253,9 @@ jobs:
           import subprocess
 
           allowed = {
-              ".github/workflows/finalize-pixel-typography-review.yml",
-              ".github/workflows/repair-pixel-typography-review.yml",
-              ".github/workflows/pixel-font-repository-delivery-contract.yml",
+              ".github/workflows-retired/finalize-pixel-typography-review.yml",
+              ".github/workflows-retired/repair-pixel-typography-review.yml",
+              ".github/workflows-retired/pixel-font-repository-delivery-contract.yml",
               "config/mcp.pixel-font-automation.windows.example.json",
               "config/pixel-font-automation-suite.v1.json",
               "config/pixel-typography-review.v1.json",
@@ -279,7 +279,7 @@ jobs:
           unexpected = sorted(observed - allowed)
           if unexpected:
               raise SystemExit(f"unexpected staged paths: {unexpected}")
-          if ".github/workflows/repair-pixel-typography-review.yml" not in observed:
+          if ".github/workflows-retired/repair-pixel-typography-review.yml" not in observed:
               raise SystemExit("recovery workflow deletion is not staged")
           PY
           git diff --cached --check

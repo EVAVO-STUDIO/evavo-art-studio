@@ -221,7 +221,7 @@ node --test `
 Dedicated CI:
 
 ```text
-.github/workflows/heavy-metal-fighting-art-studio.yml
+.github/workflows-retired/heavy-metal-fighting-art-studio.yml
 ```
 
 CI validates syntax, campaign counts, mechanical and Pilot contracts, named moves, implemented/planned boundaries, authored source banks, enriched source-cel topology, screen plans, supers, intro, attract mode, allocations, source-review binding, MCP authority and clean source.

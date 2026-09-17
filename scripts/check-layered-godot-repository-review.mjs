@@ -15,7 +15,7 @@ const files = [
   "scripts/check-layered-godot-repository-review.mjs",
   "config/layered-production-godot-repository-review.v1.json",
   "docs/LAYERED_GODOT_REPOSITORY_REVIEW.md",
-  ".github/workflows/layered-godot-workspace-writer.yml",
+  ".github/workflows-retired/layered-godot-workspace-writer.yml",
 ];
 const source = new Map();
 for (const relative of files) {
@@ -181,7 +181,7 @@ for (const token of [
   assert.ok(docs.includes(token), `repository review docs missing ${token}`);
 }
 
-const workflow = source.get(".github/workflows/layered-godot-workspace-writer.yml");
+const workflow = source.get(".github/workflows-retired/layered-godot-workspace-writer.yml");
 for (const token of [
   "scripts/layered-godot-repository-review.mjs",
   "scripts/layered-godot-repository-review/**",

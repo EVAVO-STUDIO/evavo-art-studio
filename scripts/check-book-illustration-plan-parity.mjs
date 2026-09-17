@@ -7,7 +7,7 @@ const authority = JSON.parse(readFileSync(path.join(root, "docs/BOOK_STUDIO_AND_
 const translator = readFileSync(path.join(root, "packages/contracts/src/book-production-legacy-illustration-plan.ts"), "utf8");
 const index = readFileSync(path.join(root, "packages/contracts/src/index.ts"), "utf8");
 const test = readFileSync(path.join(root, "packages/contracts/test/book-production-legacy-illustration-plan.test.mjs"), "utf8");
-const workflow = readFileSync(path.join(root, ".github/workflows/book-studio-production-handoff.yml"), "utf8");
+const workflow = readFileSync(path.join(root, ".github/workflows-retired/book-studio-production-handoff.yml"), "utf8");
 const docs = readFileSync(path.join(root, "docs/book-studio-production-handoff.md"), "utf8");
 const problems = [];
 

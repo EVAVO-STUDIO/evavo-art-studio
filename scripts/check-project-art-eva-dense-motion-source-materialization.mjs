@@ -36,7 +36,7 @@ const PNG_TEST = path.join(
 );
 const WORKFLOW = path.join(
   ROOT,
-  '.github/workflows/eva-dense-motion-source-materialization.yml',
+  '.github/workflows-retired/eva-dense-motion-source-materialization.yml',
 );
 
 const read = (file) => readFileSync(file, 'utf8');

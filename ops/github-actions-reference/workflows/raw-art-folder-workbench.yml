@@ -11,7 +11,7 @@ on:
       - "docs/RAW_ART_FOLDER_WORKBENCH.md"
       - "config/mcp.raw-art-folder.windows.example.json"
       - "package.json"
-      - ".github/workflows/raw-art-folder-workbench.yml"
+      - ".github/workflows-retired/raw-art-folder-workbench.yml"
   push:
     branches:
       - main
@@ -24,7 +24,7 @@ on:
       - "docs/RAW_ART_FOLDER_WORKBENCH.md"
       - "config/mcp.raw-art-folder.windows.example.json"
       - "package.json"
-      - ".github/workflows/raw-art-folder-workbench.yml"
+      - ".github/workflows-retired/raw-art-folder-workbench.yml"
   workflow_dispatch:
 
 permissions:

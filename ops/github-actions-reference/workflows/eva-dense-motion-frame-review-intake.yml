@@ -12,7 +12,7 @@ on:
       - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_FRAME_REVIEW_INTAKE.md"
-      - ".github/workflows/eva-dense-motion-frame-review-intake.yml"
+      - ".github/workflows-retired/eva-dense-motion-frame-review-intake.yml"
   push:
     branches: [main]
     paths:
@@ -25,7 +25,7 @@ on:
       - "scripts/project-art/eva-dense-motion-mastering-campaign.mjs"
       - "scripts/project-art/eva-dense-motion-ten-master-program.mjs"
       - "docs/PROJECT_ART_EVA_DENSE_MOTION_FRAME_REVIEW_INTAKE.md"
-      - ".github/workflows/eva-dense-motion-frame-review-intake.yml"
+      - ".github/workflows-retired/eva-dense-motion-frame-review-intake.yml"
   workflow_dispatch:
 
 permissions:

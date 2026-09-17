@@ -15,7 +15,7 @@ const files = [
   'tools/project_art_workspace_ingest_mcp.mjs',
   'docs/PERSISTENT_ARTIST_WORKSPACE_INGEST.md',
   'config/mcp.persistent-artist-workspace-ingest.windows.example.json',
-  '.github/workflows/persistent-artist-workspace-ingest.yml',
+  '.github/workflows-retired/persistent-artist-workspace-ingest.yml',
 ];
 const content = new Map();
 for (const relative of files) {
@@ -101,7 +101,7 @@ for (const token of [
   'persist-credentials: false',
   'node scripts/check-persistent-artist-workspace-ingest.mjs',
 ]) {
-  assert.equal(content.get('.github/workflows/persistent-artist-workspace-ingest.yml').includes(token), true, `Workflow is missing ${token}`);
+  assert.equal(content.get('.github/workflows-retired/persistent-artist-workspace-ingest.yml').includes(token), true, `Workflow is missing ${token}`);
 }
 for (const script of [
   'scripts/test-persistent-artist-workspace-ingest.mjs',

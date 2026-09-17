@@ -11,7 +11,7 @@ on:
       - "scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs"
       - "contracts/asset-fabricator-reference-handoff-v1.json"
       - "docs/ASSET_FABRICATOR_REFERENCE_HANDOFF.md"
-      - ".github/workflows/asset-fabricator-reference-handoff.yml"
+      - ".github/workflows-retired/asset-fabricator-reference-handoff.yml"
   pull_request:
     paths:
       - "scripts/game-art-production/asset-fabricator-reference-handoff.mjs"
@@ -21,7 +21,7 @@ on:
       - "scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs"
       - "contracts/asset-fabricator-reference-handoff-v1.json"
       - "docs/ASSET_FABRICATOR_REFERENCE_HANDOFF.md"
-      - ".github/workflows/asset-fabricator-reference-handoff.yml"
+      - ".github/workflows-retired/asset-fabricator-reference-handoff.yml"
   workflow_dispatch:
 
 permissions:

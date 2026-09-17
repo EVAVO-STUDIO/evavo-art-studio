@@ -9,7 +9,7 @@ on:
       - "packages/runtime/src/types.ts"
       - "packages/runtime/test/repository-input-boundary-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-repository-input-boundary.yml"
+      - ".github/workflows-retired/runtime-repository-input-boundary.yml"
   push:
     branches:
       - main
@@ -20,7 +20,7 @@ on:
       - "packages/runtime/src/types.ts"
       - "packages/runtime/test/repository-input-boundary-security.test.mjs"
       - "scripts/bootstrap-ci-media-tools.sh"
-      - ".github/workflows/runtime-repository-input-boundary.yml"
+      - ".github/workflows-retired/runtime-repository-input-boundary.yml"
 
 permissions:
   contents: read

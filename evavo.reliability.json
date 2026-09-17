@@ -107,7 +107,7 @@
     "git diff --exit-code -- pnpm-lock.yaml && git diff --exit-code && test -z \"$(git status --porcelain)\""
   ],
   "executedBaseline": {
-    "workflow": ".github/workflows/ci.yml",
+    "workflow": ".github/workflows-retired/ci.yml",
     "runId": "30544861146",
     "headSha": "52b6f0707f52a8c04e707cb521456f342d881d62",
     "conclusion": "success",

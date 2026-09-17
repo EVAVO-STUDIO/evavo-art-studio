@@ -15,7 +15,7 @@ on:
       - "tools/project_art_workspace_catalog_mcp.mjs"
       - "docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md"
       - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
-      - ".github/workflows/persistent-artist-workspace-catalog.yml"
+      - ".github/workflows-retired/persistent-artist-workspace-catalog.yml"
   push:
     branches:
       - main
@@ -32,7 +32,7 @@ on:
       - "tools/project_art_workspace_catalog_mcp.mjs"
       - "docs/PERSISTENT_ARTIST_WORKSPACE_CATALOG.md"
       - "config/mcp.persistent-artist-workspace-catalog.windows.example.json"
-      - ".github/workflows/persistent-artist-workspace-catalog.yml"
+      - ".github/workflows-retired/persistent-artist-workspace-catalog.yml"
   workflow_dispatch:
 
 permissions:
