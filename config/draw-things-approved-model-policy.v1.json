@@ -1,0 +1,130 @@
+{
+  "schema": "evavo.draw-things-approved-model-policy.v1",
+  "policyId": "evavo-draw-things-production-2026-09",
+  "models": [
+    {
+      "id": "flux2-klein-4b-q6p",
+      "inventoryName": "FLUX.2 [klein] 4B (6-bit)",
+      "inventoryFile": "flux_2_klein_4b_q6p.ckpt",
+      "version": "flux2_4b",
+      "expectedFiles": [
+        {
+          "name": "flux_2_klein_4b_q6p.ckpt",
+          "sha256": "ba42005a6d4e6c48430787db98ae8913aced4654682b59d0d0f1d9ccf820fe30"
+        },
+        {
+          "name": "qwen_3_4b_q8p.ckpt",
+          "sha256": "a24e3f832917aafe7f6186e6dfb96ab19a4a0729cdf60a875b5da20024333350"
+        },
+        {
+          "name": "flux_2_vae_f16.ckpt",
+          "sha256": "48369d4b1495aec3df0579591f4bf9c199a73cc288130df2359c4a173c5ae864"
+        }
+      ],
+      "source": {
+        "publisher": "Black Forest Labs",
+        "url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+      },
+      "license": {
+        "id": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0",
+        "commercialUse": "allowed",
+        "derivatives": "allowed",
+        "redistribution": "allowed"
+      },
+      "approvedUses": [
+        "concept",
+        "illustration",
+        "sprite",
+        "environment",
+        "effect",
+        "ui",
+        "print",
+        "reference"
+      ],
+      "generationDefaults": {
+        "steps": 4,
+        "cfg": 1,
+        "samplerName": "DDIM Trailing",
+        "seedMode": "ScaleAlike",
+        "clipSkip": 2,
+        "shift": 3,
+        "resolutionDependentShift": false,
+        "speedUp": true,
+        "teaCache": false,
+        "teaCacheThreshold": 0.3,
+        "teaCacheStart": 5,
+        "teaCacheEnd": -1,
+        "teaCacheMaxSkipSteps": 3
+      },
+      "priority": 220,
+      "resourceClass": "quality",
+      "notes": "Preferred modern local image route. The canonical gRPC service enables CPU offload so this quantized 4B model can remain usable on the 12 GB laptop GPU. Runtime admission still fails closed if the workstation cannot fit the job."
+    },
+    {
+      "id": "sdxl-base-1.0-8bit",
+      "inventoryName": "SDXL Base v1.0 (8-bit)",
+      "inventoryFile": "sd_xl_base_1.0_q6p_q8p.ckpt",
+      "version": "sdxl_base_v0.9",
+      "expectedFiles": [
+        {
+          "name": "sd_xl_base_1.0_q6p_q8p.ckpt",
+          "sha256": "796210c27eec08fd7ea01ad42eaf93efac5783b3f25df60906601a0a293a8f45"
+        },
+        {
+          "name": "open_clip_vit_bigg14_f16.ckpt",
+          "sha256": "1bc61283f12c3b923f4366a27d316742c0610aa934803481f0b5277124b9a8f4"
+        },
+        {
+          "name": "sdxl_vae_v1.0_f16.ckpt",
+          "sha256": "8ceb1b62fc9b88c20a171452fef55e3a5546cc621c943c78188f648351b4d7e4"
+        },
+        {
+          "name": "clip_vit_l14_f16.ckpt",
+          "sha256": "809bfd12c8d4b3d79c14e850b99130a70854f6fd8dedcacdf429417c02fa3007"
+        }
+      ],
+      "source": {
+        "publisher": "Stability AI",
+        "url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0"
+      },
+      "license": {
+        "id": "CreativeML-OpenRAIL++-M",
+        "name": "CreativeML Open RAIL++-M License",
+        "url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+        "commercialUse": "allowed",
+        "derivatives": "allowed",
+        "redistribution": "restricted"
+      },
+      "approvedUses": [
+        "concept",
+        "illustration",
+        "sprite",
+        "environment",
+        "effect",
+        "ui",
+        "print",
+        "reference"
+      ],
+      "generationDefaults": {
+        "steps": 16,
+        "cfg": 5,
+        "samplerName": "DPM++ 2M AYS",
+        "seedMode": "ScaleAlike",
+        "clipSkip": 2,
+        "shift": 1,
+        "resolutionDependentShift": false,
+        "speedUp": false,
+        "teaCache": false,
+        "teaCacheThreshold": 0.2,
+        "teaCacheStart": 5,
+        "teaCacheEnd": 2,
+        "teaCacheMaxSkipSteps": 3
+      },
+      "priority": 140,
+      "resourceClass": "baseline",
+      "notes": "Stable lower-memory fallback route. Commercial use remains subject to the OpenRAIL++ use-based restrictions and redistribution conditions."
+    }
+  ]
+}
