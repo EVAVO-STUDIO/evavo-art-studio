@@ -1,6 +1,6 @@
 # Automated local generation campaigns
 
-`RUN-LOCAL-ART-CAMPAIGN.cmd` is the generic workstation entry point for repeatable Art Studio image-generation campaigns backed by reviewed local ComfyUI provider profiles.
+`RUN-LOCAL-ART-CAMPAIGN.cmd` is the generic workstation entry point for repeatable Art Studio image-generation campaigns backed by reviewed local provider profiles. The campaign backend can be core ComfyUI or the isolated Draw Things gRPC bridge.
 
 The runner is deliberately data-driven. Lorna is an example campaign, not a hard-coded production path. The same runner can be used for characters, environments, illustrations, sprite frames, sprite layers, UI, effects and print artwork by supplying a different manifest.
 
@@ -29,9 +29,9 @@ That entry point invokes the canonical Local Compute fabric bootstrap, ensures a
 For every campaign it:
 
 1. validates the reusable `evavo.local-generation-campaign.v1` manifest;
-2. requires loopback-only ComfyUI execution and disables hosted fallback;
-3. reads the reviewed, compiled ComfyUI catalog;
-4. routes each scene independently to an explicitly requested `comfyui:<profile>` or the highest-priority reviewed compatible local profile;
+2. requires loopback-only local-provider execution and disables hosted fallback;
+3. reads the reviewed, compiled catalog for the selected backend;
+4. routes each scene independently to an explicitly requested backend adapter or the highest-priority reviewed compatible local profile;
 5. proves that profile supports the scene's operation, asset kind, continuity phase, exact provider capability profile and requested candidate count;
 6. probes the local ComfyUI service before spending work;
 7. creates ordinary governed Art Studio provider jobs with deterministic seeds, sizes and candidate counts;
@@ -111,11 +111,39 @@ This content boundary is separate from provider choice. A campaign may still exe
 
 ## Provider selection
 
-`provider.adapterId` and per-scene `adapterId` are optional. When omitted, the runner chooses the highest-priority reviewed local catalog profile whose declared operation, asset kind, continuity phase, limits and capabilities match that scene. When supplied, an adapter ID must use:
+The provider block accepts an optional backend:
+
+```json
+{
+  "provider": {
+    "backend": "draw-things"
+  }
+}
+```
+
+Supported values are:
+
+```text
+comfyui      (default, backward compatible)
+draw-things
+```
+
+When `backend` is omitted the existing ComfyUI behavior is unchanged.
+
+`provider.adapterId` and per-scene `adapterId` are optional. When omitted,
+the runner chooses the highest-priority reviewed local catalog profile whose
+declared operation, asset kind, continuity phase, limits and capabilities match
+that scene. When supplied, adapter IDs must match the selected backend:
 
 ```text
 comfyui:<profileId>
+draw-things:<profileId>
 ```
+
+The two namespaces are intentionally not interchangeable. A Draw Things
+campaign only routes to compiled profiles whose node inventory contains
+`DrawThingsSampler`; the normal ComfyUI backend explicitly excludes those
+profiles.
 
 The capability profile written to each runtime job is derived the same way as Art Studio's provider registry: `generate` and `cancellation`, plus `seed`, `custom-size`, and `candidate-count` when the request actually needs them. This prevents runtime jobs from being rejected because of capability-profile drift.
 
@@ -123,14 +151,32 @@ Every generated request sets `allowFallback: false`, so a local-generation campa
 
 ## Machine-specific configuration
 
-Both provider settings can come from the manifest or environment:
+Core ComfyUI settings can come from the manifest or environment:
 
 ```text
 EVAVO_ART_COMFYUI_BASE_URL
 EVAVO_ART_COMFYUI_CATALOG
 ```
 
-Defaults are loopback `http://127.0.0.1:8188` and, on Windows, `C:\EVAVO\comfyui\catalog.json`.
+Draw Things uses a separate dedicated service/catalog:
+
+```text
+EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL
+EVAVO_ART_DRAWTHINGS_CATALOG
+```
+
+Canonical Draw Things defaults are:
+
+```text
+ComfyUI bridge : http://127.0.0.1:8193
+Draw Things gRPC: 127.0.0.1:7859
+catalog         : %LOCALAPPDATA%\EVAVO\AI\DrawThings\catalog.json
+```
+
+Run `prepare_draw_things_local_provider` (MCP) or
+`COMMISSION-EVAVO-DRAW-THINGS-CURRENT.ps1 -Mode Prepare` (PowerShell) to
+rebuild this catalog from the real installed model bytes and committed EVAVO
+model policy. Preparation does not authorize downloads.
 
 The catalog remains the authority for exact workflow, model, runtime and node hashes. The generic campaign runner does not accept arbitrary ComfyUI workflow JSON from the manifest and therefore does not weaken the existing reviewed-workflow boundary.
 
@@ -141,3 +187,103 @@ $env:EVAVO_ART_STUDIO_ROOT = 'D:\Repos\evavo-art-studio'
 ```
 
 No other launcher change is required.
+
+
+## Draw Things continuity routing
+
+A Draw Things manifest does not need to name a workflow for ordinary routing.
+
+For a no-reference scene, Art Studio uses the model's base profile.
+
+For a scene with a required `canonical-identity` reference, Art Studio requires
+the `identity-reference` capability and selects a reviewed identity-reference
+profile.
+
+For Kontext-capable models, a scene containing both
+`canonical-identity` and `direction-master` can route to the reviewed
+direction-reference profile.
+
+An `in-between` sprite scene must contain required:
+
+```text
+canonical-identity
+previous-key-pose
+next-key-pose
+```
+
+The generated Kontext temporal profile binds the canonical identity as the base
+Draw Things reference and the previous/next key poses as shuffle/moodboard
+references. The V1 validator and provider capability profile require all three
+roles before the job reaches the GPU.
+
+Example:
+
+```json
+{
+  "schema": "evavo.local-generation-campaign.v1",
+  "campaignId": "ranger-walk-south-03",
+  "contentClass": "general",
+  "subject": {
+    "description": "The approved ranger character"
+  },
+  "provider": {
+    "backend": "draw-things"
+  },
+  "style": {
+    "styleName": "game production",
+    "intent": "Preserve the approved character and project art direction."
+  },
+  "scenes": [
+    {
+      "id": "walk-south-03",
+      "assetKind": "sprite-frame",
+      "continuityPhase": "in-between",
+      "prompt": "Intermediate south-facing walk-cycle pose between the approved neighboring key poses.",
+      "candidateCount": 2,
+      "references": [
+        {
+          "artifactId": "artifact_<sha256>",
+          "role": "canonical-identity",
+          "required": true
+        },
+        {
+          "artifactId": "artifact_<sha256>",
+          "role": "previous-key-pose",
+          "required": true
+        },
+        {
+          "artifactId": "artifact_<sha256>",
+          "role": "next-key-pose",
+          "required": true
+        }
+      ],
+      "target": {
+        "width": 512,
+        "height": 512,
+        "transparency": "opaque",
+        "outputFormat": "png"
+      }
+    }
+  ]
+}
+```
+
+The final atlas is still not generated by diffusion. Individual accepted frames
+continue through Art Studio's sequence QA, alpha/mastering, pivot/baseline
+validation and deterministic atlas/Godot delivery pipeline.
+
+## GPU-aware local model selection
+
+The canonical Local Compute launcher obtains the shared creative GPU lease before
+starting either local backend. When NVIDIA telemetry is available, the free VRAM
+measured at admission is passed to Art Studio.
+
+The generated Draw Things governance evidence marks each model as
+`baseline`, `quality` or `heavy`. Current routing keeps quality profiles
+eligible at 8 GiB or more free-at-admission and heavy profiles at 10 GiB or more.
+This lets an unpinned campaign prefer the higher-priority FLUX route when there
+is headroom and use the governed SDXL baseline when there is not.
+
+This is a local model fallback only. `allowFallback` remains false for hosted
+providers, so resource routing cannot silently send the artwork to OpenAI or
+another remote image service.
