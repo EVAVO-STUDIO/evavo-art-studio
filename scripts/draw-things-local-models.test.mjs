@@ -107,8 +107,11 @@ test("builds a governed Draw Things profile from exact local model identity", ()
     result.draft.schemaVersion,
     "evavo.comfyui-workflow-catalog-draft.v1",
   );
-  assert.equal(result.draft.profiles.length, 1);
-  const profile = result.draft.profiles[0];
+  assert.equal(result.draft.profiles.length, 2);
+  const profile = result.draft.profiles.find(
+    (entry) => entry.profileId === "dt-fixture-xl-generate",
+  );
+  assert.ok(profile);
   assert.equal(profile.profileId, "dt-fixture-xl-generate");
   assert.equal(profile.modelId, "fixture-xl");
   assert.ok(profile.assetKinds.includes("sprite-frame"));
@@ -461,12 +464,155 @@ test("catalog carries multiple governed models and sorts them by routing priorit
     },
     install: install(),
   });
-  assert.equal(draft.profiles.length, 2);
-  assert.equal(draft.profiles[0].modelId, "fixture-xl");
-  assert.equal(draft.profiles[0].priority, 220);
-  assert.equal(draft.profiles[0].workflow["3"].inputs.steps, 7);
-  assert.equal(draft.profiles[1].modelId, "fixture-fallback");
-  assert.equal(draft.profiles[1].priority, 100);
-  assert.equal(draft.profiles[1].workflow["3"].inputs.steps, 16);
+  assert.equal(draft.profiles.length, 4);
+  const primaryBase = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate",
+  );
+  const fallbackBase = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-fallback-generate",
+  );
+  assert.ok(primaryBase);
+  assert.ok(fallbackBase);
+  assert.equal(primaryBase.modelId, "fixture-xl");
+  assert.equal(primaryBase.priority, 220);
+  assert.equal(primaryBase.workflow["3"].inputs.steps, 7);
+  assert.equal(fallbackBase.modelId, "fixture-fallback");
+  assert.equal(fallbackBase.priority, 100);
+  assert.equal(fallbackBase.workflow["3"].inputs.steps, 16);
   assert.equal(governanceEvidence.models.length, 2);
+});
+
+
+test("all governed models get one canonical identity reference profile", () => {
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: inventory(),
+    governance: governance(),
+    install: install(),
+  });
+  const identity = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-identity-ref",
+  );
+  assert.ok(identity);
+  assert.equal(identity.priority, -1);
+  assert.equal(identity.workflow["5"].class_type, "LoadImage");
+  assert.deepEqual(identity.workflow["3"].inputs.image, ["5", 0]);
+  assert.equal(identity.workflow["3"].inputs.strength, 0.55);
+  assert.ok(identity.capabilities.includes("reference-images"));
+  assert.ok(identity.capabilities.includes("identity-reference"));
+  assert.ok(!identity.capabilities.includes("multiple-reference-images"));
+  assert.ok(!identity.capabilities.includes("temporal-reference"));
+  assert.deepEqual(identity.bindings.referenceImages, [
+    {
+      role: "canonical-identity",
+      nodeId: "5",
+      input: "image",
+    },
+  ]);
+  assert.equal(identity.limits.maximumReferenceImages, 1);
+});
+
+test("Kontext models get capability-honest direction and temporal reference profiles", () => {
+  const kontextInventory = inventory({
+    model: {
+      name: "Fixture XL",
+      file: "fixture_xl.safetensors",
+      version: "sdxl",
+      prefix: "",
+      modifier: "kontext",
+    },
+  });
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: kontextInventory,
+    governance: governance({ priority: 220 }),
+    install: install(),
+  });
+  assert.equal(draft.profiles.length, 4);
+
+  const base = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate",
+  );
+  const identity = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-identity-ref",
+  );
+  const direction = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-direction-ref",
+  );
+  const temporal = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-temporal-ref",
+  );
+  assert.ok(base);
+  assert.ok(identity);
+  assert.ok(direction);
+  assert.ok(temporal);
+  assert.equal(base.priority, 220);
+  assert.equal(identity.priority, 219);
+  assert.equal(direction.priority, 218);
+  assert.equal(temporal.priority, 217);
+
+  assert.equal(identity.workflow["3"].inputs.strength, 1);
+  assert.ok(direction.capabilities.includes("multiple-reference-images"));
+  assert.ok(direction.capabilities.includes("direction-reference"));
+  assert.ok(!direction.capabilities.includes("temporal-reference"));
+  assert.equal(direction.workflow["8"].class_type, "DrawThingsHints");
+  assert.equal(direction.workflow["8"].inputs.type, "Shuffle (Moodboard)");
+  assert.equal(direction.workflow["8"].inputs.weight, 0.85);
+  assert.deepEqual(direction.workflow["8"].inputs.image, ["6", 0]);
+  assert.deepEqual(direction.workflow["3"].inputs.hints, ["8", 0]);
+  assert.deepEqual(
+    direction.bindings.referenceImages.map((reference) => reference.role),
+    ["canonical-identity", "direction-master"],
+  );
+
+  assert.ok(temporal.capabilities.includes("multiple-reference-images"));
+  assert.ok(temporal.capabilities.includes("temporal-reference"));
+  assert.ok(!temporal.capabilities.includes("direction-reference"));
+  assert.equal(temporal.workflow["8"].inputs.type, "Shuffle (Moodboard)");
+  assert.equal(temporal.workflow["8"].inputs.type_2, "Shuffle (Moodboard)");
+  assert.equal(temporal.workflow["8"].inputs.weight, 0.8);
+  assert.equal(temporal.workflow["8"].inputs.weight_2, 0.8);
+  assert.deepEqual(temporal.workflow["8"].inputs.image, ["6", 0]);
+  assert.deepEqual(temporal.workflow["8"].inputs.image_2, ["7", 0]);
+  assert.deepEqual(temporal.workflow["3"].inputs.hints, ["8", 0]);
+  assert.deepEqual(
+    temporal.bindings.referenceImages.map((reference) => reference.role),
+    ["canonical-identity", "previous-key-pose", "next-key-pose"],
+  );
+  assert.ok(temporal.continuityPhases.includes("in-between"));
+  assert.equal(temporal.limits.maximumReferenceImages, 3);
+});
+
+test("non-Kontext fallback never advertises direction or temporal reference capabilities", () => {
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: inventory(),
+    governance: governance({ priority: 140 }),
+    install: install(),
+  });
+  assert.equal(draft.profiles.length, 2);
+  for (const profile of draft.profiles) {
+    assert.ok(!profile.capabilities.includes("direction-reference"));
+    assert.ok(!profile.capabilities.includes("temporal-reference"));
+    assert.ok(!profile.capabilities.includes("multiple-reference-images"));
+  }
+});
+
+test("reference profiles stay below their no-reference base route priority", () => {
+  const kontextInventory = inventory({
+    model: {
+      name: "Fixture XL",
+      file: "fixture_xl.safetensors",
+      version: "sdxl",
+      prefix: "",
+      modifier: "kontext_kv",
+    },
+  });
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: kontextInventory,
+    governance: governance({ priority: 50 }),
+    install: install(),
+  });
+  const byId = new Map(draft.profiles.map((profile) => [profile.profileId, profile]));
+  assert.equal(byId.get("dt-fixture-xl-generate").priority, 50);
+  assert.equal(byId.get("dt-fixture-xl-generate-identity-ref").priority, 49);
+  assert.equal(byId.get("dt-fixture-xl-generate-direction-ref").priority, 48);
+  assert.equal(byId.get("dt-fixture-xl-generate-temporal-ref").priority, 47);
 });
