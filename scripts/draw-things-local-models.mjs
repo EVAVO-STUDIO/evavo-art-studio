@@ -1559,6 +1559,61 @@ export function buildDrawThingsCatalogDraft({
     reviewedBy: governanceEntry.reviewedBy,
     reviewedAt: governanceEntry.reviewedAt,
   }));
+  const controlEvidence = (governance.controls ?? [])
+    .map((governanceEntry) => {
+      const inventoryEntry = inventory.controls.find(
+        (control) =>
+          control.name === governanceEntry.inventoryName &&
+          control.file === governanceEntry.inventoryFile &&
+          control.version === governanceEntry.version &&
+          control.bundleSha256 === governanceEntry.bundleSha256,
+      );
+      if (!inventoryEntry) return null;
+      return {
+        controlId: governanceEntry.id,
+        inventoryId: inventoryEntry.id,
+        inventoryName: inventoryEntry.name,
+        inventoryFile: inventoryEntry.file,
+        controlVersion: inventoryEntry.version,
+        bundleSha256: inventoryEntry.bundleSha256,
+        approvedRoles: [...governanceEntry.approvedRoles].sort(),
+        compatibleModelIds: [...governanceEntry.compatibleModelIds].sort(),
+        minimumVramGb: governanceEntry.minimumVramGb,
+        priority: governanceEntry.priority,
+        source: canonical(governanceEntry.source),
+        license: canonical(governanceEntry.license),
+        reviewedBy: governanceEntry.reviewedBy,
+        reviewedAt: governanceEntry.reviewedAt,
+      };
+    })
+    .filter(Boolean);
+  const baseMinimumVram = (modelId) => {
+    const model = modelEvidence.find((entry) => entry.modelId === modelId);
+    if (!model) return 0;
+    return model.resourceClass === "heavy"
+      ? 10
+      : model.resourceClass === "quality"
+        ? 8
+        : 0;
+  };
+  const profileEvidence = profiles.map((profile) => {
+    const poseControl = poseControlByModelId.get(profile.modelId) ?? null;
+    const usesPoseControl =
+      profile.capabilities.includes("pose-control") && poseControl !== null;
+    return {
+      profileId: profile.profileId,
+      modelId: profile.modelId,
+      minimumVramGb: usesPoseControl
+        ? Math.max(
+            baseMinimumVram(profile.modelId),
+            Number(poseControl.governanceEntry.minimumVramGb),
+          )
+        : baseMinimumVram(profile.modelId),
+      controlIds: usesPoseControl
+        ? [poseControl.governanceEntry.id]
+        : [],
+    };
+  });
   return {
     draft,
     governanceEvidence: {
@@ -1567,6 +1622,8 @@ export function buildDrawThingsCatalogDraft({
       policyId: governance.policyId ?? null,
       policySha256: governance.policySha256 ?? null,
       models: modelEvidence,
+      controls: controlEvidence,
+      profiles: profileEvidence,
       ...(modelEvidence.length === 1 ? modelEvidence[0] : {}),
       installManifestSha256: inventory.installManifestSha256,
       installCanonicalSha256: installHash,
