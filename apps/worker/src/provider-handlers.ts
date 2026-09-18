@@ -3,6 +3,7 @@ import {
   FixtureImageProviderAdapter,
   OpenAIImageProviderAdapter,
   loadComfyUIProviderAdaptersFromCatalogFile,
+  loadDrawThingsComfyUIProviderAdaptersFromCatalogFile,
   ProviderError,
   ProviderRegistry,
   executeProviderCandidateRequest,
@@ -193,11 +194,6 @@ export function createProviderRegistryFromEnvironment(
           ? { allowedRoot: environment.EVAVO_ART_DRAWTHINGS_CATALOG_ROOT.trim() }
           : {}),
         dedicatedInstance,
-        drawThingsRemote: envBoolean(
-          environment.EVAVO_ART_DRAWTHINGS_GRPC_REMOTE,
-          false,
-          "EVAVO_ART_DRAWTHINGS_GRPC_REMOTE",
-        ),
         allowRemote: envBoolean(
           environment.EVAVO_ART_DRAWTHINGS_COMFYUI_ALLOW_REMOTE,
           false,
