@@ -120,6 +120,32 @@ function isWithin(root: string, candidate: string): boolean {
   );
 }
 
+async function createDirectoryWithinRoots(
+  candidate: string,
+  roots: readonly string[],
+  name: string,
+): Promise<string> {
+  const lexical = path.resolve(candidate);
+  const canonicalRoots = await Promise.all(
+    roots.map((root) => realpath(path.resolve(root))),
+  );
+  if (!canonicalRoots.some((root) => isWithin(root, lexical))) {
+    throw new PermanentRuntimeError(
+      "RUNTIME_HANDLER_PATH_REJECTED",
+      `${name} is outside EVAVO_ART_ALLOWED_ROOTS.`,
+    );
+  }
+  await mkdir(lexical, { recursive: true });
+  const canonical = await realpath(lexical);
+  if (!canonicalRoots.some((root) => isWithin(root, canonical))) {
+    throw new PermanentRuntimeError(
+      "RUNTIME_HANDLER_PATH_REJECTED",
+      `${name} resolves outside EVAVO_ART_ALLOWED_ROOTS.`,
+    );
+  }
+  return canonical;
+}
+
 async function assertExistingPathWithinRoots(
   candidate: string,
   roots: readonly string[],
@@ -317,12 +343,8 @@ async function buildAtlasFromVerifiedFamily(
     payload.outputDirectory,
     "outputDirectory",
   );
-  const canonicalOutput = await assertExistingPathWithinRoots(
-    await (async () => {
-      const lexical = path.resolve(outputDirectory);
-      await mkdir(lexical, { recursive: true });
-      return lexical;
-    })(),
+  const canonicalOutput = await createDirectoryWithinRoots(
+    outputDirectory,
     allowedRoots,
     "outputDirectory",
   );
