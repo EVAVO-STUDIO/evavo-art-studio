@@ -109,3 +109,230 @@ EVAVO Local Compute already provides the machine-wide creative GPU lease broker 
 ## Production acceptance
 
 A Draw Things-backed candidate is never automatically final. It continues through immutable candidate storage, identity/silhouette/palette comparison, sequence continuity checks, decoded alpha/matte checks, crop/safe-bound checks, selective repair, explicit promotion, and deterministic atlas or engine export.
+
+
+## Current production commissioning path
+
+The repository now has one explicit end-to-end commissioning chain.
+
+Normal preparation, with no model/runtime downloads:
+
+```powershell
+Set-Location C:\GitRepos\evavo-local-compute
+.\COMMISSION-EVAVO-DRAW-THINGS-CURRENT.ps1 -Mode Prepare
+```
+
+Explicit first-time/update provisioning:
+
+```powershell
+Set-Location C:\GitRepos\evavo-local-compute
+.\COMMISSION-EVAVO-DRAW-THINGS-CURRENT.ps1 `
+  -Mode Provision `
+  -Stack default `
+  -AllowNetwork `
+  -Confirm PROVISION-EVAVO-DRAW-THINGS-STACK-v1
+```
+
+Provisioning is intentionally stronger authority than normal generation. It is
+the only path allowed to clone/fetch the pinned bridge, pull the pinned CUDA
+server image, install bridge dependencies, or download model files. Normal
+service start and normal Art Studio generation remain download-disabled.
+
+The commissioner performs the following fixed chain:
+
+1. provision the pinned Draw Things runtime without starting it;
+2. provision only files from Local Compute's reviewed model-stack manifest;
+3. verify every downloaded file against the Draw Things-published SHA-256;
+4. start the trusted local gRPC + isolated ComfyUI bridge service;
+5. query the real local Draw Things model inventory;
+6. hash each model metadata record and physical component, including a
+   `-tensordata` sidecar when one is physically present;
+7. bind the observed bytes to Art Studio's committed model-use/licence policy;
+8. compile the governed Draw Things workflow catalog;
+9. write catalog governance evidence beside the catalog; and
+10. expose the resulting `draw-things:*` adapters to the ordinary worker.
+
+The canonical runtime files are under:
+
+```text
+%LOCALAPPDATA%\EVAVO\AI\DrawThings\
+  install-manifest.json
+  inventory.json
+  model-governance.json
+  catalog.draft.json
+  catalog.json
+  catalog.governance.json
+  Models\
+  ComfyUIBridge\
+  bridge-venv\
+  state\
+  logs\
+```
+
+## Reviewed local model policy
+
+The current EVAVO policy is stored in:
+
+```text
+config/draw-things-approved-model-policy.v1.json
+```
+
+It is a human-reviewed policy, not a generated inventory. It records the source,
+licence decision, approved EVAVO use cases, Draw Things dependency hashes,
+generation defaults, priority and resource class for each admitted model.
+
+The current default stack contains:
+
+- `flux2-klein-4b-q6p` as the preferred quality route;
+- `sdxl-base-1.0-8bit` as the lower-memory baseline route.
+
+The physical downloader is separately pinned in Local Compute:
+
+```text
+config/draw-things-model-stack-v1.json
+```
+
+It accepts no caller-supplied URL or hash. Files are fetched only from Draw
+Things' fixed model origin and atomically admitted only after SHA-256 verification.
+
+A generated governance file is valid only while the exact local model bundle
+still matches the committed policy. A same-named checkpoint with different
+bytes does not inherit approval.
+
+## Generated profile families
+
+For each governed model Art Studio creates a no-reference generation profile:
+
+```text
+draw-things:dt-<model-id>-generate
+```
+
+Every governed model also gets a single canonical-reference profile:
+
+```text
+draw-things:dt-<model-id>-generate-identity-ref
+```
+
+That graph uploads the immutable reference artifact through ComfyUI's input
+store, loads it through the core `LoadImage` node and sends it into
+`DrawThingsSampler.image`. The sampler influence is a reviewed fixed workflow
+setting; EVAVO does not directly bind its reference-strength number because
+Draw Things img2img strength has the opposite semantic direction.
+
+Models whose Draw Things metadata proves the `kontext` or `kontext_kv`
+modifier additionally receive:
+
+```text
+draw-things:dt-<model-id>-generate-direction-ref
+draw-things:dt-<model-id>-generate-temporal-ref
+```
+
+The direction graph uses:
+
+```text
+canonical identity -> DrawThingsSampler.image
+direction master   -> DrawThingsHints(type=Shuffle (Moodboard))
+```
+
+The temporal graph uses:
+
+```text
+canonical identity -> DrawThingsSampler.image
+previous key pose  -> DrawThingsHints(type=Shuffle (Moodboard))
+next key pose      -> DrawThingsHints(type=Shuffle (Moodboard))
+```
+
+This matches Draw Things' own Kontext reference accounting: the base image plus
+shuffle hints are counted as reference images. The temporal profile therefore
+advertises `identity-reference`, `temporal-reference`,
+`multiple-reference-images` and the corresponding exact reference bindings.
+
+SDXL receives the single-image identity/img2img profile but does not claim
+Kontext multi-reference or temporal capabilities.
+
+Reference profiles have slightly lower priority than their no-reference base
+profile. This prevents a request with no references from accidentally selecting
+a workflow containing placeholder `LoadImage` nodes. Capability requirements
+then select the more specialized profile when a request actually contains
+identity/direction/temporal references.
+
+## Shared GPU admission and model fallback
+
+Local Compute's process-safe creative broker is the single GPU scheduling
+authority. Art Studio campaigns do not create a second lock.
+
+The canonical campaign launcher first creates an interactive broker job and
+waits for an exact fair GPU lease. That lease covers service startup, model
+loading, provider execution and acceptance verification. The launcher may only
+re-enter its physical execution body after verifying the exact active
+job/worker lease.
+
+When NVIDIA telemetry is available, the broker records free VRAM at admission
+and passes it to Art Studio as routing evidence. Draw Things model governance
+assigns each model a resource class:
+
+```text
+baseline
+quality
+heavy
+```
+
+Current routing thresholds are conservative:
+
+```text
+baseline : no extra profile threshold after backend admission
+quality  : 8 GiB free at admission
+heavy    : 10 GiB free at admission
+```
+
+Therefore a normal unconstrained request prefers the high-priority FLUX profile
+when there is sufficient headroom, but can select the governed SDXL baseline
+when FLUX's quality class is filtered out. A temporal request that can only be
+served by a quality-class Kontext profile fails closed below the threshold
+instead of silently degrading into an unconditioned frame.
+
+The gRPC service itself is started with CPU offload enabled, but CPU offload is
+not treated as permission to ignore GPU admission.
+
+## Agent commissioning tools
+
+The Art Studio MCP exposes:
+
+```text
+local_generation_doctor
+prepare_draw_things_local_provider
+provision_draw_things_local_provider
+run_local_generation_campaign
+```
+
+`prepare_draw_things_local_provider` is a normal trusted local-execution
+operation and does not authorize downloads.
+
+`provision_draw_things_local_provider` is disabled unless the trusted MCP
+process also has:
+
+```text
+EVAVO_ART_DRAWTHINGS_MCP_ALLOW_PROVISIONING=true
+```
+
+and the caller supplies the exact confirmation:
+
+```text
+PROVISION-EVAVO-DRAW-THINGS-STACK-v1
+```
+
+This separation means an agent can repair/rebuild an already installed local
+provider automatically, but an ordinary image request cannot silently trigger
+a multi-gigabyte workstation installation.
+
+## Batch V2 boundary
+
+The V1 campaign/provider path is provider-neutral and is the current Draw Things
+production route. The V2 batch planner has valuable QA, dependency staging and
+shot-selective retry logic, but its managed execution layer still owns a
+KSampler-specific temporary ComfyUI runtime.
+
+Do not make V2 claim Draw Things support merely by accepting a
+`draw-things:*` string. Its next migration should preserve the V2 planning/QA
+engine while replacing that managed execution layer with the same governed
+Draw Things service and shared GPU lease described above.
