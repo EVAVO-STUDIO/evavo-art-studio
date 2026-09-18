@@ -1203,9 +1203,11 @@ export interface TwoStageAnimationClipCompileRequest
   readonly keyPoseCandidatesPerFrame?: number;
   readonly inBetweenCandidatesPerFrame?: number;
   readonly delivery?: Readonly<{
-    outputDirectory: string;
     atlasId?: string;
     godotProjectPath?: string;
+    godotOutputRelativeDirectory?: string;
+    runGodotImporter?: boolean;
+    godotTimeoutMs?: number;
   }>;
 }
 
@@ -1222,8 +1224,10 @@ export interface TwoStageAnimationClipCompilation {
   readonly atlasImageRole?: string;
   readonly atlasDataRole?: string;
   readonly atlasEvidenceRole?: string;
+  readonly deliveryEvidenceRole?: string;
   readonly godotDescriptorRole?: string;
   readonly godotImporterRole?: string;
+  readonly godotResourceRole?: string;
   readonly supervisorRequest: SpriteSupervisorCompileRequestInput;
   readonly supervisorWorkflow: CompiledSpriteSupervisorWorkflow;
   readonly authority: Readonly<{
@@ -1609,16 +1613,11 @@ export function compileTwoStageAnimationClip(
   const atlasImageRole = "two-stage.atlas-image";
   const atlasDataRole = "two-stage.atlas-data";
   const atlasEvidenceRole = "two-stage.atlas-evidence";
+  const deliveryEvidenceRole = "two-stage.delivery-evidence";
   const godotDescriptorRole = "two-stage.godot-descriptor";
   const godotImporterRole = "two-stage.godot-importer";
+  const godotResourceRole = "two-stage.godot-resource";
   if (request.delivery) {
-    if (
-      typeof request.delivery.outputDirectory !== "string" ||
-      !request.delivery.outputDirectory.trim() ||
-      request.delivery.outputDirectory.includes("\\0")
-    ) {
-      fail("delivery.outputDirectory must be one non-empty safe path string");
-    }
     if (
       request.delivery.atlasId !== undefined &&
       (typeof request.delivery.atlasId !== "string" ||
@@ -1634,14 +1633,40 @@ export function compileTwoStageAnimationClip(
     ) {
       fail("delivery.godotProjectPath must be one non-empty safe path when supplied");
     }
+    if (
+      request.delivery.runGodotImporter === true &&
+      !request.delivery.godotProjectPath
+    ) {
+      fail("delivery.runGodotImporter=true requires delivery.godotProjectPath");
+    }
+    const atlasId = token(
+      request.delivery.atlasId?.trim() ||
+        request.spritePlan.asset.assetId +
+          "-" +
+          request.plan.clipId +
+          "-" +
+          request.plan.direction +
+          "-atlas",
+      128,
+    );
+    const godotPayload = request.delivery.godotProjectPath
+      ? {
+          projectPath: request.delivery.godotProjectPath.trim(),
+          outputRelativeDirectory:
+            request.delivery.godotOutputRelativeDirectory ??
+            "generated/evavo-art",
+          runImporter: request.delivery.runGodotImporter ?? false,
+          timeoutMs: request.delivery.godotTimeoutMs ?? 120_000,
+        }
+      : undefined;
     tasks.push({
       id: taskToken("atlas", request.plan.clipId),
       stage: "atlas",
       title:
-        "Build deterministic verified-family atlas for " +
+        "Build artifact-native deterministic verified-family atlas for " +
         request.plan.clipId,
       queue: "media",
-      kind: "sprite.atlas.build",
+      kind: "sprite.family.deliver",
       dependencyTaskIds: [familyTaskId],
       requiredArtifactRoles: [
         familyManifestRole,
@@ -1649,28 +1674,40 @@ export function compileTwoStageAnimationClip(
         familyCompositeRole,
       ],
       payloadTemplate: normalizeJson({
+        schemaVersion: "1.0",
         familyManifestArtifactId: { $artifact: familyManifestRole },
         familyEvidenceArtifactId: { $artifact: familyEvidenceRole },
-        outputDirectory: request.delivery.outputDirectory.trim(),
-        ...(request.delivery.atlasId
-          ? { atlasId: request.delivery.atlasId.trim() }
-          : {}),
-        ...(request.delivery.godotProjectPath
-          ? { godotProjectPath: request.delivery.godotProjectPath.trim() }
-          : {}),
+        familyCompositeArtifactIds: { $artifacts: familyCompositeRole },
+        atlas: {
+          atlasId,
+          maximumWidth: request.spritePlan.atlas.maximumWidth,
+          maximumHeight: request.spritePlan.atlas.maximumHeight,
+          padding: request.spritePlan.atlas.paddingPixels,
+          extrusion: request.spritePlan.atlas.extrusionPixels,
+          trim: request.spritePlan.atlas.trim !== "forbidden",
+          powerOfTwo: "preferred",
+          textureFiltering: "nearest",
+          pngCompressionLevel: 9,
+          loopMode: request.plan.loop ? "linear" : "none",
+        },
+        ...(godotPayload ? { godot: godotPayload } : {}),
       }),
       requiredCapabilities: [
+        "sprite.family.deliver",
+        "media.atlas-build",
         "atlas.pack",
-        "media.raster",
         "evidence.bundle",
-        ...(request.delivery.godotProjectPath ? ["godot.export"] : []),
+        ...(godotPayload
+          ? ["godot.spriteframes-build", "godot.export"]
+          : []),
       ],
       outputBindings: [
         {
           role: atlasImageRole,
           source: "output-artifact-labels",
           labels: {
-            artifactRole: "atlas-image",
+            artifactRole: "verified-family-atlas-image",
+            atlasId,
             qualityState: "passed",
           },
           cardinality: "one",
@@ -1680,8 +1717,8 @@ export function compileTwoStageAnimationClip(
           role: atlasDataRole,
           source: "output-artifact-labels",
           labels: {
-            artifactRole: "atlas-data",
-            qualityState: "passed",
+            artifactRole: "verified-family-atlas-data",
+            atlasId,
           },
           cardinality: "one",
           required: true,
@@ -1690,20 +1727,33 @@ export function compileTwoStageAnimationClip(
           role: atlasEvidenceRole,
           source: "output-artifact-labels",
           labels: {
-            artifactRole: "atlas-evidence",
+            artifactRole: "verified-family-atlas-evidence",
+            atlasId,
             qualityState: "passed",
           },
           cardinality: "one",
           required: true,
         },
-        ...(request.delivery.godotProjectPath
+        {
+          role: deliveryEvidenceRole,
+          source: "output-artifact-labels",
+          labels: {
+            artifactRole: "verified-family-delivery-evidence",
+            atlasId,
+            qualityState: "passed",
+            releaseReady: "true",
+          },
+          cardinality: "one",
+          required: true,
+        },
+        ...(godotPayload
           ? [
               {
                 role: godotDescriptorRole,
                 source: "output-artifact-labels" as const,
                 labels: {
-                  artifactRole: "godot-descriptor",
-                  qualityState: "passed",
+                  artifactRole: "godot-spriteframes-descriptor",
+                  atlasId,
                 },
                 cardinality: "one" as const,
                 required: true,
@@ -1712,18 +1762,37 @@ export function compileTwoStageAnimationClip(
                 role: godotImporterRole,
                 source: "output-artifact-labels" as const,
                 labels: {
-                  artifactRole: "godot-importer",
-                  qualityState: "passed",
+                  artifactRole: "godot-spriteframes-importer",
+                  atlasId,
                 },
                 cardinality: "one" as const,
                 required: true,
               },
+              ...(godotPayload.runImporter
+                ? [
+                    {
+                      role: godotResourceRole,
+                      source: "output-artifact-labels" as const,
+                      labels: {
+                        artifactRole: "godot-spriteframes-resource",
+                        atlasId,
+                        qualityState: "passed",
+                      },
+                      cardinality: "one" as const,
+                      required: true,
+                    },
+                  ]
+                : []),
             ]
           : []),
       ],
       maximumAttempts: 1,
       failurePolicy: {
-        reviewCodePrefixes: ["SPRITE_ATLAS_", "GODOT_", "ATLAS_FAMILY_"],
+        reviewCodePrefixes: [
+          "SPRITE_FAMILY_DELIVERY_",
+          "SPRITE_ATLAS_",
+          "GODOT_",
+        ],
         maxRedrives: 0,
         reviewOnUnclassified: true,
       },
@@ -1791,10 +1860,18 @@ export function compileTwoStageAnimationClip(
         familyEvidenceRole,
         familyManifestRole,
         ...(request.delivery
-          ? [atlasImageRole, atlasDataRole, atlasEvidenceRole]
+          ? [
+              atlasImageRole,
+              atlasDataRole,
+              atlasEvidenceRole,
+              deliveryEvidenceRole,
+            ]
           : []),
         ...(request.delivery?.godotProjectPath
           ? [godotDescriptorRole, godotImporterRole]
+          : []),
+        ...(request.delivery?.runGodotImporter === true
+          ? [godotResourceRole]
           : []),
       ],
     },
@@ -1840,6 +1917,7 @@ export function compileTwoStageAnimationClip(
           atlasImageRole,
           atlasDataRole,
           atlasEvidenceRole,
+          deliveryEvidenceRole,
         }
       : {}),
     ...(request.delivery?.godotProjectPath
@@ -1847,6 +1925,9 @@ export function compileTwoStageAnimationClip(
           godotDescriptorRole,
           godotImporterRole,
         }
+      : {}),
+    ...(request.delivery?.runGodotImporter === true
+      ? { godotResourceRole }
       : {}),
     supervisorRequest,
     supervisorWorkflow,
