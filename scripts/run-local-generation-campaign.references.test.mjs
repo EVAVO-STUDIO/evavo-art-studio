@@ -169,3 +169,78 @@ test('sprite direction-master may establish the master without a prior canonical
   assert.deepEqual(scene.references, []);
 });
 
+
+
+test('Draw Things backend routes only reviewed DrawThingsSampler profiles', () => {
+  const input = campaign([]);
+  input.provider = {
+    backend: 'draw-things',
+    baseUrl: 'http://127.0.0.1:8193',
+    catalogPath: 'C:\\temp\\draw-things-catalog.json',
+    adapterId: 'draw-things:test-reference-profile',
+  };
+  const validated = validateLocalGenerationCampaign(input, {});
+  assert.equal(validated.provider.backend, 'draw-things');
+  assert.equal(validated.provider.baseUrl, 'http://127.0.0.1:8193');
+
+  const scene = validated.scenes[0];
+  const required = requiredCapabilityProfile(scene);
+  const drawThingsProfile = {
+    profileId: 'test-reference-profile',
+    modelId: 'draw-things-test-model',
+    priority: 200,
+    operations: ['generate'],
+    assetKinds: ['illustration'],
+    continuityPhases: ['key-pose'],
+    capabilities: required,
+    limits: { maximumCandidates: 4, maximumReferenceImages: 4 },
+    nodeInventory: [{ nodeId: '1', classType: 'DrawThingsSampler' }],
+  };
+  const ordinaryProfile = {
+    ...drawThingsProfile,
+    profileId: 'ordinary-comfy',
+    nodeInventory: [{ nodeId: '1', classType: 'KSampler' }],
+  };
+
+  const route = routeScene(
+    { profiles: [ordinaryProfile, drawThingsProfile] },
+    scene,
+    'draw-things',
+  );
+  assert.equal(route.adapterId, 'draw-things:test-reference-profile');
+  assert.equal(route.modelId, 'draw-things-test-model');
+});
+
+test('Draw Things campaign rejects ComfyUI adapter identity', () => {
+  const input = campaign([]);
+  input.provider = {
+    backend: 'draw-things',
+    baseUrl: 'http://127.0.0.1:8193',
+    catalogPath: 'C:\\temp\\draw-things-catalog.json',
+    adapterId: 'comfyui:test-reference-profile',
+  };
+  assert.throws(
+    () => validateLocalGenerationCampaign(input, {}),
+    /provider\.adapterId must use draw-things:/u,
+  );
+});
+
+test('ComfyUI backend does not route through DrawThingsSampler profiles', () => {
+  const validated = validateLocalGenerationCampaign(campaign([]), {});
+  const scene = validated.scenes[0];
+  const required = requiredCapabilityProfile(scene);
+  const drawThingsOnly = {
+    profileId: 'test-reference-profile',
+    modelId: 'draw-things-model',
+    operations: ['generate'],
+    assetKinds: ['illustration'],
+    continuityPhases: ['key-pose'],
+    capabilities: required,
+    limits: { maximumCandidates: 4, maximumReferenceImages: 4 },
+    nodeInventory: [{ nodeId: '1', classType: 'DrawThingsSampler' }],
+  };
+  assert.throws(
+    () => routeScene({ profiles: [drawThingsOnly] }, scene),
+    /no reviewed local ComfyUI profile/u,
+  );
+});
