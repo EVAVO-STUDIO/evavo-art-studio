@@ -49,6 +49,10 @@ import {
   createCandidateMasteringHandlers,
 } from "./mastering-handlers.js";
 import {
+  createFamilyDeliveryHandlers,
+  familyDeliveryWorkerCapabilities,
+} from "./family-delivery-handlers.js";
+import {
   createMirroredSpriteFamilyHandlers,
   mirroredSpriteFamilyWorkerCapabilities,
 } from "./mirrored-sprite-family-handlers.js";
@@ -664,6 +668,7 @@ export function createBuiltinHandlers(
     "sprite.atlas.build": atlasBuild,
     ...createProviderHandlers(providerRegistry),
     ...createCandidateMasteringHandlers(),
+    ...createFamilyDeliveryHandlers(allowedRoots),
     ...createDeterministicMirrorAwareFinalizerHandlers(),
     ...createCandidateSelectionHandlers(),
     ...createMirroredSpriteFamilyHandlers(),
@@ -716,6 +721,8 @@ async function main(): Promise<void> {
   const masteringCapabilities = candidateMasteringWorkerCapabilities();
   const adaptiveCapabilities =
     deterministicMirrorAwareFinalizerWorkerCapabilities();
+  const familyDeliveryCapabilities =
+    familyDeliveryWorkerCapabilities();
   const selectionCapabilities = candidateSelectionWorkerCapabilities();
   const familyCapabilities = mirroredSpriteFamilyWorkerCapabilities();
   const repairCapabilities = targetedRepairWorkerCapabilities(providerRegistry);
@@ -743,6 +750,7 @@ async function main(): Promise<void> {
         "evidence.bundle",
         ...supervisorCapabilities,
         ...masteringCapabilities,
+        ...familyDeliveryCapabilities,
         ...adaptiveCapabilities,
         ...selectionCapabilities,
         ...familyCapabilities,
