@@ -610,7 +610,68 @@ function validateApprovedPolicy(value) {
       ...(typeof entry.notes === "string" && entry.notes.trim() ? { notes: entry.notes.trim() } : {}),
     };
   });
-  return { schema: POLICY_SCHEMA, policyId, reviewedBy, reviewedAt, models };
+  const rawControls = policy.controls ?? [];
+  if (!Array.isArray(rawControls) || rawControls.length > 64) {
+    fail("policy.controls must contain at most 64 entries");
+  }
+  const controls = rawControls.map((raw, index) => {
+    const entry = object(raw, `policy.controls[${index}]`);
+    const id = safeId(entry.id, `policy.controls[${index}].id`);
+    if (ids.has(id)) fail(`duplicate policy asset id ${id}`);
+    ids.add(id);
+    const license = object(entry.license, `policy.controls[${index}].license`);
+    for (const field of ["commercialUse", "derivatives", "redistribution"]) {
+      if (!new Set(["allowed", "restricted", "unknown", "prohibited"]).has(license[field])) {
+        fail(`policy.controls[${index}].license.${field} is unsupported`);
+      }
+    }
+    if (!Array.isArray(entry.approvedRoles) || !entry.approvedRoles.length) {
+      fail(`policy.controls[${index}].approvedRoles must be non-empty`);
+    }
+    const approvedRoles = [...new Set(entry.approvedRoles.map((role, roleIndex) =>
+      text(role, `policy.controls[${index}].approvedRoles[${roleIndex}]`, 64),
+    ))].sort();
+    const allowedRoles = new Set([
+      "pose-control",
+      "edge-control",
+      "depth-control",
+      "palette-reference",
+      "line-reference",
+      "material-reference",
+    ]);
+    if (approvedRoles.some((role) => !allowedRoles.has(role))) {
+      fail(`policy.controls[${index}].approvedRoles contains unsupported roles`);
+    }
+    if (!Array.isArray(entry.compatibleModelIds) || !entry.compatibleModelIds.length) {
+      fail(`policy.controls[${index}].compatibleModelIds must be non-empty`);
+    }
+    const compatibleModelIds = [...new Set(entry.compatibleModelIds.map((modelId, modelIndex) =>
+      safeId(modelId, `policy.controls[${index}].compatibleModelIds[${modelIndex}]`),
+    ))].sort();
+    const minimumVramGb = entry.minimumVramGb;
+    if (typeof minimumVramGb !== "number" || !Number.isFinite(minimumVramGb) || minimumVramGb < 0 || minimumVramGb > 64) {
+      fail(`policy.controls[${index}].minimumVramGb must be a finite number in [0, 64]`);
+    }
+    const priority = entry.priority;
+    if (!Number.isInteger(priority) || priority < -1000 || priority > 1000) {
+      fail(`policy.controls[${index}].priority must be an integer in [-1000, 1000]`);
+    }
+    return {
+      id,
+      inventoryName: text(entry.inventoryName, `policy.controls[${index}].inventoryName`, 512),
+      inventoryFile: text(entry.inventoryFile, `policy.controls[${index}].inventoryFile`, 1024),
+      version: text(entry.version, `policy.controls[${index}].version`, 256),
+      expectedFiles: validateExpectedFiles(entry.expectedFiles, `policy.controls[${index}].expectedFiles`),
+      source: canonical(object(entry.source, `policy.controls[${index}].source`)),
+      license: canonical(license),
+      approvedRoles,
+      compatibleModelIds,
+      minimumVramGb,
+      priority,
+      ...(typeof entry.notes === "string" && entry.notes.trim() ? { notes: entry.notes.trim() } : {}),
+    };
+  });
+  return { schema: POLICY_SCHEMA, policyId, reviewedBy, reviewedAt, models, controls };
 }
 
 function componentMap(model) {
@@ -676,6 +737,54 @@ export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
     fail("no approved policy model matches the exact current Draw Things inventory");
   }
   models.sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
+
+  const controls = [];
+  for (const policyControl of policy.controls) {
+    const observed = inventory.controls.find(
+      (control) =>
+        control.name === policyControl.inventoryName &&
+        control.file === policyControl.inventoryFile &&
+        control.version === policyControl.version,
+    );
+    if (!observed) continue;
+    const components = componentMap(observed);
+    const expected = new Map(policyControl.expectedFiles.map((entry) => [entry.name, entry.sha256]));
+    for (const [name, expectedSha] of expected) {
+      if (components.get(name) !== expectedSha) {
+        fail(`policy control ${policyControl.id} expected exact file ${name} with SHA-256 ${expectedSha}, but current inventory differs`);
+      }
+    }
+    const unexpected = [...components.keys()].filter((name) => !expected.has(name));
+    if (unexpected.length) {
+      fail(`policy control ${policyControl.id} contains unreviewed physical components: ${unexpected.join(", ")}`);
+    }
+    if (policyControl.license.commercialUse !== "allowed") {
+      fail(`control ${policyControl.id} is not approved for commercial use`);
+    }
+    if (policyControl.license.derivatives === "prohibited") {
+      fail(`control ${policyControl.id} prohibits derivative use`);
+    }
+    controls.push({
+      id: policyControl.id,
+      inventoryName: policyControl.inventoryName,
+      inventoryFile: policyControl.inventoryFile,
+      version: policyControl.version,
+      bundleSha256: sha(observed.bundleSha256, `inventory control ${policyControl.id}.bundleSha256`),
+      expectedFiles: policyControl.expectedFiles,
+      source: policyControl.source,
+      license: policyControl.license,
+      approvedRoles: policyControl.approvedRoles,
+      compatibleModelIds: policyControl.compatibleModelIds,
+      minimumVramGb: policyControl.minimumVramGb,
+      priority: policyControl.priority,
+      policyId: policy.policyId,
+      policySha256: policyDigest,
+      reviewedBy: policy.reviewedBy,
+      reviewedAt: policy.reviewedAt,
+      ...(policyControl.notes ? { notes: policyControl.notes } : {}),
+    });
+  }
+  controls.sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
   return {
     schema: GOVERNANCE_SCHEMA,
     policyId: policy.policyId,
@@ -683,6 +792,7 @@ export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
     reviewedBy: policy.reviewedBy,
     reviewedAt: policy.reviewedAt,
     models,
+    controls,
   };
 }
 
