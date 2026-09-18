@@ -1424,9 +1424,6 @@ export function compileTwoStageAnimationClip(
   const inBetweenBatches = request.plan.generationBatches.filter(
     (batch) => batch.phase === "in-between",
   );
-  if (!inBetweenBatches.length) {
-    fail("Animation Director plan contains no in-between batches");
-  }
 
   const keyRequest = batchRequestForClip(request, keyBatch.id, undefined);
   const verifiedKeys = verifiedBatch(keyRequest);
