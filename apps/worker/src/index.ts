@@ -539,6 +539,7 @@ export function createBuiltinHandlers(
       await ingestFile(context, atlas.imagePath, "image/png", "runtime", {
         atlasId: atlas.packageData.atlasId,
         artifactRole: "atlas-image",
+        qualityState: "passed",
         ...(familyBinding
           ? { familyEvidenceArtifactId: familyBinding.familyEvidenceArtifactId }
           : {}),
@@ -587,7 +588,9 @@ export function createBuiltinHandlers(
           {
             atlasId: atlas.packageData.atlasId,
             artifactRole: "godot-descriptor",
+            qualityState: "passed",
           },
+          atlasSourceArtifacts,
         ),
         await ingestFile(
           context,
@@ -597,7 +600,9 @@ export function createBuiltinHandlers(
           {
             atlasId: atlas.packageData.atlasId,
             artifactRole: "godot-importer",
+            qualityState: "passed",
           },
+          atlasSourceArtifacts,
         ),
       );
     }
