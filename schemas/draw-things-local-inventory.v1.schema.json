@@ -11,14 +11,30 @@
     "grpcEndpoint",
     "installManifestSha256",
     "models",
+    "controls",
     "rawCategoryCounts"
   ],
   "properties": {
-    "schema": { "const": "evavo.draw-things-local-inventory.v1" },
-    "capturedAt": { "type": "string", "format": "date-time" },
-    "bridgeEndpoint": { "type": "string", "format": "uri" },
-    "grpcEndpoint": { "type": "string", "minLength": 1, "maxLength": 512 },
-    "installManifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "schema": {
+      "const": "evavo.draw-things-local-inventory.v1"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "bridgeEndpoint": {
+      "type": "string",
+      "format": "uri"
+    },
+    "grpcEndpoint": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "installManifestSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "models": {
       "type": "array",
       "maxItems": 512,
@@ -36,12 +52,33 @@
           "model"
         ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
-          "name": { "type": "string", "minLength": 1, "maxLength": 512 },
-          "file": { "type": "string", "minLength": 1, "maxLength": 1024 },
-          "version": { "type": "string", "minLength": 1, "maxLength": 256 },
-          "bundleSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-          "metadataSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "bundleSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "metadataSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
           "components": {
             "type": "array",
             "minItems": 1,
@@ -49,21 +86,119 @@
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["relativePath", "sizeBytes", "sha256"],
+              "required": [
+                "relativePath",
+                "sizeBytes",
+                "sha256"
+              ],
               "properties": {
-                "relativePath": { "type": "string", "minLength": 1, "maxLength": 2048 },
-                "sizeBytes": { "type": "integer", "minimum": 1 },
-                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                "relativePath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
               }
             }
           },
-          "model": { "type": "object" }
+          "model": {
+            "type": "object"
+          }
         }
       }
     },
     "rawCategoryCounts": {
       "type": "object",
-      "additionalProperties": { "type": "integer", "minimum": 0 }
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "controls": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "file",
+          "version",
+          "bundleSha256",
+          "metadataSha256",
+          "components",
+          "model"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "bundleSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "metadataSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "components": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "relativePath",
+                "sizeBytes",
+                "sha256"
+              ],
+              "properties": {
+                "relativePath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          },
+          "model": {
+            "type": "object"
+          }
+        }
+      }
     }
   }
 }
