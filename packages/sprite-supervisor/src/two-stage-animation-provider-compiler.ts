@@ -465,6 +465,72 @@ function selectionPolicy(): JsonValue {
   });
 }
 
+function identitySelectionPolicy(): JsonValue {
+  return normalizeJson({
+    profile: "custom",
+    allowAutomaticSelection: true,
+    requireReferenceLineage: false,
+    requireQualityPassed: true,
+    allowedCandidateRoles: ["provider-candidate-alpha-master"],
+    alphaVisibleThreshold: 8,
+    maximumTranslationPixels: 12,
+    maximumEdgeDistancePixels: 24,
+    minimumOverallScore: 0.5,
+    minimumWinnerMargin: 0,
+    metrics: [
+      {
+        id: "palette-similarity",
+        weight: 0.3,
+        minimum: 0.42,
+        blocking: true,
+      },
+      {
+        id: "visible-area-similarity",
+        weight: 0.2,
+        minimum: 0.42,
+        blocking: true,
+      },
+      {
+        id: "luminance-similarity",
+        weight: 0.15,
+        minimum: 0.35,
+        blocking: false,
+      },
+      {
+        id: "bounds-aspect-similarity",
+        weight: 0.1,
+        minimum: 0.42,
+        blocking: false,
+      },
+      {
+        id: "centroid-similarity",
+        weight: 0.1,
+        minimum: 0.4,
+        blocking: false,
+      },
+      {
+        id: "edge-similarity",
+        weight: 0.05,
+        minimum: 0.2,
+        blocking: false,
+      },
+      {
+        id: "silhouette-iou",
+        weight: 0.05,
+        minimum: 0.15,
+        blocking: false,
+      },
+      {
+        id: "overlap-colour-similarity",
+        weight: 0.05,
+        minimum: 0.2,
+        blocking: false,
+      },
+    ],
+    externalEvidence: [],
+  });
+}
+
 function promotionNamespace(
   request: TwoStageAnimationProviderBatchCompileRequest,
   frameId: string,
@@ -609,13 +675,22 @@ function tasksForFrame(
   const structuralRole = artifactRole("structural-raw", frameId);
   const structuralMasterRole = artifactRole("structural-master", frameId);
   const finalMasteredRole = artifactRole("final-mastered", frameId);
-  const selectionEvidenceRole = artifactRole("selection-evidence", frameId);
-  const selectedRole = artifactRole("selected", frameId);
+  const poseSelectionEvidenceRole = artifactRole(
+    "pose-selection-evidence",
+    frameId,
+  );
+  const poseSelectedRole = artifactRole("pose-selected", frameId);
+  const identitySelectionEvidenceRole = artifactRole(
+    "identity-selection-evidence",
+    frameId,
+  );
+  const selectedRole = artifactRole("identity-selected", frameId);
   const finalMasterRole = artifactRole("frame-master", frameId);
 
   const structuralTaskId = taskToken("structure", frameId);
   const structuralMasterTaskId = taskToken("structure-master", frameId);
-  const selectionTaskId = taskToken("select", frameId);
+  const selectionTaskId = taskToken("pose-select", frameId);
+  const identitySelectionTaskId = taskToken("identity-select", frameId);
   const promotionTaskId = taskToken("promote", frameId);
   const tasks: SpriteSupervisorTaskInput[] = [];
 
@@ -848,7 +923,68 @@ function tasksForFrame(
     requiredCapabilities: ["selection.compare", "evidence.bundle"],
     outputBindings: [
       {
-        role: selectionEvidenceRole,
+        role: poseSelectionEvidenceRole,
+        source: "runtime-result-json",
+        pointer: "/evidenceArtifactId",
+        cardinality: "one",
+        required: true,
+      },
+      {
+        role: poseSelectedRole,
+        source: "runtime-result-json",
+        pointer: "/evidence/selectedCandidateArtifactId",
+        cardinality: "one",
+        required: true,
+      },
+    ],
+    maximumAttempts: 1,
+    failurePolicy: {
+      reviewCodePrefixes: ["CANDIDATE_SELECTION_"],
+      maxRedrives: 0,
+      reviewOnUnclassified: true,
+    },
+  });
+
+  const identityReference =
+    referenceByRole(finalProxy, "direction-master") ??
+    referenceByRole(finalProxy, "canonical-identity");
+  if (!identityReference) {
+    fail("final refinement request has no identity reference for " + frameId);
+  }
+  tasks.push({
+    id: identitySelectionTaskId,
+    stage: "family-verification",
+    title: "Verify identity/style lock for " + frameId,
+    queue: "selection",
+    kind: "art.candidate.select",
+    dependencyTaskIds: [selectionTaskId],
+    requiredArtifactRoles: [poseSelectedRole],
+    staticInputArtifacts: [identityReference.artifactId],
+    payloadTemplate: normalizeJson({
+      schemaVersion: "1.0",
+      selectionId: token(
+        "two-stage-identity-" + shortHash(frameId),
+        128,
+      ),
+      candidateArtifactIds: { $artifacts: poseSelectedRole },
+      referenceArtifactId: identityReference.artifactId,
+      referenceRole:
+        identityReference.role === "direction-master"
+          ? "direction-identity-lock"
+          : "canonical-identity-lock",
+      policy: identitySelectionPolicy(),
+      metadata: {
+        compilerVersion: TWO_STAGE_ANIMATION_PROVIDER_COMPILER_VERSION,
+        frameId,
+        clipId: request.plan.clipId,
+        batchId: request.batchId,
+        gate: "identity-style",
+      },
+    }),
+    requiredCapabilities: ["selection.compare", "evidence.bundle"],
+    outputBindings: [
+      {
+        role: identitySelectionEvidenceRole,
         source: "runtime-result-json",
         pointer: "/evidenceArtifactId",
         cardinality: "one",
@@ -876,12 +1012,14 @@ function tasksForFrame(
     title: "Promote selected two-stage frame master for " + frameId,
     queue: "selection",
     kind: "art.candidate.promote",
-    dependencyTaskIds: [selectionTaskId],
-    requiredArtifactRoles: [selectionEvidenceRole, selectedRole],
+    dependencyTaskIds: [identitySelectionTaskId],
+    requiredArtifactRoles: [identitySelectionEvidenceRole, selectedRole],
     payloadTemplate: normalizeJson({
       schemaVersion: "1.0",
       promotionId: token("two-stage-promote-" + shortHash(frameId), 128),
-      selectionEvidenceArtifactId: { $artifact: selectionEvidenceRole },
+      selectionEvidenceArtifactId: {
+        $artifact: identitySelectionEvidenceRole,
+      },
       candidateArtifactId: { $artifact: selectedRole },
       target: {
         namespace: promotionNamespace(request, frameId),
@@ -937,6 +1075,7 @@ function tasksForFrame(
         ...finalTaskIds,
         ...finalMasterTaskIds,
         selectionTaskId,
+        identitySelectionTaskId,
         promotionTaskId,
       ],
     },
