@@ -5,6 +5,9 @@ import {
   buildDrawThingsCatalogDraft,
   governanceFromPolicy,
 } from "./draw-things-local-models.mjs";
+import {
+  compileComfyUIWorkflowCatalog,
+} from "../packages/providers/dist/index.js";
 
 const SHA_A = "a".repeat(64);
 const SHA_B = "b".repeat(64);
@@ -493,7 +496,7 @@ test("all governed models get one canonical identity reference profile", () => {
     (profile) => profile.profileId === "dt-fixture-xl-generate-identity-ref",
   );
   assert.ok(identity);
-  assert.equal(identity.priority, -1);
+  assert.equal(identity.priority, 169);
   assert.equal(identity.workflow["5"].class_type, "LoadImage");
   assert.deepEqual(identity.workflow["3"].inputs.image, ["5", 0]);
   assert.equal(identity.workflow["3"].inputs.strength, 0.55);
@@ -615,4 +618,46 @@ test("reference profiles stay below their no-reference base route priority", () 
   assert.equal(byId.get("dt-fixture-xl-generate-identity-ref").priority, 49);
   assert.equal(byId.get("dt-fixture-xl-generate-direction-ref").priority, 48);
   assert.equal(byId.get("dt-fixture-xl-generate-temporal-ref").priority, 47);
+});
+
+
+test("generated Kontext reference profiles compile through the real governed catalog validator", () => {
+  const kontextInventory = inventory({
+    model: {
+      name: "Fixture XL",
+      file: "fixture_xl.safetensors",
+      version: "sdxl",
+      prefix: "",
+      modifier: "kontext",
+    },
+  });
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: kontextInventory,
+    governance: governance({
+      priority: 220,
+      generationDefaults: policy().models[0].generationDefaults,
+    }),
+    install: install(),
+  });
+  const compiled = compileComfyUIWorkflowCatalog(draft);
+  assert.equal(compiled.profiles.length, 4);
+  const temporal = compiled.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-temporal-ref",
+  );
+  assert.ok(temporal);
+  assert.ok(temporal.capabilities.includes("identity-reference"));
+  assert.ok(temporal.capabilities.includes("temporal-reference"));
+  assert.ok(temporal.capabilities.includes("multiple-reference-images"));
+  assert.deepEqual(
+    temporal.bindings.referenceImages.map((reference) => reference.role),
+    ["canonical-identity", "previous-key-pose", "next-key-pose"],
+  );
+  assert.ok(
+    temporal.nodeInventory.some(
+      (node) => node.classType === "DrawThingsHints",
+    ),
+  );
+  assert.ok(
+    temporal.nodeInventory.filter((node) => node.classType === "LoadImage").length === 3,
+  );
 });
