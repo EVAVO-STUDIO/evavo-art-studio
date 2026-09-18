@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildDrawThingsCatalogDraft,
+  governanceFromPolicy,
 } from "./draw-things-local-models.mjs";
 
 const SHA_A = "a".repeat(64);
@@ -270,4 +271,202 @@ test("generated sampler pins all governance-sensitive endpoints and model metada
     "color_calibration",
   ];
   for (const key of required) assert.ok(Object.hasOwn(sampler, key), key);
+});
+
+
+function policy(overrides = {}) {
+  return {
+    schema: "evavo.draw-things-approved-model-policy.v1",
+    policyId: "fixture-policy",
+    reviewedBy: "EVAVO Studio",
+    reviewedAt: "2026-09-18T03:47:00.000Z",
+    models: [
+      {
+        id: "fixture-xl",
+        inventoryName: "Fixture XL",
+        inventoryFile: "fixture_xl.safetensors",
+        version: "sdxl",
+        expectedFiles: [
+          {
+            name: "fixture_xl.safetensors",
+            sha256: "1".repeat(64),
+          },
+        ],
+        source: {
+          publisher: "Fixture Publisher",
+          url: "https://example.com/model",
+        },
+        license: {
+          id: "fixture-open-license",
+          name: "Fixture Open License",
+          url: "https://example.com/license",
+          commercialUse: "allowed",
+          derivatives: "allowed",
+          redistribution: "restricted",
+        },
+        approvedUses: ["illustration", "sprite", "environment"],
+        generationDefaults: {
+          steps: 7,
+          cfg: 2.5,
+          samplerName: "DDIM Trailing",
+          seedMode: "ScaleAlike",
+          clipSkip: 2,
+          shift: 3,
+          resolutionDependentShift: false,
+          speedUp: true,
+          teaCache: false,
+          teaCacheThreshold: 0.3,
+          teaCacheStart: 5,
+          teaCacheEnd: -1,
+          teaCacheMaxSkipSteps: 3,
+        },
+        priority: 220,
+        resourceClass: "quality",
+        ...overrides,
+      },
+    ],
+  };
+}
+
+test("reviewed policy binds exact current physical files into generated governance", () => {
+  const result = governanceFromPolicy(
+    inventory(),
+    policy(),
+    "9".repeat(64),
+  );
+  assert.equal(result.policyId, "fixture-policy");
+  assert.equal(result.policySha256, "9".repeat(64));
+  assert.equal(result.models.length, 1);
+  assert.equal(result.models[0].bundleSha256, BUNDLE);
+  assert.equal(result.models[0].priority, 220);
+  assert.equal(result.models[0].resourceClass, "quality");
+  assert.equal(result.models[0].generationDefaults.steps, 7);
+  assert.equal(result.models[0].generationDefaults.samplerName, "DDIM Trailing");
+});
+
+test("reviewed policy rejects an unexpected tensor sidecar until it is explicitly reviewed", () => {
+  const input = inventory({
+    components: [
+      {
+        relativePath: "fixture_xl.safetensors",
+        sizeBytes: 1024,
+        sha256: "1".repeat(64),
+      },
+      {
+        relativePath: "fixture_xl.safetensors-tensordata",
+        sizeBytes: 4096,
+        sha256: "2".repeat(64),
+      },
+    ],
+  });
+  assert.throws(
+    () => governanceFromPolicy(input, policy(), "9".repeat(64)),
+    /unreviewed physical components/u,
+  );
+});
+
+test("reviewed policy rejects dependency hash drift", () => {
+  const input = inventory({
+    components: [
+      {
+        relativePath: "fixture_xl.safetensors",
+        sizeBytes: 1024,
+        sha256: "3".repeat(64),
+      },
+    ],
+  });
+  assert.throws(
+    () => governanceFromPolicy(input, policy(), "9".repeat(64)),
+    /current inventory differs/u,
+  );
+});
+
+test("model-specific governance defaults control the Draw Things sampler", () => {
+  const generated = governanceFromPolicy(
+    inventory(),
+    policy(),
+    "9".repeat(64),
+  );
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: inventory(),
+    governance: generated,
+    install: install(),
+  });
+  const sampler = draft.profiles[0].workflow["3"].inputs;
+  assert.equal(sampler.steps, 7);
+  assert.equal(sampler.cfg, 2.5);
+  assert.equal(sampler.sampler_name, "DDIM Trailing");
+  assert.equal(sampler.seed_mode, "ScaleAlike");
+  assert.equal(sampler.clip_skip, 2);
+  assert.equal(sampler.shift, 3);
+  assert.equal(sampler.res_dpt_shift, false);
+  assert.equal(sampler.speed_up, true);
+  assert.equal(sampler.tea_cache_end, -1);
+  assert.equal(draft.profiles[0].priority, 220);
+});
+
+test("catalog carries multiple governed models and sorts them by routing priority", () => {
+  const firstInventory = inventory().models[0];
+  const secondInventory = {
+    ...structuredClone(firstInventory),
+    id: "dt-fallback",
+    name: "Fixture Fallback",
+    file: "fallback.ckpt",
+    version: "fallback",
+    bundleSha256: "4".repeat(64),
+    metadataSha256: "5".repeat(64),
+    components: [
+      {
+        relativePath: "fallback.ckpt",
+        sizeBytes: 2048,
+        sha256: "6".repeat(64),
+      },
+    ],
+    model: {
+      name: "Fixture Fallback",
+      file: "fallback.ckpt",
+      version: "fallback",
+      prefix: "",
+    },
+  };
+  const multiInventory = {
+    ...inventory(),
+    models: [firstInventory, secondInventory],
+    rawCategoryCounts: { models: 2 },
+  };
+  const primary = governance({
+    priority: 220,
+    generationDefaults: policy().models[0].generationDefaults,
+  }).models[0];
+  const fallback = {
+    ...structuredClone(primary),
+    id: "fixture-fallback",
+    inventoryName: "Fixture Fallback",
+    inventoryFile: "fallback.ckpt",
+    version: "fallback",
+    bundleSha256: "4".repeat(64),
+    priority: 100,
+    generationDefaults: {
+      ...policy().models[0].generationDefaults,
+      steps: 16,
+      cfg: 5,
+      samplerName: "DPM++ 2M AYS",
+    },
+  };
+  const { draft, governanceEvidence } = buildDrawThingsCatalogDraft({
+    inventory: multiInventory,
+    governance: {
+      schema: "evavo.draw-things-model-governance.v1",
+      models: [fallback, primary],
+    },
+    install: install(),
+  });
+  assert.equal(draft.profiles.length, 2);
+  assert.equal(draft.profiles[0].modelId, "fixture-xl");
+  assert.equal(draft.profiles[0].priority, 220);
+  assert.equal(draft.profiles[0].workflow["3"].inputs.steps, 7);
+  assert.equal(draft.profiles[1].modelId, "fixture-fallback");
+  assert.equal(draft.profiles[1].priority, 100);
+  assert.equal(draft.profiles[1].workflow["3"].inputs.steps, 16);
+  assert.equal(governanceEvidence.models.length, 2);
 });
