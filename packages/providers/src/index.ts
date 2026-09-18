@@ -6,6 +6,7 @@ export * from "./contract.js";
 export * from "./provider-provenance.js";
 export * from "./adapters/fixture.js";
 export * from "./adapters/comfyui.js";
+export * from "./adapters/draw-things-comfyui.js";
 export {
   OpenAIImageProviderAdapter,
   openAIImageSourceSize,
