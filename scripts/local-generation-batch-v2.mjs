@@ -264,10 +264,23 @@ export function validateLocalGenerationBatch(input) {
     seedBump: integer(retryRaw.seedBump ?? 1009, 'retry_rules.seedBump', 1, 10000000),
   });
   const providerRaw = obj(manifest.provider ?? {}, 'provider');
+  const backend = providerRaw.backend ?? 'comfyui';
+  if (!['comfyui', 'draw-things'].includes(backend)) {
+    fail('provider.backend must be comfyui or draw-things');
+  }
+  const adapterId = providerRaw.adapterId ?? null;
+  if (
+    adapterId != null &&
+    (typeof adapterId !== 'string' ||
+      !adapterId.startsWith(backend === 'draw-things' ? 'draw-things:' : 'comfyui:'))
+  ) {
+    fail(`provider.adapterId must match provider.backend ${backend}`);
+  }
   const provider = Object.freeze({
+    backend,
     baseUrl: providerRaw.baseUrl ?? null,
     catalogPath: providerRaw.catalogPath ?? null,
-    adapterId: providerRaw.adapterId ?? null,
+    adapterId,
   });
   return Object.freeze({
     schema: LOCAL_GENERATION_BATCH_SCHEMA,
@@ -331,6 +344,7 @@ export function compileLegacyManifest(plan, frames = plan.frames, attempt = 1) {
       description: plan.character.description,
     },
     provider: {
+      backend: plan.provider.backend ?? 'comfyui',
       ...(plan.provider.baseUrl ? { baseUrl: plan.provider.baseUrl } : {}),
       ...(plan.provider.catalogPath ? { catalogPath: plan.provider.catalogPath } : {}),
       ...(plan.provider.adapterId ? { adapterId: plan.provider.adapterId } : {}),
