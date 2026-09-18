@@ -19,13 +19,21 @@ import {
 } from "@evavo/art-quality";
 import { assertPathWithinAllowedRoots, inspectRepository } from "@evavo/art-repo-inspector";
 
+import { registerArtDirectionTools } from "./art-direction-tools.js";
+import { registerArtProductionTools } from "./art-production-tools.js";
 import { registerBookArtTools } from "./book-art-tools.js";
 import { registerBookCreativeDirectionTools } from "./book-creative-direction-tools.js";
 import { registerBookCreativeProgrammeRuntimeTools } from "./book-creative-programme-runtime-tools.js";
+import { registerLayeredGodotTools } from "./layered-godot-tools.js";
+import { registerLocalGenerationBatchTools } from "./local-generation-batch-tools.js";
+import { registerLocalGenerationTools } from "./local-generation-tools.js";
 import { registerProviderTools } from "./provider-tools.js";
 import { registerRuntimeTools } from "./runtime-tools.js";
 import { registerSelectionTools } from "./selection-tools.js";
+import { registerRepairTools } from "./repair-tools.js";
 import { registerSpriteFamilyTools } from "./sprite-family-tools.js";
+import { registerSpritePlanTools } from "./sprite-plan-tools.js";
+import { registerSpriteSupervisorTools } from "./sprite-supervisor-tools.js";
 
 const server = new McpServer({
   name: "evavo-art-studio",
@@ -34,6 +42,14 @@ const server = new McpServer({
 
 registerRuntimeTools(server);
 registerProviderTools(server);
+registerArtDirectionTools(server);
+registerArtProductionTools(server);
+registerSpritePlanTools(server);
+registerSpriteSupervisorTools(server);
+registerRepairTools(server);
+registerLayeredGodotTools(server);
+registerLocalGenerationTools(server);
+registerLocalGenerationBatchTools(server);
 registerBookArtTools(server);
 registerBookCreativeDirectionTools(server);
 registerBookCreativeProgrammeRuntimeTools(server);
