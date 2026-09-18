@@ -752,7 +752,7 @@ test("full-clip graph remains local-only at every provider task", async () => {
 });
 
 
-test("full-clip delivery chains verified family artifacts into atlas packaging", async () => {
+test("full-clip delivery consumes verified family artifacts without filesystem input paths", async () => {
   const batch = await request("hero-walk-right:keys");
   const {
     batchId: _batchId,
@@ -765,53 +765,152 @@ test("full-clip delivery chains verified family artifacts into atlas packaging",
     keyPoseCandidatesPerFrame: 1,
     inBetweenCandidatesPerFrame: 1,
     delivery: {
-      outputDirectory: "C:\\EVAVO\\ArtStudio\\deliveries\\hero-walk-right",
       atlasId: "hero-walk-right-atlas",
-      godotProjectPath: "C:\\GitRepos\\game-project",
     },
   });
 
-  const atlasTasks = result.supervisorRequest.tasks.filter(
-    (task) => task.kind === "sprite.atlas.build",
+  const deliveryTasks = result.supervisorRequest.tasks.filter(
+    (task) => task.kind === "sprite.family.deliver",
   );
-  assert.equal(atlasTasks.length, 1);
-  const atlas = atlasTasks[0];
-  assert.deepEqual(atlas.requiredArtifactRoles, [
+  assert.equal(deliveryTasks.length, 1);
+  const delivery = deliveryTasks[0];
+  assert.deepEqual(delivery.requiredArtifactRoles, [
     result.familyManifestRole,
     result.familyEvidenceRole,
     result.familyCompositeRole,
   ]);
-  assert.deepEqual(atlas.payloadTemplate.familyManifestArtifactId, {
+  assert.deepEqual(delivery.payloadTemplate.familyManifestArtifactId, {
     $artifact: result.familyManifestRole,
   });
-  assert.deepEqual(atlas.payloadTemplate.familyEvidenceArtifactId, {
+  assert.deepEqual(delivery.payloadTemplate.familyEvidenceArtifactId, {
     $artifact: result.familyEvidenceRole,
   });
-  assert.equal(atlas.payloadTemplate.atlasId, "hero-walk-right-atlas");
+  assert.deepEqual(delivery.payloadTemplate.familyCompositeArtifactIds, {
+    $artifacts: result.familyCompositeRole,
+  });
   assert.equal(
-    atlas.payloadTemplate.godotProjectPath,
-    "C:\\GitRepos\\game-project",
+    Object.hasOwn(delivery.payloadTemplate, "outputDirectory"),
+    false,
   );
+  assert.equal(delivery.payloadTemplate.atlas.atlasId, "hero-walk-right-atlas");
+  assert.equal(
+    delivery.payloadTemplate.atlas.maximumWidth,
+    result.supervisorRequest.spritePlan.atlas.maximumWidth,
+  );
+  assert.equal(
+    delivery.payloadTemplate.atlas.maximumHeight,
+    result.supervisorRequest.spritePlan.atlas.maximumHeight,
+  );
+  assert.equal(delivery.payloadTemplate.atlas.textureFiltering, "nearest");
+  assert.equal(delivery.payloadTemplate.atlas.loopMode, "linear");
+  assert.equal(delivery.payloadTemplate.godot, undefined);
   assert.ok(result.atlasImageRole);
   assert.ok(result.atlasDataRole);
   assert.ok(result.atlasEvidenceRole);
-  assert.ok(result.godotDescriptorRole);
-  assert.ok(result.godotImporterRole);
+  assert.ok(result.deliveryEvidenceRole);
   assert.ok(
     result.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
-      result.atlasEvidenceRole,
+      result.deliveryEvidenceRole,
     ),
   );
   assert.ok(
-    result.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
-      result.godotDescriptorRole,
-    ),
+    delivery.requiredCapabilities.includes("sprite.family.deliver"),
   );
   assert.ok(
-    atlas.outputBindings.some(
+    delivery.requiredCapabilities.includes("media.atlas-build"),
+  );
+  assert.ok(
+    delivery.outputBindings.some(
       (binding) =>
         binding.role === result.atlasEvidenceRole &&
+        binding.labels.artifactRole === "verified-family-atlas-evidence" &&
+        binding.labels.qualityState === "passed",
+    ),
+  );
+  assert.ok(
+    delivery.outputBindings.some(
+      (binding) =>
+        binding.role === result.deliveryEvidenceRole &&
+        binding.labels.artifactRole === "verified-family-delivery-evidence" &&
+        binding.labels.releaseReady === "true",
+    ),
+  );
+});
+
+test("full-clip Godot delivery is project-scoped and can request native SpriteFrames creation", async () => {
+  const batch = await request("hero-walk-right:keys");
+  const {
+    batchId: _batchId,
+    keyPoseArtifactIds: _keyPoseArtifactIds,
+    finalCandidatesPerFrame: _finalCandidatesPerFrame,
+    ...clipInput
+  } = batch;
+  const result = compileTwoStageAnimationClip({
+    ...clipInput,
+    keyPoseCandidatesPerFrame: 1,
+    inBetweenCandidatesPerFrame: 1,
+    delivery: {
+      atlasId: "hero-walk-right-atlas",
+      godotProjectPath: "C:\\GitRepos\\game-project",
+      godotOutputRelativeDirectory: "generated/evavo-sprites",
+      runGodotImporter: true,
+      godotTimeoutMs: 180000,
+    },
+  });
+
+  const delivery = result.supervisorRequest.tasks.find(
+    (task) => task.kind === "sprite.family.deliver",
+  );
+  assert.ok(delivery);
+  assert.deepEqual(delivery.payloadTemplate.godot, {
+    projectPath: "C:\\GitRepos\\game-project",
+    outputRelativeDirectory: "generated/evavo-sprites",
+    runImporter: true,
+    timeoutMs: 180000,
+  });
+  assert.equal(
+    Object.hasOwn(delivery.payloadTemplate.godot, "godotExecutable"),
+    false,
+  );
+  assert.ok(delivery.requiredCapabilities.includes("godot.spriteframes-build"));
+  assert.ok(delivery.requiredCapabilities.includes("godot.export"));
+  assert.ok(result.godotDescriptorRole);
+  assert.ok(result.godotImporterRole);
+  assert.ok(result.godotResourceRole);
+  assert.ok(
+    result.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
+      result.godotResourceRole,
+    ),
+  );
+  assert.ok(
+    delivery.outputBindings.some(
+      (binding) =>
+        binding.role === result.godotResourceRole &&
+        binding.labels.artifactRole === "godot-spriteframes-resource" &&
         binding.labels.qualityState === "passed",
     ),
   );
 });
+
+test("full-clip compiler rejects Godot importer execution without a project root", async () => {
+  const batch = await request("hero-walk-right:keys");
+  const {
+    batchId: _batchId,
+    keyPoseArtifactIds: _keyPoseArtifactIds,
+    finalCandidatesPerFrame: _finalCandidatesPerFrame,
+    ...clipInput
+  } = batch;
+  assert.throws(
+    () =>
+      compileTwoStageAnimationClip({
+        ...clipInput,
+        keyPoseCandidatesPerFrame: 1,
+        inBetweenCandidatesPerFrame: 1,
+        delivery: {
+          runGodotImporter: true,
+        },
+      }),
+    /runGodotImporter=true requires delivery\.godotProjectPath/u,
+  );
+});
+
