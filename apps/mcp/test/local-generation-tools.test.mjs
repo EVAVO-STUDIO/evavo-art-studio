@@ -9,6 +9,8 @@ const ENTRYPOINT = path.join(MCP_ROOT, "dist", "index.js");
 const REQUIRED_LOCAL_GENERATION_TOOLS = Object.freeze([
   "local_generation_campaign_capabilities",
   "local_generation_doctor",
+  "prepare_draw_things_local_provider",
+  "provision_draw_things_local_provider",
   "run_local_generation_campaign",
   "run_shipped_local_generation_campaign",
   "run_lorna_strip_poker_acceptance",
