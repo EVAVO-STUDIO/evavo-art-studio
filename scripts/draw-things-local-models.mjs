@@ -1703,6 +1703,15 @@ async function runInventory(args) {
       bundleSha256: model.bundleSha256,
       componentCount: model.components.length,
     })),
+    controlCount: inventory.controls.length,
+    controls: inventory.controls.map((control) => ({
+      id: control.id,
+      name: control.name,
+      file: control.file,
+      version: control.version,
+      bundleSha256: control.bundleSha256,
+      componentCount: control.components.length,
+    })),
     rawCategoryCounts: inventory.rawCategoryCounts,
     authority: {
       modelDownload: false,
@@ -1751,6 +1760,15 @@ async function runGovern(args) {
       bundleSha256: model.bundleSha256,
       priority: model.priority,
       resourceClass: model.resourceClass,
+    })),
+    approvedControlCount: derived.governance.controls?.length ?? 0,
+    approvedControls: (derived.governance.controls ?? []).map((control) => ({
+      id: control.id,
+      bundleSha256: control.bundleSha256,
+      approvedRoles: control.approvedRoles,
+      compatibleModelIds: control.compatibleModelIds,
+      minimumVramGb: control.minimumVramGb,
+      priority: control.priority,
     })),
     authority: {
       modelDownload: false,
