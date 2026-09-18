@@ -197,16 +197,28 @@ async function main() {
       validatedWithProviderPackage: true,
     },
     provider: {
+      backend: campaign.provider.backend,
       baseUrl: campaign.provider.baseUrl,
       localOnly: true,
       fallbackAllowed: false,
       systemStatsReachable: isRecord(systemStats),
       objectInfoReachable: true,
+      ...(campaign.provider.backend === "draw-things"
+        ? {
+            resourceRouting: {
+              availableVramGb: resourceRouting?.availableVramGb ?? null,
+              restricted: resourceRouting?.restricted === true,
+              evidencePath: resourceRouting?.evidencePath ?? null,
+            },
+          }
+        : {}),
     },
-    routes: routeProfiles.map(({ sceneId, profile }) => ({
+    routes: routeProfiles.map(({ sceneId, route, profile }) => ({
       sceneId,
-      adapterId: `comfyui:${profile.profileId}`,
-      modelId: profile.modelId,
+      adapterId: route.adapterId,
+      modelId: route.modelId,
+      profileId: route.profileId,
+      requiredCapabilities: route.requiredCapabilities,
       profileSha256: profile.profileSha256,
     })),
     runtimeProfiles,
@@ -214,7 +226,9 @@ async function main() {
     allConfiguredRuntimeChoicesAvailable: runtimeProfiles.every((profile) => profile.missingModelSelections.length === 0),
     physicalCheckpointHashVerifiedDirectly: false,
     physicalCheckpointHashNote:
-      "The catalog's model inventory hashes are tamper-validated. ComfyUI runtime choice availability and subsequent real workflow execution prove loadability; the catalog format does not currently bind model identities to host filesystem paths for direct checkpoint hashing.",
+      campaign.provider.backend === "draw-things"
+        ? "Draw Things commissioning binds the committed model policy to an exact physical inventory and governance evidence. This per-campaign doctor revalidates the compiled catalog, runtime node classes, backend routing and current resource admission; normal service start has no model download or mutation authority."
+        : "The catalog's model inventory hashes are tamper-validated. ComfyUI runtime choice availability and subsequent real workflow execution prove loadability; the catalog format does not currently bind model identities to host filesystem paths for direct checkpoint hashing.",
     arbitraryWorkflowSubmission: false,
     hostedFallback: false,
   };
