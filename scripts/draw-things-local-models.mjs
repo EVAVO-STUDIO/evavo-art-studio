@@ -1111,6 +1111,77 @@ export function governanceFromPolicy(
   };
 }
 
+function validateGovernanceExternalStores(value, label) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 32) {
+    fail(`${label} must contain at most 32 external stores`);
+  }
+  const names = new Set();
+  return value.map((raw, index) => {
+    const entry = object(raw, `${label}[${index}]`);
+    const name = text(entry.name, `${label}[${index}].name`, 256);
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u.test(name) ||
+      !name.endsWith(".ckpt-tensordata") ||
+      names.has(name)
+    ) {
+      fail(`${label}[${index}].name is invalid or duplicated`);
+    }
+    names.add(name);
+    const sizeBytes = entry.sizeBytes;
+    if (
+      !Number.isInteger(sizeBytes) ||
+      sizeBytes < 1 ||
+      sizeBytes > 16 * 1024 * 1024 * 1024
+    ) {
+      fail(`${label}[${index}].sizeBytes is invalid`);
+    }
+    if (entry.verification !== "evavo-provision-receipt-sha256") {
+      fail(`${label}[${index}].verification is unsupported`);
+    }
+    return {
+      name,
+      sizeBytes,
+      sha256: sha(entry.sha256, `${label}[${index}].sha256`),
+      verification: "evavo-provision-receipt-sha256",
+      provisionReceiptSha256: sha(
+        entry.provisionReceiptSha256,
+        `${label}[${index}].provisionReceiptSha256`,
+      ),
+    };
+  });
+}
+
+function validateGovernanceProvisionReceipt(value) {
+  if (value === undefined) return null;
+  const receipt = object(value, "governance.provisionReceipt");
+  if (receipt.sourceOrigin !== "https://static.libnnc.org/") {
+    fail("governance.provisionReceipt.sourceOrigin is not approved");
+  }
+  if (
+    receipt.bootstrapPolicy !==
+    "fixed-official-origin+committed-size then receipt-pinned SHA-256"
+  ) {
+    fail("governance.provisionReceipt.bootstrapPolicy is unsupported");
+  }
+  return {
+    receiptSha256: sha(
+      receipt.receiptSha256,
+      "governance.provisionReceipt.receiptSha256",
+    ),
+    stackManifestSha256: sha(
+      receipt.stackManifestSha256,
+      "governance.provisionReceipt.stackManifestSha256",
+    ),
+    sourceOrigin: receipt.sourceOrigin,
+    installManifestSha256: sha(
+      receipt.installManifestSha256,
+      "governance.provisionReceipt.installManifestSha256",
+    ),
+    bootstrapPolicy: receipt.bootstrapPolicy,
+  };
+}
+
 function validateGovernance(value) {
   const governance = object(value, "Draw Things model governance");
   if (governance.schema !== GOVERNANCE_SCHEMA) {
@@ -1125,6 +1196,9 @@ function validateGovernance(value) {
   if (governance.reviewedAt !== undefined && !Number.isFinite(Date.parse(governance.reviewedAt))) {
     fail("governance.reviewedAt is invalid");
   }
+  const provisionReceipt = validateGovernanceProvisionReceipt(
+    governance.provisionReceipt,
+  );
   const ids = new Set();
   for (const [index, raw] of governance.models.entries()) {
     const entry = object(raw, `governance.models[${index}]`);
@@ -1137,6 +1211,22 @@ function validateGovernance(value) {
     sha(entry.bundleSha256, `governance.models[${index}].bundleSha256`);
     if (entry.expectedFiles !== undefined) {
       validateExpectedFiles(entry.expectedFiles, `governance.models[${index}].expectedFiles`);
+    }
+    const externalStores = validateGovernanceExternalStores(
+      entry.externalStores,
+      `governance.models[${index}].externalStores`,
+    );
+    if (externalStores.length && !provisionReceipt) {
+      fail(
+        `governance.models[${index}] has external stores without provisionReceipt evidence`,
+      );
+    }
+    for (const store of externalStores) {
+      if (store.provisionReceiptSha256 !== provisionReceipt?.receiptSha256) {
+        fail(
+          `governance.models[${index}] external store ${store.name} is bound to a different provision receipt`,
+        );
+      }
     }
     const license = object(entry.license, `governance.models[${index}].license`);
     for (const field of ["commercialUse", "derivatives", "redistribution"]) {
@@ -1174,6 +1264,22 @@ function validateGovernance(value) {
     text(entry.version, `governance.controls[${index}].version`, 256);
     sha(entry.bundleSha256, `governance.controls[${index}].bundleSha256`);
     validateExpectedFiles(entry.expectedFiles, `governance.controls[${index}].expectedFiles`);
+    const externalStores = validateGovernanceExternalStores(
+      entry.externalStores,
+      `governance.controls[${index}].externalStores`,
+    );
+    if (externalStores.length && !provisionReceipt) {
+      fail(
+        `governance.controls[${index}] has external stores without provisionReceipt evidence`,
+      );
+    }
+    for (const store of externalStores) {
+      if (store.provisionReceiptSha256 !== provisionReceipt?.receiptSha256) {
+        fail(
+          `governance.controls[${index}] external store ${store.name} is bound to a different provision receipt`,
+        );
+      }
+    }
     const license = object(entry.license, `governance.controls[${index}].license`);
     if (license.commercialUse !== "allowed") {
       fail(`governance control ${id} is not commercially approved`);
