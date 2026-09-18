@@ -347,6 +347,18 @@ function extractReceipt(stdout: string): unknown | null {
       if (parsed.schema === "evavo.local-generation-campaign-receipt.v1") {
         return parsed;
       }
+      if (
+        parsed.kind === "evavo-art-studio-brokered-campaign-v1" &&
+        parsed.ok === true &&
+        parsed.campaignReceipt &&
+        typeof parsed.campaignReceipt === "object" &&
+        !Array.isArray(parsed.campaignReceipt)
+      ) {
+        const nested = parsed.campaignReceipt as Record<string, unknown>;
+        if (nested.schema === "evavo.local-generation-campaign-receipt.v1") {
+          return nested;
+        }
+      }
     } catch {
       // Other workstation commands may emit non-receipt JSON. Ignore them.
     }
