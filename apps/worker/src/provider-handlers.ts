@@ -173,6 +173,80 @@ export function createProviderRegistryFromEnvironment(
       }),
     );
   }
+  const drawThingsCatalogPath =
+    environment.EVAVO_ART_DRAWTHINGS_CATALOG?.trim();
+  if (drawThingsCatalogPath) {
+    const dedicatedInstance = envBoolean(
+      environment.EVAVO_ART_DRAWTHINGS_COMFYUI_DEDICATED_INSTANCE,
+      false,
+      "EVAVO_ART_DRAWTHINGS_COMFYUI_DEDICATED_INSTANCE",
+    );
+    if (!dedicatedInstance) {
+      throw new Error(
+        "EVAVO_ART_DRAWTHINGS_COMFYUI_DEDICATED_INSTANCE=true is required because Draw Things bridge execution inherits ComfyUI instance-wide cancellation.",
+      );
+    }
+    adapters.push(
+      ...loadDrawThingsComfyUIProviderAdaptersFromCatalogFile({
+        catalogPath: drawThingsCatalogPath,
+        ...(environment.EVAVO_ART_DRAWTHINGS_CATALOG_ROOT?.trim()
+          ? { allowedRoot: environment.EVAVO_ART_DRAWTHINGS_CATALOG_ROOT.trim() }
+          : {}),
+        dedicatedInstance,
+        drawThingsRemote: envBoolean(
+          environment.EVAVO_ART_DRAWTHINGS_GRPC_REMOTE,
+          false,
+          "EVAVO_ART_DRAWTHINGS_GRPC_REMOTE",
+        ),
+        allowRemote: envBoolean(
+          environment.EVAVO_ART_DRAWTHINGS_COMFYUI_ALLOW_REMOTE,
+          false,
+          "EVAVO_ART_DRAWTHINGS_COMFYUI_ALLOW_REMOTE",
+        ),
+        ...(environment.EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL?.trim()
+          ? { baseUrl: environment.EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL.trim() }
+          : {}),
+        ...(environment.EVAVO_ART_DRAWTHINGS_COMFYUI_API_TOKEN?.trim()
+          ? { apiToken: environment.EVAVO_ART_DRAWTHINGS_COMFYUI_API_TOKEN.trim() }
+          : {}),
+        pollIntervalMs: envInteger(
+          environment.EVAVO_ART_DRAWTHINGS_COMFYUI_POLL_INTERVAL_MS,
+          500,
+          50,
+          60_000,
+          "EVAVO_ART_DRAWTHINGS_COMFYUI_POLL_INTERVAL_MS",
+        ),
+        executionTimeoutMs: envInteger(
+          environment.EVAVO_ART_DRAWTHINGS_COMFYUI_EXECUTION_TIMEOUT_MS,
+          1_800_000,
+          1_000,
+          1_800_000,
+          "EVAVO_ART_DRAWTHINGS_COMFYUI_EXECUTION_TIMEOUT_MS",
+        ),
+        maximumJsonBytes: envInteger(
+          environment.EVAVO_ART_DRAWTHINGS_COMFYUI_MAX_JSON_BYTES,
+          4 * 1024 * 1024,
+          1_024,
+          64 * 1024 * 1024,
+          "EVAVO_ART_DRAWTHINGS_COMFYUI_MAX_JSON_BYTES",
+        ),
+        maximumOutputBytes: envInteger(
+          environment.EVAVO_ART_DRAWTHINGS_COMFYUI_MAX_OUTPUT_BYTES,
+          128 * 1024 * 1024,
+          1_024,
+          512 * 1024 * 1024,
+          "EVAVO_ART_DRAWTHINGS_COMFYUI_MAX_OUTPUT_BYTES",
+        ),
+        maximumUploadBytes: envInteger(
+          environment.EVAVO_ART_DRAWTHINGS_COMFYUI_MAX_UPLOAD_BYTES,
+          64 * 1024 * 1024,
+          1_024,
+          512 * 1024 * 1024,
+          "EVAVO_ART_DRAWTHINGS_COMFYUI_MAX_UPLOAD_BYTES",
+        ),
+      }),
+    );
+  }
   const apiKey = environment.OPENAI_API_KEY?.trim();
   if (apiKey) {
     const model = environment.EVAVO_ART_OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
