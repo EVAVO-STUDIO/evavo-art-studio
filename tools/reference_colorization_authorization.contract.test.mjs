@@ -37,7 +37,7 @@ test("restoration intake trusted provenance stays aligned with authorization sch
   const source = await read("./lib/existing_image_restoration_intake.mjs");
   const match = source.match(/TRUSTED_COLOUR_REFERENCE_PROVENANCE\s*=\s*Object\.freeze\(\[([\s\S]*?)\]\)/u);
   assert.ok(match, "trusted colour provenance list missing");
-  const values = [...match[1].matchAll(/['\"]([^'\"]+)['\"]/gu)].map((item) => item[1]).sort();
+  const values = [...match[1].matchAll(/['"]([^'"]+)['"]/gu)].map((item) => item[1]).sort();
   assert.deepEqual(values, expectedProvenance);
   for (const token of [
     "missing_real_colour_reference",
