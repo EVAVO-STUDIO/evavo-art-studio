@@ -8,6 +8,7 @@ import {
   compileAutomaticSpriteFinalizationWorkflow,
   compileAutomaticSpriteWorkflow,
   compileSpriteSupervisorWorkflow,
+  compileVerifiedAnimationProviderBatch,
   spriteSupervisorProtocolSummary,
 } from "@evavo/art-sprite-supervisor";
 
@@ -107,6 +108,31 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
           workflow: compileSpriteSupervisorWorkflow(request),
           executionBoundary:
             "Compile-only: no runtime submission, provider call, artifact read, shell execution, reference mutation, promotion or deployment.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_verified_animation_provider_batch",
+    {
+      description:
+        "Compile cryptographically verified per-frame provider requests from an Animation Director batch and exact pose-control bindings. This validates pose-control identity and frame/canvas binding before producing provider requests; it never calls a provider or submits runtime jobs.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult({
+          schemaVersion: "1.0",
+          compilation: compileVerifiedAnimationProviderBatch(
+            request as Parameters<
+              typeof compileVerifiedAnimationProviderBatch
+            >[0],
+          ),
+          executionBoundary:
+            "Compile-only: pose-control bindings are verified, but no provider execution, runtime submission, approval, promotion, repository mutation or deployment occurs.",
         });
       } catch (error: unknown) {
         return toolError(error);
