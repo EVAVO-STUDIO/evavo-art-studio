@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compileAnimationDirectorPlan } from "@evavo/art-direction";
+import { compileAnimationDirectorPlan, compileAuthoredAnimationDirectorPlan } from "@evavo/art-direction";
 import { compileAnimationProviderBatch } from "../dist/index.js";
 
 const artifact = (hex) => `artifact_${hex.repeat(64)}`;
@@ -196,5 +196,194 @@ test("enforces batch candidate budget and exact dependency artifact identity", (
   assert.throws(
     () => compileAnimationProviderBatch(invalidPose),
     /poseControlArtifactIds\.1 must be a canonical artifact/,
+  );
+});
+
+
+function attackPlan() {
+  return compileAuthoredAnimationDirectorPlan({
+    clipId: "hero-heavy-attack-right",
+    subjectId: "hero",
+    action: "heavy-attack",
+    direction: "right",
+    motionStyle: "arcade-snappy",
+    fps: 10,
+    canvas: { width: 96, height: 128 },
+    canonicalIdentityArtifactId: artifact("a"),
+    directionMasterArtifactId: artifact("b"),
+    loop: false,
+    frames: [
+      {
+        role: "anticipation",
+        keyPose: true,
+        groundContactRequired: true,
+        contactLandmarkId: "root",
+      },
+      {
+        role: "windup",
+        keyPose: false,
+        groundContactRequired: true,
+        contactLandmarkId: "root",
+      },
+      {
+        role: "strike",
+        keyPose: true,
+        groundContactRequired: true,
+        contactLandmarkId: "root",
+      },
+      {
+        role: "follow-through",
+        keyPose: false,
+        groundContactRequired: true,
+        contactLandmarkId: "root",
+      },
+      {
+        role: "recovery",
+        keyPose: true,
+        groundContactRequired: true,
+        contactLandmarkId: "root",
+      },
+    ],
+    structure: {
+      rootLandmarkId: "root",
+      requiredLandmarkIds: ["root", "weaponHand", "weaponTip"],
+      loopClosureLandmarkIds: ["root"],
+      maximumRootStepPixels: 5,
+      loopClosureTolerancePixels: 2,
+      contactDriftTolerancePixels: 1,
+    },
+  });
+}
+
+test("provider compiler canonically accepts generic authored attack clips", () => {
+  const plan = attackPlan();
+  const result = compileAnimationProviderBatch({
+    plan,
+    batchId: "hero-heavy-attack-right:inbetweens-01",
+    poseControlArtifactIds: {
+      "1": artifact("1"),
+      "2": artifact("2"),
+      "3": artifact("3"),
+      "4": artifact("4"),
+      "5": artifact("5"),
+    },
+    keyPoseArtifactIds: {
+      "1": artifact("c"),
+      "3": artifact("d"),
+      "5": artifact("e"),
+    },
+    style: style(),
+    background: {
+      strategy: "chroma-key",
+      matteColour: "#00ff00",
+    },
+    candidateCount: 2,
+  });
+
+  assert.equal(result.phase, "in-between");
+  assert.equal(result.planProtocolVersion, "2026-09-18.1");
+  assert.equal(result.requests.length, 1);
+  const request = result.requests[0];
+  assert.equal(request.frameId, "hero-heavy-attack-right:f002");
+  assert.equal(request.shot.action, "heavy-attack:windup");
+  assert.match(request.creativeIntent, /heavy-attack/u);
+  assert.match(request.creativeIntent, /landmark root/u);
+  assert.deepEqual(
+    request.references.map((entry) => entry.role),
+    [
+      "canonical-identity",
+      "direction-master",
+      "pose-control",
+      "previous-key-pose",
+      "next-key-pose",
+    ],
+  );
+  assert.equal(
+    request.references.find((entry) => entry.role === "previous-key-pose").artifactId,
+    artifact("c"),
+  );
+  assert.equal(
+    request.references.find((entry) => entry.role === "next-key-pose").artifactId,
+    artifact("d"),
+  );
+  assert.deepEqual(
+    request.metadata.requiredLandmarkIds,
+    ["root", "weaponHand", "weaponTip"],
+  );
+});
+
+test("provider compiler rejects mutation of a canonical authored plan", () => {
+  const plan = structuredClone(attackPlan());
+  plan.frames[1].role = "mutated-role";
+  assert.throws(
+    () =>
+      compileAnimationProviderBatch({
+        plan,
+        batchId: "hero-heavy-attack-right:inbetweens-01",
+        poseControlArtifactIds: {
+          "1": artifact("1"),
+          "2": artifact("2"),
+          "3": artifact("3"),
+          "4": artifact("4"),
+          "5": artifact("5"),
+        },
+        keyPoseArtifactIds: {
+          "1": artifact("c"),
+          "3": artifact("d"),
+          "5": artifact("e"),
+        },
+        style: style(),
+        background: {
+          strategy: "chroma-key",
+          matteColour: "#00ff00",
+        },
+      }),
+    /does not match the canonical Animation Director compilation/u,
+  );
+});
+
+test("provider compiler supports all-key authored clips with no temporal references", () => {
+  const plan = compileAuthoredAnimationDirectorPlan({
+    ...attackPlan(),
+    clipId: "hero-gesture-right",
+    action: "gesture",
+    frames: [
+      {
+        role: "start",
+        keyPose: true,
+        groundContactRequired: true,
+        contactLandmarkId: "root",
+      },
+      {
+        role: "end",
+        keyPose: true,
+        groundContactRequired: true,
+        contactLandmarkId: "root",
+      },
+    ],
+  });
+  const result = compileAnimationProviderBatch({
+    plan,
+    batchId: "hero-gesture-right:keys",
+    poseControlArtifactIds: {
+      "1": artifact("1"),
+      "2": artifact("2"),
+    },
+    style: style(),
+    background: {
+      strategy: "chroma-key",
+      matteColour: "#00ff00",
+    },
+  });
+  assert.equal(result.requests.length, 2);
+  assert.ok(
+    result.requests.every(
+      (request) =>
+        !request.references.some(
+          (entry) =>
+            entry.role === "previous-key-pose" ||
+            entry.role === "next-key-pose",
+        ),
+    ),
   );
 });
