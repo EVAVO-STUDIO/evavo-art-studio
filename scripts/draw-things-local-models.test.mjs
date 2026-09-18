@@ -39,6 +39,7 @@ function inventory(overrides = {}) {
     grpcEndpoint: "127.0.0.1:7859",
     installManifestSha256: "e".repeat(64),
     rawCategoryCounts: { models: 1 },
+    controls: [],
     models: [
       {
         id: "dt-fixture",
@@ -722,6 +723,274 @@ test("true inpainting models alone get a masked inpaint profile", () => {
   assert.ok(
     compiledInpaint.nodeInventory.some(
       (node) => node.classType === "LoadImageMask",
+    ),
+  );
+});
+
+test("reviewed pose-control policy binds exact current control bytes", () => {
+  const controlBundle = "7".repeat(64);
+  const input = {
+    ...inventory(),
+    controls: [
+      {
+        id: "dt-pose-control",
+        name: "Fixture Union Pose",
+        file: "fixture-pose.ckpt",
+        version: "sdxl",
+        bundleSha256: controlBundle,
+        metadataSha256: "8".repeat(64),
+        components: [
+          {
+            relativePath: "fixture-pose.ckpt",
+            sizeBytes: 2048,
+            sha256: "6".repeat(64),
+          },
+        ],
+        model: {
+          name: "Fixture Union Pose",
+          file: "fixture-pose.ckpt",
+          version: "sdxl",
+          type: "controlnetunion",
+          global_average_pooling: false,
+        },
+      },
+    ],
+    rawCategoryCounts: { models: 1, controlNets: 1 },
+  };
+  const policyWithControl = {
+    ...policy(),
+    controls: [
+      {
+        id: "fixture-pose-control",
+        inventoryName: "Fixture Union Pose",
+        inventoryFile: "fixture-pose.ckpt",
+        version: "sdxl",
+        expectedFiles: [
+          {
+            name: "fixture-pose.ckpt",
+            sha256: "6".repeat(64),
+          },
+        ],
+        source: {
+          publisher: "Fixture Control Publisher",
+          url: "https://example.com/control",
+        },
+        license: {
+          id: "Apache-2.0",
+          name: "Apache License 2.0",
+          url: "https://www.apache.org/licenses/LICENSE-2.0",
+          commercialUse: "allowed",
+          derivatives: "allowed",
+          redistribution: "allowed",
+        },
+        approvedRoles: ["pose-control"],
+        compatibleModelIds: ["fixture-xl"],
+        minimumVramGb: 8,
+        priority: 180,
+      },
+    ],
+  };
+  const generated = governanceFromPolicy(
+    input,
+    policyWithControl,
+    "9".repeat(64),
+  );
+  assert.equal(generated.controls.length, 1);
+  assert.equal(generated.controls[0].id, "fixture-pose-control");
+  assert.equal(generated.controls[0].bundleSha256, controlBundle);
+  assert.deepEqual(generated.controls[0].approvedRoles, ["pose-control"]);
+  assert.equal(generated.controls[0].minimumVramGb, 8);
+});
+
+test("SDXL pose-control profile proves identity, pose, control bundle, and VRAM floor", () => {
+  const controlBundle = "7".repeat(64);
+  const poseInventory = {
+    ...inventory(),
+    controls: [
+      {
+        id: "dt-pose-control",
+        name: "Fixture Union Pose",
+        file: "fixture-pose.ckpt",
+        version: "sdxl",
+        bundleSha256: controlBundle,
+        metadataSha256: "8".repeat(64),
+        components: [
+          {
+            relativePath: "fixture-pose.ckpt",
+            sizeBytes: 2048,
+            sha256: "6".repeat(64),
+          },
+        ],
+        model: {
+          name: "Fixture Union Pose",
+          file: "fixture-pose.ckpt",
+          version: "sdxl",
+          type: "controlnetunion",
+          global_average_pooling: false,
+        },
+      },
+    ],
+    rawCategoryCounts: { models: 1, controlNets: 1 },
+  };
+  const poseGovernance = {
+    ...governance({ priority: 140, resourceClass: "baseline" }),
+    controls: [
+      {
+        id: "fixture-pose-control",
+        inventoryName: "Fixture Union Pose",
+        inventoryFile: "fixture-pose.ckpt",
+        version: "sdxl",
+        bundleSha256: controlBundle,
+        expectedFiles: [
+          {
+            name: "fixture-pose.ckpt",
+            sha256: "6".repeat(64),
+          },
+        ],
+        source: {
+          publisher: "Fixture Control Publisher",
+          url: "https://example.com/control",
+        },
+        license: {
+          id: "Apache-2.0",
+          name: "Apache License 2.0",
+          url: "https://www.apache.org/licenses/LICENSE-2.0",
+          commercialUse: "allowed",
+          derivatives: "allowed",
+          redistribution: "allowed",
+        },
+        approvedRoles: ["pose-control"],
+        compatibleModelIds: ["fixture-xl"],
+        minimumVramGb: 8,
+        priority: 180,
+        policyId: "fixture-policy",
+        policySha256: "9".repeat(64),
+        reviewedBy: "owner",
+        reviewedAt: "2026-09-18T00:00:00.000Z",
+      },
+    ],
+  };
+
+  const { draft, governanceEvidence } = buildDrawThingsCatalogDraft({
+    inventory: poseInventory,
+    governance: poseGovernance,
+    install: install(),
+  });
+  assert.equal(draft.profiles.length, 4);
+  const pose = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-pose-ref",
+  );
+  assert.ok(pose);
+  assert.ok(pose.capabilities.includes("identity-reference"));
+  assert.ok(pose.capabilities.includes("pose-control"));
+  assert.ok(pose.capabilities.includes("multiple-reference-images"));
+  assert.deepEqual(
+    pose.bindings.referenceImages.map((reference) => reference.role),
+    ["canonical-identity", "pose-control"],
+  );
+  assert.equal(pose.workflow["7"].class_type, "DrawThingsControlNet");
+  assert.equal(pose.workflow["7"].inputs.control_input_type, "Pose");
+  assert.equal(pose.workflow["7"].inputs.control_mode, "Balanced");
+  assert.deepEqual(pose.workflow["7"].inputs.image, ["6", 0]);
+  assert.deepEqual(pose.workflow["3"].inputs.control_net, ["7", 0]);
+  assert.equal(
+    pose.workflow["7"].inputs.control_name.value.file,
+    "fixture-pose.ckpt",
+  );
+  assert.equal(pose.modelInventory.length, 2);
+  assert.equal(pose.modelInventory[1].id, "fixture-pose-control");
+  assert.equal(pose.modelInventory[1].sha256, controlBundle);
+
+  const profileEvidence = governanceEvidence.profiles.find(
+    (entry) => entry.profileId === pose.profileId,
+  );
+  assert.ok(profileEvidence);
+  assert.equal(profileEvidence.minimumVramGb, 8);
+  assert.deepEqual(profileEvidence.controlIds, ["fixture-pose-control"]);
+  assert.equal(governanceEvidence.controls.length, 1);
+
+  const compiled = compileComfyUIWorkflowCatalog(draft);
+  const compiledPose = compiled.profiles.find(
+    (profile) => profile.profileId === pose.profileId,
+  );
+  assert.ok(compiledPose);
+  assert.ok(compiledPose.capabilities.includes("pose-control"));
+  assert.ok(
+    compiledPose.nodeInventory.some(
+      (node) => node.classType === "DrawThingsControlNet",
+    ),
+  );
+});
+
+test("pose-control profile is not emitted for an incompatible base model", () => {
+  const poseInventory = {
+    ...inventory(),
+    controls: [
+      {
+        id: "dt-pose-control",
+        name: "Fixture Union Pose",
+        file: "fixture-pose.ckpt",
+        version: "sdxl",
+        bundleSha256: "7".repeat(64),
+        metadataSha256: "8".repeat(64),
+        components: [
+          {
+            relativePath: "fixture-pose.ckpt",
+            sizeBytes: 2048,
+            sha256: "6".repeat(64),
+          },
+        ],
+        model: {
+          name: "Fixture Union Pose",
+          file: "fixture-pose.ckpt",
+          version: "sdxl",
+          type: "controlnetunion",
+        },
+      },
+    ],
+  };
+  const result = buildDrawThingsCatalogDraft({
+    inventory: poseInventory,
+    governance: {
+      ...governance(),
+      controls: [
+        {
+          id: "fixture-pose-control",
+          inventoryName: "Fixture Union Pose",
+          inventoryFile: "fixture-pose.ckpt",
+          version: "sdxl",
+          bundleSha256: "7".repeat(64),
+          expectedFiles: [
+            { name: "fixture-pose.ckpt", sha256: "6".repeat(64) },
+          ],
+          source: {
+            publisher: "Fixture Control Publisher",
+            url: "https://example.com/control",
+          },
+          license: {
+            id: "Apache-2.0",
+            name: "Apache License 2.0",
+            url: "https://www.apache.org/licenses/LICENSE-2.0",
+            commercialUse: "allowed",
+            derivatives: "allowed",
+            redistribution: "allowed",
+          },
+          approvedRoles: ["pose-control"],
+          compatibleModelIds: ["different-model"],
+          minimumVramGb: 8,
+          priority: 180,
+          policyId: "fixture-policy",
+          policySha256: "9".repeat(64),
+          reviewedBy: "owner",
+          reviewedAt: "2026-09-18T00:00:00.000Z",
+        },
+      ],
+    },
+    install: install(),
+  });
+  assert.ok(
+    !result.draft.profiles.some((profile) =>
+      profile.capabilities.includes("pose-control"),
     ),
   );
 });
