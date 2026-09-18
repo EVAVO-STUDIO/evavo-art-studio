@@ -1114,6 +1114,99 @@ function addTemporalReferenceProfile(base, pair) {
   return profile;
 }
 
+function addEditProfile(base, pair) {
+  const profile = cloneJson(base);
+  profile.profileId = profileSuffixId(base, "edit");
+  profile.label = `${base.label} · local image edit`;
+  profile.description =
+    `${base.description} Uses one exact base image for local repair/edit work. ` +
+    (supportsKontextReferences(pair)
+      ? "The Kontext model receives the source image at full reference strength."
+      : "The fallback img2img route uses a conservative fixed denoise strength for selective repair.");
+  profile.version = `${base.version}-edit`;
+  profile.priority = Number(base.priority) - 4;
+  profile.operations = ["edit"];
+  profile.continuityPhases = ["key-pose", "repair", "independent"];
+  profile.capabilities = [
+    ...new Set([
+      ...base.capabilities.filter((capability) => capability !== "generate"),
+      "edit",
+      "reference-images",
+    ]),
+  ];
+  profile.workflow["5"] = {
+    class_type: "LoadImage",
+    inputs: { image: "evavo-base-image-placeholder.png" },
+  };
+  profile.workflow["3"].inputs.image = ["5", 0];
+  profile.workflow["3"].inputs.strength = supportsKontextReferences(pair)
+    ? 1
+    : 0.35;
+  profile.bindings.referenceImages = [
+    {
+      role: "base-image",
+      nodeId: "5",
+      input: "image",
+    },
+  ];
+  profile.limits.maximumReferenceImages = 1;
+  return profile;
+}
+
+function supportsNativeInpaint(pair) {
+  return drawThingsModifier(pair) === "inpainting";
+}
+
+function addInpaintProfile(base, pair) {
+  if (!supportsNativeInpaint(pair)) return null;
+  const profile = cloneJson(base);
+  profile.profileId = profileSuffixId(base, "inpaint");
+  profile.label = `${base.label} · local masked inpaint`;
+  profile.description =
+    `${base.description} Uses a true Draw Things inpainting model with an exact base image and exact mask. This profile is emitted only when the local model inventory declares modifier=inpainting.`;
+  profile.version = `${base.version}-inpaint`;
+  profile.priority = Number(base.priority) - 5;
+  profile.operations = ["inpaint"];
+  profile.continuityPhases = ["repair", "independent"];
+  profile.capabilities = [
+    ...new Set([
+      ...base.capabilities.filter((capability) => capability !== "generate"),
+      "inpaint",
+      "reference-images",
+      "multiple-reference-images",
+      "mask",
+    ]),
+  ];
+  profile.workflow["5"] = {
+    class_type: "LoadImage",
+    inputs: { image: "evavo-inpaint-base-placeholder.png" },
+  };
+  profile.workflow["6"] = {
+    class_type: "LoadImageMask",
+    inputs: {
+      image: "evavo-inpaint-mask-placeholder.png",
+      channel: "red",
+    },
+  };
+  profile.workflow["3"].inputs.image = ["5", 0];
+  profile.workflow["3"].inputs.mask = ["6", 0];
+  profile.workflow["3"].inputs.strength = 1;
+  profile.bindings.referenceImages = [
+    {
+      role: "base-image",
+      nodeId: "5",
+      input: "image",
+    },
+    {
+      role: "mask",
+      nodeId: "6",
+      input: "image",
+    },
+  ];
+  profile.limits.maximumReferenceImages = 2;
+  return profile;
+}
+
 function drawThingsProfilesForPair(
   pair,
   install,
@@ -1126,11 +1219,17 @@ function drawThingsProfilesForPair(
     bridgeRuntimeSha256,
     grpcRuntimeSha256,
   );
-  const profiles = [base, addCanonicalIdentityReference(base, pair)];
+  const profiles = [
+    base,
+    addCanonicalIdentityReference(base, pair),
+    addEditProfile(base, pair),
+  ];
   const direction = addDirectionReferenceProfile(base, pair);
   const temporal = addTemporalReferenceProfile(base, pair);
+  const inpaint = addInpaintProfile(base, pair);
   if (direction) profiles.push(direction);
   if (temporal) profiles.push(temporal);
+  if (inpaint) profiles.push(inpaint);
   return profiles;
 }
 
