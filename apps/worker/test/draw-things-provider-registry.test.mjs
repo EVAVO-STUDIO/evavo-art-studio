@@ -12,7 +12,11 @@ import {
 
 import { createProviderRegistryFromEnvironment } from "../dist/provider-handlers.js";
 
-async function drawThingsCatalogFixture() {
+async function drawThingsCatalogFixture({
+  server = "127.0.0.1",
+  port = "7859",
+  useTls = false,
+} = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "evavo-draw-things-worker-"));
   const catalog = compileComfyUIWorkflowCatalog({
     schemaVersion: COMFYUI_WORKFLOW_CATALOG_DRAFT_SCHEMA,
@@ -45,6 +49,9 @@ async function drawThingsCatalogFixture() {
               width: 512,
               height: 512,
               batch_size: 1,
+              server,
+              port,
+              use_tls: useTls,
             },
           },
         },
@@ -68,12 +75,12 @@ async function drawThingsCatalogFixture() {
           { id: "comfyui", version: "0.4.0", sha256: "b".repeat(64) },
           {
             id: "draw-things-comfyui",
-            version: "2026.09.11",
+            version: "1.11.1",
             sha256: "c".repeat(64),
           },
           {
             id: "draw-things-grpc-server",
-            version: "2026.09.11",
+            version: "v26.0910.1",
             sha256: "d".repeat(64),
           },
         ],
@@ -90,16 +97,21 @@ async function drawThingsCatalogFixture() {
   return { root, catalogPath };
 }
 
-test("worker registers Draw Things bridge as a distinct local provider", async () => {
-  const fixture = await drawThingsCatalogFixture();
-  const registry = createProviderRegistryFromEnvironment({
+function registryEnvironment(fixture) {
+  return {
     EVAVO_ART_DRAWTHINGS_CATALOG: fixture.catalogPath,
     EVAVO_ART_DRAWTHINGS_CATALOG_ROOT: fixture.root,
-    EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL: "http://127.0.0.1:8192",
+    EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL: "http://127.0.0.1:8193",
     EVAVO_ART_DRAWTHINGS_COMFYUI_DEDICATED_INSTANCE: "true",
     EVAVO_ART_DRAWTHINGS_COMFYUI_ALLOW_REMOTE: "false",
-    EVAVO_ART_DRAWTHINGS_GRPC_REMOTE: "false",
-  });
+  };
+}
+
+test("worker registers Draw Things bridge as a distinct local provider", async () => {
+  const fixture = await drawThingsCatalogFixture();
+  const registry = createProviderRegistryFromEnvironment(
+    registryEnvironment(fixture),
+  );
 
   const descriptors = registry.list();
   assert.equal(descriptors.length, 1);
@@ -120,16 +132,15 @@ test("worker fails closed without explicit Draw Things dedicated-instance author
   );
 });
 
-test("worker records explicit remote Draw Things gRPC policy", async () => {
-  const fixture = await drawThingsCatalogFixture();
-  const registry = createProviderRegistryFromEnvironment({
-    EVAVO_ART_DRAWTHINGS_CATALOG: fixture.catalogPath,
-    EVAVO_ART_DRAWTHINGS_CATALOG_ROOT: fixture.root,
-    EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL: "http://127.0.0.1:8192",
-    EVAVO_ART_DRAWTHINGS_COMFYUI_DEDICATED_INSTANCE: "true",
-    EVAVO_ART_DRAWTHINGS_COMFYUI_ALLOW_REMOTE: "false",
-    EVAVO_ART_DRAWTHINGS_GRPC_REMOTE: "true",
+test("worker derives remote Draw Things policy from immutable workflow endpoint", async () => {
+  const fixture = await drawThingsCatalogFixture({
+    server: "gpu.example.com",
+    port: "7859",
+    useTls: true,
   });
+  const registry = createProviderRegistryFromEnvironment(
+    registryEnvironment(fixture),
+  );
   assert.equal(registry.list()[0].dataPolicy.remote, true);
   assert.equal(
     registry.list()[0].dataPolicy.usedForTraining,
