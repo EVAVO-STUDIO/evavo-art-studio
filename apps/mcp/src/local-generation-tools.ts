@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { access, lstat, mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
@@ -8,9 +8,15 @@ import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
+import { compileTwoStageAnimationClip } from "@evavo/art-sprite-supervisor";
+
 const MAXIMUM_CAPTURE_BYTES = 2 * 1024 * 1024;
 const MAXIMUM_CAMPAIGN_BYTES = 512 * 1024;
 const MAXIMUM_IMAGE_BYTES = 32 * 1024 * 1024;
+const MAXIMUM_DRAW_THINGS_CATALOG_BYTES = 16 * 1024 * 1024;
+const MAXIMUM_SUPERVISOR_PACKET_BYTES = 32 * 1024 * 1024;
+const SUPERVISOR_PACKET_SCHEMA = "evavo.local-two-stage-animation-execution.v1";
+const SUPERVISOR_BROKER_KIND = "evavo-art-studio-brokered-supervisor-v1";
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const SHIPPED_EXAMPLES = Object.freeze({
   "lorna-strip-poker-test": "local-generation-campaign.lorna.json",
@@ -341,6 +347,207 @@ async function invokeLocalCompute(manifestPath: string): Promise<{
   return {
     stdout: stdout.toString("utf8"),
     stderr: stderr.toString("utf8"),
+  };
+}
+
+async function readPreparedDrawThingsCatalog(): Promise<unknown> {
+  const filePath = defaultDrawThingsCatalogPath();
+  const info = await lstat(filePath);
+  if (
+    !info.isFile() ||
+    info.isSymbolicLink() ||
+    info.size < 1 ||
+    info.size > MAXIMUM_DRAW_THINGS_CATALOG_BYTES
+  ) {
+    throw new Error(
+      `prepared Draw Things catalog must be one regular file containing 1 to ${MAXIMUM_DRAW_THINGS_CATALOG_BYTES} bytes`,
+    );
+  }
+  try {
+    return JSON.parse(await readFile(filePath, "utf8")) as unknown;
+  } catch (error: unknown) {
+    throw new Error(
+      `prepared Draw Things catalog is invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function supervisorPacketBytes(workflow: unknown): Buffer {
+  const bytes = Buffer.from(
+    `${JSON.stringify(
+      {
+        schema: SUPERVISOR_PACKET_SCHEMA,
+        workflow,
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  if (
+    bytes.length < 1 ||
+    bytes.length > MAXIMUM_SUPERVISOR_PACKET_BYTES
+  ) {
+    throw new Error(
+      `two-stage supervisor packet must contain 1 to ${MAXIMUM_SUPERVISOR_PACKET_BYTES} bytes`,
+    );
+  }
+  return bytes;
+}
+
+async function persistSupervisorPacket(workflow: unknown): Promise<string> {
+  const bytes = supervisorPacketBytes(workflow);
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const root = path.join(requestRoot(), "two-stage-animation");
+  await mkdir(root, { recursive: true });
+  const packetPath = path.join(root, `packet-${digest}.json`);
+  try {
+    await writeFile(packetPath, bytes, { flag: "wx" });
+  } catch (error: unknown) {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "";
+    if (code !== "EEXIST") throw error;
+  }
+  return packetPath;
+}
+
+async function invokeLocalComputeSupervisor(packetPath: string): Promise<{
+  readonly stdout: string;
+  readonly stderr: string;
+}> {
+  if (process.platform !== "win32") {
+    throw new Error(
+      "Brokered two-stage animation execution currently requires the EVAVO Windows workstation.",
+    );
+  }
+  const launcher = path.join(
+    localComputeRoot(),
+    "RUN-EVAVO-ART-SUPERVISOR-CURRENT.ps1",
+  );
+  await access(launcher);
+  const child = spawn(
+    "powershell.exe",
+    [
+      "-NoLogo",
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      launcher,
+      "-PacketPath",
+      packetPath,
+      "-ArtStudioRoot",
+      artStudioRoot(),
+    ],
+    {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+      shell: false,
+    },
+  );
+  let stdout: Buffer = Buffer.alloc(0);
+  let stderr: Buffer = Buffer.alloc(0);
+  child.stdout.on("data", (chunk: Buffer) => {
+    stdout = appendBounded(stdout, Buffer.from(chunk));
+  });
+  child.stderr.on("data", (chunk: Buffer) => {
+    stderr = appendBounded(stderr, Buffer.from(chunk));
+  });
+  await new Promise<void>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(
+        new Error(
+          `Local Compute Art Studio supervisor exited with code ${String(code)}. ${stderr.toString("utf8").trim().slice(-4000)}`,
+        ),
+      );
+    });
+  });
+  return {
+    stdout: stdout.toString("utf8"),
+    stderr: stderr.toString("utf8"),
+  };
+}
+
+function extractSupervisorBrokerReceipt(stdout: string): unknown | null {
+  const lines = stdout
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]!;
+    if (!line.startsWith("{")) continue;
+    try {
+      const parsed = JSON.parse(line) as Record<string, unknown>;
+      if (
+        parsed.kind === SUPERVISOR_BROKER_KIND &&
+        parsed.ok === true &&
+        parsed.executionReceipt &&
+        typeof parsed.executionReceipt === "object" &&
+        !Array.isArray(parsed.executionReceipt)
+      ) {
+        return parsed;
+      }
+    } catch {
+      // Build and worker commands may emit unrelated text/JSON.
+    }
+  }
+  return null;
+}
+
+async function executeTwoStageAnimationClip(
+  request: unknown,
+): Promise<Readonly<{
+  status: "completed";
+  packetPath: string;
+  runId: string;
+  workflowSha256: string;
+  receipt: unknown;
+  stderrTail: string | null;
+}>> {
+  if (!executionEnabled()) {
+    throw new Error(
+      "Two-stage local animation execution requires EVAVO_ART_ALLOW_WRITES=true and EVAVO_ART_LOCAL_GENERATION_MCP_ALLOW_EXECUTION=true.",
+    );
+  }
+
+  await invokeDrawThingsCommission("Prepare");
+  const catalog = await readPreparedDrawThingsCatalog();
+  if (
+    !request ||
+    typeof request !== "object" ||
+    Array.isArray(request)
+  ) {
+    throw new Error("two-stage animation request must be an object");
+  }
+  const compiled = compileTwoStageAnimationClip({
+    ...(request as Record<string, unknown>),
+    drawThingsCatalog: catalog,
+  } as Parameters<typeof compileTwoStageAnimationClip>[0]);
+  const packetPath = await persistSupervisorPacket(
+    compiled.supervisorWorkflow,
+  );
+  const execution = await invokeLocalComputeSupervisor(packetPath);
+  const receipt = extractSupervisorBrokerReceipt(execution.stdout);
+  if (!receipt) {
+    throw new Error(
+      "Brokered two-stage animation completed without a parseable Local Compute supervisor receipt.",
+    );
+  }
+  return {
+    status: "completed",
+    packetPath,
+    runId: compiled.supervisorWorkflow.runId,
+    workflowSha256: compiled.supervisorWorkflow.workflowSha256,
+    receipt,
+    stderrTail: execution.stderr.trim().slice(-4000) || null,
   };
 }
 
