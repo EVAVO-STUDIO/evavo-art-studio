@@ -48,6 +48,13 @@ function executionEnabled(): boolean {
   );
 }
 
+function drawThingsProvisioningEnabled(): boolean {
+  return (
+    executionEnabled() &&
+    process.env.EVAVO_ART_DRAWTHINGS_MCP_ALLOW_PROVISIONING === "true"
+  );
+}
+
 function artStudioRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 }
@@ -337,6 +344,92 @@ async function invokeLocalCompute(manifestPath: string): Promise<{
   };
 }
 
+async function invokeDrawThingsCommission(
+  mode: "Prepare" | "Provision",
+  options: Readonly<{
+    stack?: "default" | "quality" | "fallback";
+    confirmation?: string;
+  }> = {},
+): Promise<unknown> {
+  if (process.platform !== "win32") {
+    throw new Error(
+      "Draw Things commissioning currently requires the EVAVO Windows workstation.",
+    );
+  }
+  const launcher = path.join(
+    localComputeRoot(),
+    "COMMISSION-EVAVO-DRAW-THINGS-CURRENT.ps1",
+  );
+  await access(launcher);
+  const args = [
+    "-NoLogo",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    launcher,
+    "-Mode",
+    mode,
+  ];
+  if (mode === "Provision") {
+    args.push(
+      "-Stack",
+      options.stack ?? "default",
+      "-AllowNetwork",
+      "-Confirm",
+      options.confirmation ?? "",
+    );
+  }
+  const child = spawn("powershell.exe", args, {
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: process.env,
+    shell: false,
+  });
+  let stdout: Buffer = Buffer.alloc(0);
+  let stderr: Buffer = Buffer.alloc(0);
+  child.stdout.on("data", (chunk: Buffer) => {
+    stdout = appendBounded(stdout, Buffer.from(chunk));
+  });
+  child.stderr.on("data", (chunk: Buffer) => {
+    stderr = appendBounded(stderr, Buffer.from(chunk));
+  });
+  await new Promise<void>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) resolve();
+      else {
+        reject(
+          new Error(
+            `Draw Things ${mode.toLowerCase()} commissioning exited with code ${String(code)}. ${stderr.toString("utf8").trim()}`,
+          ),
+        );
+      }
+    });
+  });
+  const body = stdout.toString("utf8").trim();
+  if (!body) {
+    throw new Error("Draw Things commissioning returned no JSON receipt.");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new Error(
+      `Draw Things commissioning returned invalid JSON: ${body.slice(-2000)}`,
+    );
+  }
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
+    (parsed as Record<string, unknown>).ok !== true
+  ) {
+    throw new Error("Draw Things commissioning did not return a successful receipt.");
+  }
+  return parsed;
+}
+
 function extractReceipt(stdout: string): unknown | null {
   const lines = stdout.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
@@ -432,6 +525,17 @@ export function registerLocalGenerationTools(server: McpServer): void {
         localOnly: true,
         hostedFallback: false,
         campaignSchema: "evavo.local-generation-campaign.v1",
+        drawThingsCommissioning: {
+          prepareTool: "prepare_draw_things_local_provider",
+          provisionTool: "provision_draw_things_local_provider",
+          prepareDownloads: false,
+          provisionRequiresOperatorEnablement: true,
+          provisionEnablementEnvironment:
+            "EVAVO_ART_DRAWTHINGS_MCP_ALLOW_PROVISIONING=true",
+          provisionConfirmation:
+            "PROVISION-EVAVO-DRAW-THINGS-STACK-v1",
+          provisionStacks: ["default", "quality", "fallback"],
+        },
         providerBackends: {
           comfyui: {
             adapterPrefix: "comfyui:",
@@ -491,6 +595,10 @@ export function registerLocalGenerationTools(server: McpServer): void {
         const example = shippedExamplePath("lorna-strip-poker-test");
         const catalog = defaultCatalogPath();
         const baseUrl = loopbackBaseUrl(defaultComfyBaseUrl());
+        const drawThingsCommissioner = path.join(
+          computeRoot,
+          "COMMISSION-EVAVO-DRAW-THINGS-CURRENT.ps1",
+        );
         const drawThingsRuntime = path.join(
           computeRoot,
           "src",
@@ -513,6 +621,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
           catalogEvidence,
           outputEvidence,
           comfy,
+          drawThingsCommissionerEvidence,
           drawThingsRuntimeEvidence,
           drawThingsServiceEvidence,
           drawThingsInstallEvidence,
@@ -525,6 +634,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
           regularFileEvidence(catalog),
           directoryEvidence(campaignOutputRoot()),
           comfyEvidence(baseUrl),
+          regularFileEvidence(drawThingsCommissioner),
           regularFileEvidence(drawThingsRuntime),
           regularFileEvidence(drawThingsServiceAction),
           regularFileEvidence(drawThingsInstall),
@@ -548,6 +658,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
         const drawThingsReadyWithoutStarting = Boolean(
           executionEnabled() &&
           bridgeEvidence.regularFile &&
+          drawThingsCommissionerEvidence.regularFile &&
           drawThingsRuntimeEvidence.regularFile &&
           drawThingsServiceEvidence.regularFile &&
           drawThingsInstallEvidence.regularFile &&
@@ -557,6 +668,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
         );
         const drawThingsServiceStartReady = Boolean(
           executionEnabled() &&
+          drawThingsCommissionerEvidence.regularFile &&
           drawThingsRuntimeEvidence.regularFile &&
           drawThingsServiceEvidence.regularFile &&
           drawThingsInstallEvidence.regularFile,
@@ -576,6 +688,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
           outputRoot: outputEvidence,
           comfy,
           drawThings: {
+            commissioner: drawThingsCommissionerEvidence,
             runtime: drawThingsRuntimeEvidence,
             reviewedServiceAction: drawThingsServiceEvidence,
             installManifest: drawThingsInstallEvidence,
@@ -584,6 +697,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
             canonicalComfyUrl: "http://127.0.0.1:8193",
             canonicalGrpcEndpoint: "127.0.0.1:7859",
             automaticDownloadOnServiceStart: false,
+            provisioningEnabledForMcp: drawThingsProvisioningEnabled(),
           },
           note: drawThingsReadyWithoutStarting
             ? "Core ComfyUI and the Draw Things bridge are independently discoverable; Draw Things is ready for a reviewed draw-things campaign."
@@ -593,6 +707,62 @@ export function registerLocalGenerationTools(server: McpServer): void {
         });
       } catch (error: unknown) {
         return toolError("LOCAL_GENERATION_DOCTOR_FAILED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "prepare_draw_things_local_provider",
+    {
+      description:
+        "Prepare the already-provisioned local Draw Things provider without downloading anything. Starts/verifies the pinned local service, captures exact model hashes, binds them to the committed EVAVO model policy and compiles the governed draw-things:* catalog. Requires trusted local execution.",
+      inputSchema: z.object({}),
+    },
+    async () => {
+      if (!executionEnabled()) {
+        return toolError(
+          "DRAW_THINGS_PREPARE_DISABLED",
+          new Error(
+            "Trusted local generation execution is disabled for this MCP process.",
+          ),
+        );
+      }
+      try {
+        return textResult(await invokeDrawThingsCommission("Prepare"));
+      } catch (error: unknown) {
+        return toolError("DRAW_THINGS_PREPARE_FAILED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "provision_draw_things_local_provider",
+    {
+      description:
+        "Explicitly provision the pinned Draw Things runtime and hash-pinned local model stack, then prepare the governed Art Studio catalog. This can download several GB and is disabled unless the trusted MCP process separately enables Draw Things provisioning. It never accepts arbitrary URLs, hashes, models or workflows.",
+      inputSchema: z.object({
+        stack: z.enum(["default", "quality", "fallback"]).default("default"),
+        confirmation: z.literal("PROVISION-EVAVO-DRAW-THINGS-STACK-v1"),
+      }),
+    },
+    async ({ stack, confirmation }) => {
+      if (!drawThingsProvisioningEnabled()) {
+        return toolError(
+          "DRAW_THINGS_PROVISIONING_DISABLED",
+          new Error(
+            "Draw Things provisioning requires EVAVO_ART_DRAWTHINGS_MCP_ALLOW_PROVISIONING=true in the trusted MCP process in addition to the exact confirmation.",
+          ),
+        );
+      }
+      try {
+        return textResult(
+          await invokeDrawThingsCommission("Provision", {
+            stack,
+            confirmation,
+          }),
+        );
+      } catch (error: unknown) {
+        return toolError("DRAW_THINGS_PROVISIONING_FAILED", error);
       }
     },
   );
