@@ -20,20 +20,21 @@ export const DRAW_THINGS_COMFYUI_PROVIDER_EVIDENCE_SCHEMA =
   "evavo.draw-things-comfyui-provider-evidence.v1" as const;
 export const DRAW_THINGS_SAMPLER_CLASS = "DrawThingsSampler" as const;
 
-export interface DrawThingsComfyUIProviderOptions
-  extends ComfyUIProviderOptions {
-  /**
-   * Operator assertion for the Draw Things gRPC service reached by the official
-   * ComfyUI bridge. Art Studio can verify the reviewed ComfyUI workflow and its
-   * DrawThingsSampler node, but the bridge owns the actual gRPC endpoint.
-   */
-  readonly drawThingsRemote: boolean;
-}
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+export type DrawThingsComfyUIProviderOptions = ComfyUIProviderOptions;
 
 export interface LoadDrawThingsComfyUIProviderOptions
   extends Omit<DrawThingsComfyUIProviderOptions, "catalog"> {
   readonly catalogPath: string;
   readonly allowedRoot?: string;
+}
+
+interface DrawThingsEndpointEvidence {
+  readonly server: string;
+  readonly port: string;
+  readonly useTls: boolean;
+  readonly remote: boolean;
 }
 
 function metadataObject(
@@ -44,26 +45,100 @@ function metadataObject(
     : {};
 }
 
-function usesDrawThings(profile: ComfyUIWorkflowProfile): boolean {
-  return profile.nodeInventory.some(
+function drawThingsEndpoint(
+  profile: ComfyUIWorkflowProfile,
+): DrawThingsEndpointEvidence {
+  const samplers = profile.nodeInventory.filter(
     (entry) => entry.classType === DRAW_THINGS_SAMPLER_CLASS,
   );
+  if (!samplers.length) {
+    throw new ProviderError(
+      "DRAW_THINGS_PROFILE_MISSING",
+      `Draw Things profile ${profile.profileId} must contain ${DRAW_THINGS_SAMPLER_CLASS}.`,
+      "permanent",
+    );
+  }
+
+  const endpoints = samplers.map((entry) => {
+    const node = profile.workflow[entry.nodeId];
+    if (!node) {
+      throw new ProviderError(
+        "DRAW_THINGS_PROFILE_INVALID",
+        `Draw Things sampler node ${entry.nodeId} is absent from workflow ${profile.profileId}.`,
+        "permanent",
+      );
+    }
+    const serverValue = node.inputs.server;
+    const portValue = node.inputs.port;
+    const tlsValue = node.inputs.use_tls;
+    const server =
+      typeof serverValue === "string" ? serverValue.trim().toLowerCase() : "";
+    const port =
+      typeof portValue === "string" || typeof portValue === "number"
+        ? String(portValue).trim()
+        : "";
+    if (!server || !port || !/^\d{1,5}$/u.test(port)) {
+      throw new ProviderError(
+        "DRAW_THINGS_ENDPOINT_INVALID",
+        `Draw Things sampler ${entry.nodeId} must pin a concrete server and port in the reviewed workflow.`,
+        "permanent",
+      );
+    }
+    const numericPort = Number(port);
+    if (numericPort < 1 || numericPort > 65_535 || typeof tlsValue !== "boolean") {
+      throw new ProviderError(
+        "DRAW_THINGS_ENDPOINT_INVALID",
+        `Draw Things sampler ${entry.nodeId} has an invalid port or use_tls value.`,
+        "permanent",
+      );
+    }
+    const remote = !LOOPBACK_HOSTS.has(server);
+    if (remote && tlsValue !== true) {
+      throw new ProviderError(
+        "DRAW_THINGS_REMOTE_TLS_REQUIRED",
+        `Remote Draw Things sampler ${entry.nodeId} must enable TLS.`,
+        "permanent",
+      );
+    }
+    return {
+      server,
+      port,
+      useTls: tlsValue,
+      remote,
+    } satisfies DrawThingsEndpointEvidence;
+  });
+
+  const first = endpoints[0]!;
+  for (const endpoint of endpoints.slice(1)) {
+    if (
+      endpoint.server !== first.server ||
+      endpoint.port !== first.port ||
+      endpoint.useTls !== first.useTls
+    ) {
+      throw new ProviderError(
+        "DRAW_THINGS_ENDPOINT_AMBIGUOUS",
+        `Draw Things profile ${profile.profileId} contains sampler nodes targeting different gRPC endpoints.`,
+        "permanent",
+      );
+    }
+  }
+  return first;
 }
 
 class DrawThingsComfyUIProviderAdapter implements ProviderAdapter {
   public readonly descriptor: ProviderAdapterDescriptor;
   readonly #delegate: ProviderAdapter;
   readonly #profile: ComfyUIWorkflowProfile;
-  readonly #drawThingsRemote: boolean;
+  readonly #endpoint: DrawThingsEndpointEvidence;
 
   public constructor(
     delegate: ProviderAdapter,
     profile: ComfyUIWorkflowProfile,
-    drawThingsRemote: boolean,
+    endpoint: DrawThingsEndpointEvidence,
   ) {
     this.#delegate = delegate;
     this.#profile = profile;
-    this.#drawThingsRemote = drawThingsRemote;
+    this.#endpoint = endpoint;
     this.descriptor = Object.freeze({
       protocolVersion: PROVIDER_PROTOCOL_VERSION,
       id: `draw-things:${profile.profileId}`,
@@ -76,9 +151,9 @@ class DrawThingsComfyUIProviderAdapter implements ProviderAdapter {
       maximumReferenceImages: delegate.descriptor.maximumReferenceImages,
       maximumSourceBytes: delegate.descriptor.maximumSourceBytes,
       dataPolicy: Object.freeze({
-        remote: delegate.descriptor.dataPolicy.remote || drawThingsRemote,
+        remote: delegate.descriptor.dataPolicy.remote || endpoint.remote,
         retainedByProvider: true,
-        usedForTraining: drawThingsRemote ? "provider-dependent" : false,
+        usedForTraining: endpoint.remote ? "provider-dependent" : false,
       }),
     });
   }
@@ -100,7 +175,10 @@ class DrawThingsComfyUIProviderAdapter implements ProviderAdapter {
           profileSha256: this.#profile.profileSha256,
           samplerClass: DRAW_THINGS_SAMPLER_CLASS,
           delegatedAdapterId: result.adapterId,
-          drawThingsRemote: this.#drawThingsRemote,
+          grpcServer: this.#endpoint.server,
+          grpcPort: this.#endpoint.port,
+          grpcTls: this.#endpoint.useTls,
+          drawThingsRemote: this.#endpoint.remote,
           directGrpcClientUsed: false,
           arbitraryWorkflowAccepted: false,
           candidateApprovalPerformed: false,
@@ -121,7 +199,11 @@ export function createDrawThingsComfyUIProviderAdapters(
       adapter,
     ]),
   );
-  const profiles = options.catalog.profiles.filter(usesDrawThings);
+  const profiles = options.catalog.profiles.filter((profile) =>
+    profile.nodeInventory.some(
+      (entry) => entry.classType === DRAW_THINGS_SAMPLER_CLASS,
+    ),
+  );
   if (!profiles.length) {
     throw new ProviderError(
       "DRAW_THINGS_PROFILE_MISSING",
@@ -142,7 +224,7 @@ export function createDrawThingsComfyUIProviderAdapters(
       return new DrawThingsComfyUIProviderAdapter(
         delegate,
         profile,
-        options.drawThingsRemote,
+        drawThingsEndpoint(profile),
       );
     }),
   );
