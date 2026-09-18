@@ -119,7 +119,7 @@
     "raw-art:provider-execution:check": "pnpm --filter @evavo/art-studio-worker build && node scripts/check-raw-art-provider-runtime-execution.mjs",
     "provider:comfyui:catalog:compile": "pnpm --filter @evavo/art-providers build && node scripts/compile-comfyui-workflow-catalog.mjs",
     "provider:comfyui:check": "node scripts/check-comfyui-provider-adapter.mjs && node --test packages/providers/test/comfyui.test.mjs apps/worker/test/comfyui-provider-registry.test.mjs",
-    "provider:drawthings:check": "pnpm --filter @evavo/art-providers build && pnpm --filter @evavo/art-studio-worker build && node --test packages/providers/test/draw-things-comfyui.test.mjs apps/worker/test/draw-things-provider-registry.test.mjs",
+    "provider:drawthings:check": "pnpm --filter @evavo/art-providers build && pnpm --filter @evavo/art-studio-worker build && node --test packages/providers/test/draw-things-comfyui.test.mjs apps/worker/test/draw-things-provider-registry.test.mjs && pnpm run provider:drawthings:model:check",
     "raw-art:provider-review": "node scripts/compile-raw-art-provider-review-plan.mjs",
     "raw-art:provider-review:check": "pnpm --filter @evavo/art-studio-worker build && node scripts/check-raw-art-provider-review.mjs",
     "mcp:review:build": "pnpm run build:domain && pnpm --filter @evavo/art-studio-mcp build",
@@ -149,7 +149,10 @@
     "pixel-font:v2:chess-lord:audit": "python tools/pixel_font_studio_v2.py audit --family config/pixel-font-families/chess-lord-v2/chess-lord.family.json",
     "pixel-font:v2:check": "node scripts/check-pixel-font-studio-v2.mjs",
     "game-hud:review": "node tools/game_hud_review.mjs",
-    "game-hud:check": "node --check tools/game_hud_review.mjs && node --test tools/game_hud_review.test.mjs"
+    "game-hud:check": "node --check tools/game_hud_review.mjs && node --test tools/game_hud_review.test.mjs",
+    "provider:drawthings:inventory": "node scripts/draw-things-local-models.mjs inventory",
+    "provider:drawthings:catalog:compile": "pnpm --filter @evavo/art-providers build && node scripts/draw-things-local-models.mjs compile",
+    "provider:drawthings:model:check": "node --check scripts/draw-things-local-models.mjs && node --test scripts/draw-things-local-models.test.mjs"
   },
   "workspaces": [
     "apps/*",
