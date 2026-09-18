@@ -1054,3 +1054,513 @@ export function compileTwoStageAnimationProviderBatch(
     },
   };
 }
+
+
+export interface TwoStageAnimationClipCompileRequest
+  extends Omit<
+    TwoStageAnimationProviderBatchCompileRequest,
+    "batchId" | "keyPoseArtifactIds" | "finalCandidatesPerFrame"
+  > {
+  readonly keyPoseCandidatesPerFrame?: number;
+  readonly inBetweenCandidatesPerFrame?: number;
+}
+
+export interface TwoStageAnimationClipCompilation {
+  readonly schemaVersion: "1.0";
+  readonly compilerVersion: typeof TWO_STAGE_ANIMATION_PROVIDER_COMPILER_VERSION;
+  readonly clipId: string;
+  readonly animationDirectorPlanSha256: string;
+  readonly drawThingsCatalogSha256: string;
+  readonly frames: readonly TwoStageAnimationFrameCompilation[];
+  readonly familyEvidenceRole: string;
+  readonly familyManifestRole: string;
+  readonly familyCompositeRole: string;
+  readonly supervisorRequest: SpriteSupervisorCompileRequestInput;
+  readonly supervisorWorkflow: CompiledSpriteSupervisorWorkflow;
+  readonly authority: Readonly<{
+    providerExecution: false;
+    runtimeSubmission: false;
+    creativeApproval: false;
+    repositoryMutation: false;
+    publication: false;
+  }>;
+}
+
+function exactArtifactId(value: string, name: string): ArtifactId {
+  if (!ARTIFACT_ID.test(value)) {
+    fail(name + " must be a canonical artifact_[sha256] id");
+  }
+  return value as ArtifactId;
+}
+
+function phaseCandidateCount(
+  requested: number | undefined,
+  maximum: number,
+  label: string,
+): number {
+  const value = requested ?? maximum;
+  if (!Number.isInteger(value) || value < 1 || value > maximum) {
+    fail(label + " must be an integer from 1 to " + maximum);
+  }
+  return value;
+}
+
+function batchRequestForClip(
+  request: TwoStageAnimationClipCompileRequest,
+  batchId: string,
+  keyPoseArtifactIds: Readonly<Record<string, ArtifactId>> | undefined,
+): TwoStageAnimationProviderBatchCompileRequest {
+  return {
+    spritePlan: request.spritePlan,
+    plan: request.plan,
+    batchId,
+    poseControlBindings: request.poseControlBindings,
+    ...(keyPoseArtifactIds ? { keyPoseArtifactIds } : {}),
+    style: request.style,
+    background: request.background,
+    ...(request.quality ? { quality: request.quality } : {}),
+    drawThingsCatalog: request.drawThingsCatalog,
+    ...(request.promotion ? { promotion: request.promotion } : {}),
+    ...(request.requireFinalHumanApproval !== undefined
+      ? { requireFinalHumanApproval: request.requireFinalHumanApproval }
+      : {}),
+    ...(request.metadata === undefined ? {} : { metadata: request.metadata }),
+  };
+}
+
+function frameIdForNumber(
+  request: TwoStageAnimationClipCompileRequest,
+  frameNumber: number,
+): string {
+  return (
+    request.plan.clipId +
+    ":f" +
+    String(frameNumber).padStart(3, "0")
+  );
+}
+
+function familyManifestForClip(
+  request: TwoStageAnimationClipCompileRequest,
+  frameRoles: ReadonlyMap<number, string>,
+): JsonValue {
+  const pivot = request.spritePlan.godot.pivot;
+  const frames = request.plan.frames.map((frame) => {
+    const frameId = frameIdForNumber(request, frame.frame);
+    const masterRole = frameRoles.get(frame.frame);
+    if (!masterRole) {
+      fail("family manifest is missing promoted frame role for " + frameId);
+    }
+    return {
+      id: frameId,
+      animation: request.plan.clipId,
+      direction: request.plan.direction,
+      frameIndex: frame.frame - 1,
+      globalFrameIndex: frame.frame - 1,
+      durationMs: frame.duration.numeratorMs / frame.duration.denominator,
+      pivot,
+      groundContact: frame.groundContactRequired,
+      layers: [
+        {
+          layerId: "identity-core",
+          artifactId: { $artifact: masterRole },
+          offset: { x: 0, y: 0 },
+          opacity: 1,
+        },
+      ],
+    };
+  });
+  const identityFrameId = frameIdForNumber(request, 1);
+  return normalizeJson({
+    schemaVersion: "1.0",
+    familyId: token(
+      request.spritePlan.asset.assetId +
+        "-" +
+        request.plan.clipId +
+        "-" +
+        request.plan.direction +
+        "-two-stage-family",
+      128,
+    ),
+    canvas: request.plan.canvas,
+    layerDefinitions: [
+      {
+        id: "identity-core",
+        role: "identity-core",
+        sourcePolicy: "per-frame",
+        required: true,
+        contributesToComposite: true,
+        contributesToIdentity: true,
+        mustRemainSeparate: false,
+        zIndex: 0,
+        blendMode: "normal",
+        minimumVisibleFraction: 0.001,
+        registrationTolerancePixels:
+          request.plan.qualityRequirements.maximumRootStepPixels,
+        allowedOccludedBy: [],
+        occludes: [],
+      },
+    ],
+    frames,
+    policy: {
+      identityReferenceFrameId: identityFrameId,
+      requireDeclaredComposite: false,
+      requireReferenceLineage: false,
+      requireQualityPassed: true,
+      alphaVisibleThreshold: 8,
+      maximumInputBytes: 64 * 1024 * 1024,
+      maximumPixels:
+        request.plan.canvas.width * request.plan.canvas.height,
+      maximumFrames: 64,
+      decodeConcurrency: 4,
+      maximumTranslationPixels:
+        request.plan.qualityRequirements.maximumRootStepPixels,
+      maximumEdgeDistancePixels: 16,
+      pivotTolerancePixels: 0,
+      groundContactTolerancePixels:
+        request.plan.qualityRequirements.plantedFootDriftTolerancePixels,
+      minimumCanonicalVisibleAreaSimilarity: 0.58,
+      minimumCanonicalPaletteSimilarity: 0.5,
+      minimumCanonicalCentroidSimilarity: 0.58,
+      minimumAdjacentVisibleAreaSimilarity: 0.52,
+      minimumAdjacentPaletteSimilarity: 0.46,
+      minimumAdjacentCentroidSimilarity: 0.52,
+      minimumLoopClosureSimilarity:
+        request.plan.qualityRequirements.loopClosureRequired ? 0.5 : 0,
+      compositeChannelTolerance: 0,
+      maximumCompositeMeanError: 0,
+      maximumCompositeMismatchFraction: 0,
+    },
+    metadata: {
+      compilerVersion: TWO_STAGE_ANIMATION_PROVIDER_COMPILER_VERSION,
+      spritePlanId: request.spritePlan.planId,
+      spritePlanSha256: request.spritePlan.planSha256,
+      clipId: request.plan.clipId,
+      direction: request.plan.direction,
+      motionStyle: request.plan.motionStyle,
+      fps: request.plan.fps,
+      loop: request.plan.loop,
+      localOnly: true,
+    },
+  });
+}
+
+export function compileTwoStageAnimationClip(
+  request: TwoStageAnimationClipCompileRequest,
+): TwoStageAnimationClipCompilation {
+  if (!request || typeof request !== "object") {
+    fail("request must be an object");
+  }
+  verifySpritePlanCompatibility(request as TwoStageAnimationProviderBatchCompileRequest);
+  if (
+    request.background.strategy !== "chroma-key" ||
+    typeof request.background.matteColour !== "string" ||
+    !/^#[a-fA-F0-9]{6}$/u.test(request.background.matteColour)
+  ) {
+    fail(
+      "two-stage Draw Things animation requires one exact #RRGGBB chroma-key matte",
+    );
+  }
+  const catalog = validateComfyUIWorkflowCatalog(request.drawThingsCatalog);
+  const keyBatch = request.plan.generationBatches.find(
+    (batch) => batch.phase === "key-pose",
+  );
+  if (!keyBatch) {
+    fail("Animation Director plan contains no key-pose batch");
+  }
+  const inBetweenBatches = request.plan.generationBatches.filter(
+    (batch) => batch.phase === "in-between",
+  );
+  if (!inBetweenBatches.length) {
+    fail("Animation Director plan contains no in-between batches");
+  }
+
+  const keyRequest = batchRequestForClip(request, keyBatch.id, undefined);
+  const verifiedKeys = verifiedBatch(keyRequest);
+  const keyCandidateCount = phaseCandidateCount(
+    request.keyPoseCandidatesPerFrame,
+    keyBatch.maximumCandidatesPerFrame,
+    "keyPoseCandidatesPerFrame",
+  );
+  const compiledKeys = verifiedKeys.requests.map((source) =>
+    tasksForFrame(
+      keyRequest,
+      source,
+      catalog,
+      keyCandidateCount,
+    ),
+  );
+
+  const compiledByFrameNumber = new Map<
+    number,
+    Readonly<{
+      frame: TwoStageAnimationFrameCompilation;
+      tasks: readonly SpriteSupervisorTaskInput[];
+    }>
+  >();
+  for (const compiled of compiledKeys) {
+    const frameNumber = Number(
+      compiled.frame.frameId.split(":f").at(-1),
+    );
+    if (!Number.isInteger(frameNumber)) {
+      fail("compiled key frame id is invalid: " + compiled.frame.frameId);
+    }
+    compiledByFrameNumber.set(frameNumber, compiled);
+  }
+
+  const placeholder = exactArtifactId(
+    request.plan.canonicalIdentityArtifactId,
+    "canonicalIdentityArtifactId",
+  );
+  for (const batch of inBetweenBatches) {
+    const placeholderKeyPoses = Object.fromEntries(
+      batch.dependsOnFrames.map((frameNumber) => [
+        String(frameNumber),
+        placeholder,
+      ]),
+    ) as Readonly<Record<string, ArtifactId>>;
+    const batchRequest = batchRequestForClip(
+      request,
+      batch.id,
+      placeholderKeyPoses,
+    );
+    const verified = verifiedBatch(batchRequest);
+    const candidateCount = phaseCandidateCount(
+      request.inBetweenCandidatesPerFrame,
+      batch.maximumCandidatesPerFrame,
+      "inBetweenCandidatesPerFrame",
+    );
+    const previousFrame = batch.dependsOnFrames[0];
+    const nextFrame = batch.dependsOnFrames[1];
+    if (previousFrame === undefined || nextFrame === undefined) {
+      fail("in-between batch " + batch.id + " must declare two key-pose dependencies");
+    }
+    const previousCompiled = compiledByFrameNumber.get(previousFrame);
+    const nextCompiled = compiledByFrameNumber.get(nextFrame);
+    if (!previousCompiled || !nextCompiled) {
+      fail(
+        "in-between batch " +
+          batch.id +
+          " depends on key poses that were not compiled first",
+      );
+    }
+    const runtimeTemporal: RuntimeTemporalBinding = {
+      previousRole: previousCompiled.frame.finalMasterRole,
+      nextRole: nextCompiled.frame.finalMasterRole,
+      dependencyTaskIds: [
+        taskToken("promote", previousCompiled.frame.frameId),
+        taskToken("promote", nextCompiled.frame.frameId),
+      ],
+    };
+    for (const source of verified.requests) {
+      const compiled = tasksForFrame(
+        batchRequest,
+        source,
+        catalog,
+        candidateCount,
+        runtimeTemporal,
+      );
+      const frameNumber = Number(
+        compiled.frame.frameId.split(":f").at(-1),
+      );
+      if (!Number.isInteger(frameNumber)) {
+        fail("compiled in-between frame id is invalid: " + compiled.frame.frameId);
+      }
+      compiledByFrameNumber.set(frameNumber, compiled);
+    }
+  }
+
+  const ordered = [...compiledByFrameNumber.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map((entry) => entry[1]);
+  if (ordered.length !== request.plan.frames.length) {
+    fail(
+      "compiled clip frame count " +
+        ordered.length +
+        " does not match Animation Director frame count " +
+        request.plan.frames.length,
+    );
+  }
+
+  const frameRoles = new Map(
+    ordered.map((entry, index) => [
+      index + 1,
+      entry.frame.finalMasterRole,
+    ]),
+  );
+  const familyEvidenceRole = "two-stage.family-evidence";
+  const familyManifestRole = "two-stage.family-manifest";
+  const familyCompositeRole = "two-stage.family-composites";
+  const familyTaskId = taskToken("family", request.plan.clipId);
+  const familyTask: SpriteSupervisorTaskInput = {
+    id: familyTaskId,
+    stage: "family-verification",
+    title:
+      "Verify the complete two-stage " +
+      request.plan.clipId +
+      " animation family",
+    queue: "selection",
+    kind: "sprite.family.verify",
+    dependencyTaskIds: ordered.map((entry) =>
+      taskToken("promote", entry.frame.frameId),
+    ),
+    requiredArtifactRoles: ordered.map(
+      (entry) => entry.frame.finalMasterRole,
+    ),
+    payloadTemplate: familyManifestForClip(request, frameRoles),
+    requiredCapabilities: [
+      "sprite.family.verify",
+      "media.layer-compose",
+      "selection.compare",
+      "evidence.bundle",
+    ],
+    outputBindings: [
+      {
+        role: familyEvidenceRole,
+        source: "output-artifact-labels",
+        labels: {
+          artifactRole: "sprite-family-consistency-evidence",
+          qualityState: "passed",
+        },
+        cardinality: "one",
+        required: true,
+      },
+      {
+        role: familyManifestRole,
+        source: "output-artifact-labels",
+        labels: {
+          artifactRole: "sprite-family-normalized-manifest",
+        },
+        cardinality: "one",
+        required: true,
+      },
+      {
+        role: familyCompositeRole,
+        source: "output-artifact-labels",
+        labels: {
+          artifactRole: "layered-frame-composite",
+          qualityState: "passed",
+        },
+        cardinality: "many",
+        required: true,
+      },
+    ],
+    maximumAttempts: 1,
+    failurePolicy: {
+      reviewCodePrefixes: ["SPRITE_FAMILY_"],
+      maxRedrives: 0,
+      reviewOnUnclassified: true,
+    },
+  };
+
+  const tasks = [
+    ...ordered.flatMap((entry) => entry.tasks),
+    familyTask,
+  ];
+  const initialArtifactIds = new Set<ArtifactId>([
+    exactArtifactId(
+      request.plan.canonicalIdentityArtifactId,
+      "canonicalIdentityArtifactId",
+    ),
+    ...Object.values(request.poseControlBindings).map((binding) =>
+      exactArtifactId(binding.artifactId, "poseControlBindings.artifactId"),
+    ),
+  ]);
+  if (request.plan.directionMasterArtifactId) {
+    initialArtifactIds.add(
+      exactArtifactId(
+        request.plan.directionMasterArtifactId,
+        "directionMasterArtifactId",
+      ),
+    );
+  }
+
+  const planSha256 = verifiedKeys.planSha256;
+  const bindingSha256s = [
+    ...new Set(
+      Object.values(request.poseControlBindings).map(
+        (binding) => binding.bindingSha256,
+      ),
+    ),
+  ].sort();
+  const supervisorRequest: SpriteSupervisorCompileRequestInput = {
+    schemaVersion: "1.0",
+    runId: token(
+      "two-stage-clip-" +
+        request.plan.clipId +
+        "-" +
+        shortHash({
+          planSha256,
+          catalogSha256: catalog.catalogSha256,
+          bindingSha256s,
+        }),
+      128,
+    ),
+    spritePlan: request.spritePlan,
+    initialArtifactBindings: [
+      {
+        role: "two-stage.source-artifacts",
+        artifactIds: [...initialArtifactIds].sort(),
+      },
+    ],
+    tasks,
+    policy: {
+      tickDelayMs: 1_000,
+      maximumTicks: Math.max(2_000, tasks.length * 10),
+      maximumActiveChildren: 1,
+      defaultMaximumRedrives: 2,
+      defaultMaximumRepairCycles: 0,
+      cancelChildrenOnAbort: true,
+      reviewOnUnclassifiedFailure: true,
+      requireAllPlanStagesCovered: false,
+      requireFinalHumanApproval:
+        request.requireFinalHumanApproval ?? false,
+      requiredReleaseArtifactRoles: [
+        familyEvidenceRole,
+        familyManifestRole,
+      ],
+    },
+    metadata: normalizeJson({
+      compilerVersion: TWO_STAGE_ANIMATION_PROVIDER_COMPILER_VERSION,
+      mode: "full-clip",
+      animationDirectorPlanSha256: planSha256,
+      verifiedPoseControlBindingSha256s: bindingSha256s,
+      drawThingsCatalogId: catalog.catalogId,
+      drawThingsCatalogVersion: catalog.catalogVersion,
+      drawThingsCatalogSha256: catalog.catalogSha256,
+      clipId: request.plan.clipId,
+      direction: request.plan.direction,
+      frameCount: ordered.length,
+      localOnly: true,
+      maximumActiveChildren: 1,
+      familyVerificationRequired: true,
+      structuralStage: "SDXL-or-compatible pose-control",
+      finalStage: "Kontext edit refinement",
+      temporalDependencySource: "promoted-key-pose-masters",
+      ...(request.metadata === undefined
+        ? {}
+        : { sourceMetadata: request.metadata }),
+    }),
+  };
+  const supervisorWorkflow =
+    compileSpriteSupervisorWorkflow(supervisorRequest);
+  return {
+    schemaVersion: "1.0",
+    compilerVersion: TWO_STAGE_ANIMATION_PROVIDER_COMPILER_VERSION,
+    clipId: request.plan.clipId,
+    animationDirectorPlanSha256: planSha256,
+    drawThingsCatalogSha256: catalog.catalogSha256,
+    frames: ordered.map((entry) => entry.frame),
+    familyEvidenceRole,
+    familyManifestRole,
+    familyCompositeRole,
+    supervisorRequest,
+    supervisorWorkflow,
+    authority: {
+      providerExecution: false,
+      runtimeSubmission: false,
+      creativeApproval: false,
+      repositoryMutation: false,
+      publication: false,
+    },
+  };
+}
