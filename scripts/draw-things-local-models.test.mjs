@@ -530,7 +530,7 @@ test("Kontext models get capability-honest direction and temporal reference prof
     governance: governance({ priority: 220 }),
     install: install(),
   });
-  assert.equal(draft.profiles.length, 5);
+  assert.equal(draft.profiles.length, 9);
 
   const base = draft.profiles.find(
     (profile) => profile.profileId === "dt-fixture-xl-generate",
@@ -622,6 +622,61 @@ test("reference profiles stay below their no-reference base route priority", () 
   assert.equal(byId.get("dt-fixture-xl-generate-edit").priority, 46);
 });
 
+
+test("Kontext final refinement profiles combine structural draft with continuity locks", () => {
+  const kontextInventory = inventory({
+    model: {
+      name: "Fixture XL",
+      file: "fixture_xl.safetensors",
+      version: "sdxl",
+      prefix: "",
+      modifier: "kontext",
+    },
+  });
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: kontextInventory,
+    governance: governance({ priority: 220 }),
+    install: install(),
+  });
+  const final = draft.profiles.find(
+    (profile) =>
+      profile.profileId ===
+      "dt-fixture-xl-generate-edit-direction-temporal-ref",
+  );
+  assert.ok(final);
+  assert.deepEqual(final.operations, ["edit"]);
+  assert.ok(final.capabilities.includes("edit"));
+  assert.ok(final.capabilities.includes("identity-reference"));
+  assert.ok(final.capabilities.includes("direction-reference"));
+  assert.ok(final.capabilities.includes("temporal-reference"));
+  assert.ok(final.capabilities.includes("multiple-reference-images"));
+  assert.ok(!final.capabilities.includes("pose-control"));
+  assert.equal(final.workflow["3"].inputs.strength, 1);
+  assert.deepEqual(final.workflow["3"].inputs.hints, ["8", 0]);
+  assert.deepEqual(
+    final.bindings.referenceImages.map((reference) => reference.role),
+    [
+      "base-image",
+      "canonical-identity",
+      "direction-master",
+      "previous-key-pose",
+      "next-key-pose",
+    ],
+  );
+  assert.equal(final.limits.maximumReferenceImages, 5);
+  assert.equal(final.workflow["8"].inputs.type, "Shuffle (Moodboard)");
+  assert.equal(final.workflow["8"].inputs.type_2, "Shuffle (Moodboard)");
+  assert.equal(final.workflow["8"].inputs.type_3, "Shuffle (Moodboard)");
+  assert.equal(final.workflow["8"].inputs.type_4, "Shuffle (Moodboard)");
+
+  const compiled = compileComfyUIWorkflowCatalog(draft);
+  const compiledFinal = compiled.profiles.find(
+    (profile) => profile.profileId === final.profileId,
+  );
+  assert.ok(compiledFinal);
+  assert.deepEqual(compiledFinal.operations, ["edit"]);
+  assert.equal(compiledFinal.bindings.referenceImages.length, 5);
+});
 
 test("every governed model gets a capability-honest local edit profile", () => {
   const { draft } = buildDrawThingsCatalogDraft({
@@ -1014,7 +1069,7 @@ test("generated Kontext reference profiles compile through the real governed cat
     install: install(),
   });
   const compiled = compileComfyUIWorkflowCatalog(draft);
-  assert.equal(compiled.profiles.length, 5);
+  assert.equal(compiled.profiles.length, 9);
   const temporal = compiled.profiles.find(
     (profile) => profile.profileId === "dt-fixture-xl-generate-temporal-ref",
   );
