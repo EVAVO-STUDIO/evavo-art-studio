@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const INVENTORY_SCHEMA = "evavo.draw-things-local-inventory.v1";
 const GOVERNANCE_SCHEMA = "evavo.draw-things-model-governance.v1";
+const POLICY_SCHEMA = "evavo.draw-things-approved-model-policy.v1";
 const INSTALL_SCHEMA = "evavo.draw-things-local-install.v1";
 const CATALOG_DRAFT_SCHEMA = "evavo.comfyui-workflow-catalog-draft.v1";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
@@ -124,6 +125,14 @@ function defaultCatalog(environment = process.env) {
 
 function defaultGovernanceEvidence(environment = process.env) {
   return path.join(defaultRuntimeRoot(environment), "catalog.governance.json");
+}
+
+function defaultGovernancePath(environment = process.env) {
+  return path.join(defaultRuntimeRoot(environment), "model-governance.json");
+}
+
+function defaultPolicyPath() {
+  return path.join(ROOT, "config", "draw-things-approved-model-policy.v1.json");
 }
 
 function safeLoopbackBaseUrl(value) {
@@ -449,6 +458,202 @@ function validateInventory(value) {
     fail("inventory.models must contain at most 512 models");
   }
   return inventory;
+}
+
+function generationDefaults(value, label = "generationDefaults") {
+  if (value === undefined || value === null) {
+    return {
+      steps: 20,
+      cfg: 4.5,
+      samplerName: "DPM++ 2M AYS",
+      seedMode: "ScaleAlike",
+      clipSkip: 1,
+      shift: 1,
+      resolutionDependentShift: true,
+      speedUp: true,
+      teaCache: false,
+      teaCacheThreshold: 0.2,
+      teaCacheStart: 5,
+      teaCacheEnd: 2,
+      teaCacheMaxSkipSteps: 3,
+    };
+  }
+  const defaults = object(value, label);
+  const integer = (key, minimum, maximum) => {
+    const result = defaults[key];
+    if (!Number.isInteger(result) || result < minimum || result > maximum) {
+      fail(`${label}.${key} must be an integer in [${minimum}, ${maximum}]`);
+    }
+    return result;
+  };
+  const number = (key, minimum, maximum) => {
+    const result = defaults[key];
+    if (typeof result !== "number" || !Number.isFinite(result) || result < minimum || result > maximum) {
+      fail(`${label}.${key} must be a number in [${minimum}, ${maximum}]`);
+    }
+    return result;
+  };
+  const boolean = (key) => {
+    if (typeof defaults[key] !== "boolean") fail(`${label}.${key} must be boolean`);
+    return defaults[key];
+  };
+  return {
+    steps: integer("steps", 1, 150),
+    cfg: number("cfg", 0, 50),
+    samplerName: text(defaults.samplerName, `${label}.samplerName`, 128),
+    seedMode: text(defaults.seedMode, `${label}.seedMode`, 64),
+    clipSkip: integer("clipSkip", 1, 23),
+    shift: number("shift", 0.1, 16),
+    resolutionDependentShift: boolean("resolutionDependentShift"),
+    speedUp: boolean("speedUp"),
+    teaCache: boolean("teaCache"),
+    teaCacheThreshold: number("teaCacheThreshold", 0, 1),
+    teaCacheStart: integer("teaCacheStart", 0, 1000),
+    teaCacheEnd: integer("teaCacheEnd", -151, 150),
+    teaCacheMaxSkipSteps: integer("teaCacheMaxSkipSteps", 1, 50),
+  };
+}
+
+function validateExpectedFiles(value, label) {
+  if (!Array.isArray(value) || !value.length || value.length > 32) {
+    fail(`${label} must contain 1 to 32 files`);
+  }
+  const names = new Set();
+  return value.map((raw, index) => {
+    const file = object(raw, `${label}[${index}]`);
+    const name = text(file.name, `${label}[${index}].name`, 256);
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u.test(name) || names.has(name)) {
+      fail(`${label}[${index}].name is unsafe or duplicated`);
+    }
+    names.add(name);
+    return { name, sha256: sha(file.sha256, `${label}[${index}].sha256`) };
+  });
+}
+
+function validateApprovedPolicy(value) {
+  const policy = object(value, "Draw Things approved model policy");
+  if (policy.schema !== POLICY_SCHEMA) fail(`policy must use ${POLICY_SCHEMA}`);
+  const policyId = safeId(policy.policyId, "policy.policyId");
+  const reviewedBy = text(policy.reviewedBy, "policy.reviewedBy", 256);
+  if (!Number.isFinite(Date.parse(policy.reviewedAt))) fail("policy.reviewedAt is invalid");
+  const reviewedAt = policy.reviewedAt;
+  if (!Array.isArray(policy.models) || !policy.models.length || policy.models.length > 64) {
+    fail("policy.models must contain 1 to 64 entries");
+  }
+  const ids = new Set();
+  const models = policy.models.map((raw, index) => {
+    const entry = object(raw, `policy.models[${index}]`);
+    const id = safeId(entry.id, `policy.models[${index}].id`);
+    if (ids.has(id)) fail(`duplicate policy model id ${id}`);
+    ids.add(id);
+    const license = object(entry.license, `policy.models[${index}].license`);
+    for (const field of ["commercialUse", "derivatives", "redistribution"]) {
+      if (!new Set(["allowed", "restricted", "unknown", "prohibited"]).has(license[field])) {
+        fail(`policy.models[${index}].license.${field} is unsupported`);
+      }
+    }
+    if (!Array.isArray(entry.approvedUses) || !entry.approvedUses.length) {
+      fail(`policy.models[${index}].approvedUses must be non-empty`);
+    }
+    const priority = entry.priority;
+    if (!Number.isInteger(priority) || priority < -1000 || priority > 1000) {
+      fail(`policy.models[${index}].priority must be an integer in [-1000, 1000]`);
+    }
+    const resourceClass = entry.resourceClass ?? "baseline";
+    if (!new Set(["baseline", "quality", "heavy"]).has(resourceClass)) {
+      fail(`policy.models[${index}].resourceClass is unsupported`);
+    }
+    return {
+      id,
+      inventoryName: text(entry.inventoryName, `policy.models[${index}].inventoryName`, 512),
+      inventoryFile: text(entry.inventoryFile, `policy.models[${index}].inventoryFile`, 1024),
+      version: text(entry.version, `policy.models[${index}].version`, 256),
+      expectedFiles: validateExpectedFiles(entry.expectedFiles, `policy.models[${index}].expectedFiles`),
+      source: canonical(object(entry.source, `policy.models[${index}].source`)),
+      license: canonical(license),
+      approvedUses: [...new Set(entry.approvedUses.map((use, useIndex) =>
+        text(use, `policy.models[${index}].approvedUses[${useIndex}]`, 64),
+      ))].sort(),
+      generationDefaults: generationDefaults(entry.generationDefaults, `policy.models[${index}].generationDefaults`),
+      priority,
+      resourceClass,
+      ...(typeof entry.notes === "string" && entry.notes.trim() ? { notes: entry.notes.trim() } : {}),
+    };
+  });
+  return { schema: POLICY_SCHEMA, policyId, reviewedBy, reviewedAt, models };
+}
+
+function componentMap(model) {
+  if (!Array.isArray(model.components) || !model.components.length) {
+    fail(`inventory model ${model.id ?? model.file ?? "unknown"} has no physical components`);
+  }
+  const result = new Map();
+  for (const component of model.components) {
+    const item = object(component, "inventory model component");
+    const relativePath = text(item.relativePath, "inventory component.relativePath", 2048);
+    const name = path.posix.basename(relativePath.replace(/\\/gu, "/"));
+    if (result.has(name)) fail(`inventory model contains duplicate component basename ${name}`);
+    result.set(name, sha(item.sha256, `inventory component ${name}.sha256`));
+  }
+  return result;
+}
+
+export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
+  const inventory = validateInventory(inventoryRaw);
+  const policy = validateApprovedPolicy(policyRaw);
+  const policyDigest = sha(policySha256, "policySha256");
+  const models = [];
+  for (const policyModel of policy.models) {
+    const observed = inventory.models.find(
+      (model) =>
+        model.name === policyModel.inventoryName &&
+        model.file === policyModel.inventoryFile &&
+        model.version === policyModel.version,
+    );
+    if (!observed) continue;
+    const components = componentMap(observed);
+    const expected = new Map(policyModel.expectedFiles.map((entry) => [entry.name, entry.sha256]));
+    for (const [name, expectedSha] of expected) {
+      if (components.get(name) !== expectedSha) {
+        fail(`policy model ${policyModel.id} expected exact file ${name} with SHA-256 ${expectedSha}, but current inventory differs`);
+      }
+    }
+    const unexpected = [...components.keys()].filter((name) => !expected.has(name));
+    if (unexpected.length) {
+      fail(`policy model ${policyModel.id} contains unreviewed physical components: ${unexpected.join(", ")}`);
+    }
+    models.push({
+      id: policyModel.id,
+      inventoryName: policyModel.inventoryName,
+      inventoryFile: policyModel.inventoryFile,
+      version: policyModel.version,
+      bundleSha256: sha(observed.bundleSha256, `inventory ${policyModel.id}.bundleSha256`),
+      expectedFiles: policyModel.expectedFiles,
+      source: policyModel.source,
+      license: policyModel.license,
+      approvedUses: policyModel.approvedUses,
+      generationDefaults: policyModel.generationDefaults,
+      priority: policyModel.priority,
+      resourceClass: policyModel.resourceClass,
+      policyId: policy.policyId,
+      policySha256: policyDigest,
+      reviewedBy: policy.reviewedBy,
+      reviewedAt: policy.reviewedAt,
+      ...(policyModel.notes ? { notes: policyModel.notes } : {}),
+    });
+  }
+  if (!models.length) {
+    fail("no approved policy model matches the exact current Draw Things inventory");
+  }
+  models.sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
+  return {
+    schema: GOVERNANCE_SCHEMA,
+    policyId: policy.policyId,
+    policySha256: policyDigest,
+    reviewedBy: policy.reviewedBy,
+    reviewedAt: policy.reviewedAt,
+    models,
+  };
 }
 
 function validateGovernance(value) {
