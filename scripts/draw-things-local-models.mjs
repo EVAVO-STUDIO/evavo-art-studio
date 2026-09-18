@@ -661,8 +661,14 @@ function validateGovernance(value) {
   if (governance.schema !== GOVERNANCE_SCHEMA) {
     fail(`governance must use ${GOVERNANCE_SCHEMA}`);
   }
-  if (!Array.isArray(governance.models) || governance.models.length > 256) {
-    fail("governance.models must contain at most 256 entries");
+  if (!Array.isArray(governance.models) || !governance.models.length || governance.models.length > 256) {
+    fail("governance.models must contain 1 to 256 entries");
+  }
+  if (governance.policyId !== undefined) safeId(governance.policyId, "governance.policyId");
+  if (governance.policySha256 !== undefined) sha(governance.policySha256, "governance.policySha256");
+  if (governance.reviewedBy !== undefined) text(governance.reviewedBy, "governance.reviewedBy", 256);
+  if (governance.reviewedAt !== undefined && !Number.isFinite(Date.parse(governance.reviewedAt))) {
+    fail("governance.reviewedAt is invalid");
   }
   const ids = new Set();
   for (const [index, raw] of governance.models.entries()) {
@@ -674,6 +680,9 @@ function validateGovernance(value) {
     text(entry.inventoryFile, `governance.models[${index}].inventoryFile`, 1024);
     text(entry.version, `governance.models[${index}].version`, 256);
     sha(entry.bundleSha256, `governance.models[${index}].bundleSha256`);
+    if (entry.expectedFiles !== undefined) {
+      validateExpectedFiles(entry.expectedFiles, `governance.models[${index}].expectedFiles`);
+    }
     const license = object(entry.license, `governance.models[${index}].license`);
     for (const field of ["commercialUse", "derivatives", "redistribution"]) {
       if (!new Set(["allowed", "restricted", "unknown", "prohibited"]).has(license[field])) {
@@ -686,44 +695,53 @@ function validateGovernance(value) {
     text(entry.reviewedBy, `governance.models[${index}].reviewedBy`, 256);
     const reviewed = Date.parse(entry.reviewedAt);
     if (!Number.isFinite(reviewed)) fail(`governance.models[${index}].reviewedAt is invalid`);
+    generationDefaults(entry.generationDefaults, `governance.models[${index}].generationDefaults`);
+    if (entry.priority !== undefined && (!Number.isInteger(entry.priority) || entry.priority < -1000 || entry.priority > 1000)) {
+      fail(`governance.models[${index}].priority must be an integer in [-1000, 1000]`);
+    }
+    if (entry.resourceClass !== undefined && !new Set(["baseline", "quality", "heavy"]).has(entry.resourceClass)) {
+      fail(`governance.models[${index}].resourceClass is unsupported`);
+    }
+    if (entry.policyId !== undefined) safeId(entry.policyId, `governance.models[${index}].policyId`);
+    if (entry.policySha256 !== undefined) sha(entry.policySha256, `governance.models[${index}].policySha256`);
   }
   return governance;
 }
 
-function selectGovernedModel(inventory, governance, requestedId) {
-  const eligible = governance.models.filter((entry) => {
-    if (requestedId && entry.id !== requestedId) return false;
-    const inventoryModelEntry = inventory.models.find(
+function selectGovernedModels(inventory, governance, requestedId) {
+  const pairs = [];
+  for (const governanceEntry of governance.models) {
+    if (requestedId && governanceEntry.id !== requestedId) continue;
+    const inventoryEntry = inventory.models.find(
       (model) =>
-        model.name === entry.inventoryName &&
-        model.file === entry.inventoryFile &&
-        model.version === entry.version &&
-        model.bundleSha256 === entry.bundleSha256,
+        model.name === governanceEntry.inventoryName &&
+        model.file === governanceEntry.inventoryFile &&
+        model.version === governanceEntry.version &&
+        model.bundleSha256 === governanceEntry.bundleSha256,
     );
-    return Boolean(inventoryModelEntry);
-  });
-  if (!eligible.length) {
+    if (!inventoryEntry) continue;
+    if (governanceEntry.license.commercialUse !== "allowed") {
+      fail(`model ${governanceEntry.id} is not approved for commercial use`);
+    }
+    if (governanceEntry.license.derivatives === "prohibited") {
+      fail(`model ${governanceEntry.id} prohibits derivative use`);
+    }
+    pairs.push({ governanceEntry, inventoryEntry });
+  }
+  if (!pairs.length) {
     fail(
       requestedId
         ? `governed model ${requestedId} does not exactly match current local inventory`
-        : "no governed model exactly matches the current local inventory",
+        : "no governed model exactly matches current local inventory",
     );
   }
-  if (eligible.length !== 1) {
-    fail("more than one governed model matches; select one explicitly with --model");
-  }
-  const governanceEntry = eligible[0];
-  if (governanceEntry.license.commercialUse !== "allowed") {
-    fail(`model ${governanceEntry.id} is not approved for commercial use`);
-  }
-  if (governanceEntry.license.derivatives === "prohibited") {
-    fail(`model ${governanceEntry.id} prohibits derivative use`);
-  }
-  const inventoryEntry = inventory.models.find(
-    (model) => model.bundleSha256 === governanceEntry.bundleSha256,
+  pairs.sort(
+    (left, right) =>
+      Number(right.governanceEntry.priority ?? 170) -
+        Number(left.governanceEntry.priority ?? 170) ||
+      left.governanceEntry.id.localeCompare(right.governanceEntry.id),
   );
-  if (!inventoryEntry) fail("governed model disappeared from the current inventory");
-  return { governanceEntry, inventoryEntry };
+  return pairs;
 }
 
 function assetKindsForUses(uses) {
@@ -743,7 +761,8 @@ function assetKindsForUses(uses) {
   return [...result].sort();
 }
 
-function samplerInputs(model) {
+function samplerInputs(model, configuredDefaults = undefined) {
+  const defaults = generationDefaults(configuredDefaults);
   return {
     settings: "Basic",
     server: "127.0.0.1",
@@ -755,20 +774,20 @@ function samplerInputs(model) {
     },
     strength: 1,
     seed: 1,
-    seed_mode: "ScaleAlike",
+    seed_mode: defaults.seedMode,
     width: 1024,
     height: 1024,
-    steps: 20,
+    steps: defaults.steps,
     num_frames: 14,
-    cfg: 4.5,
+    cfg: defaults.cfg,
     cfg_zero_star: false,
     cfg_zero_star_init_steps: 0,
-    speed_up: true,
+    speed_up: defaults.speedUp,
     guidance_embed: 4.5,
-    sampler_name: "DPM++ 2M AYS",
+    sampler_name: defaults.samplerName,
     stochastic_sampling_gamma: 0.3,
-    res_dpt_shift: true,
-    shift: 1,
+    res_dpt_shift: defaults.resolutionDependentShift,
+    shift: defaults.shift,
     batch_size: 1,
     fps: 5,
     motion_scale: 127,
@@ -776,7 +795,7 @@ function samplerInputs(model) {
     start_frame_guidance: 1,
     causal_inference: 0,
     causal_inference_pad: 0,
-    clip_skip: 1,
+    clip_skip: defaults.clipSkip,
     sharpness: 0.6,
     mask_blur: 1.5,
     mask_blur_outset: 0,
@@ -793,11 +812,11 @@ function samplerInputs(model) {
     diffusion_tile_width: 512,
     diffusion_tile_height: 512,
     diffusion_tile_overlap: 64,
-    tea_cache: false,
-    tea_cache_start: 5,
-    tea_cache_end: 2,
-    tea_cache_threshold: 0.2,
-    tea_cache_max_skip_steps: 3,
+    tea_cache: defaults.teaCache,
+    tea_cache_start: defaults.teaCacheStart,
+    tea_cache_end: defaults.teaCacheEnd,
+    tea_cache_threshold: defaults.teaCacheThreshold,
+    tea_cache_max_skip_steps: defaults.teaCacheMaxSkipSteps,
     separate_clip_l: false,
     clip_l_text: "",
     separate_open_clip_g: false,
@@ -805,6 +824,93 @@ function samplerInputs(model) {
     color_calibration: "Disabled",
     positive: ["1", 0],
     negative: ["2", 0],
+  };
+}
+
+function drawThingsProfile(pair, install, bridgeRuntimeSha256, grpcRuntimeSha256) {
+  const { governanceEntry, inventoryEntry } = pair;
+  const profileId = safeId(
+    `dt-${governanceEntry.id}-generate`,
+    "generated Draw Things profileId",
+  );
+  const assetKinds = assetKindsForUses(governanceEntry.approvedUses);
+  const continuityPhases = governanceEntry.approvedUses.includes("sprite")
+    ? ["direction-master", "identity-master", "independent"]
+    : ["independent"];
+  const defaults = generationDefaults(governanceEntry.generationDefaults);
+  return {
+    profileId,
+    label: `Draw Things local · ${inventoryEntry.name}`,
+    description:
+      `Pinned local-only Draw Things text generation through the reviewed EVAVO ComfyUI gRPC bridge. Resource class ${governanceEntry.resourceClass ?? "baseline"}. This base profile deliberately does not claim identity/reference/in-between capabilities.`,
+    version: `1.0.0-${inventoryEntry.bundleSha256.slice(0, 12)}`,
+    priority: Number(governanceEntry.priority ?? 170),
+    operations: ["generate"],
+    assetKinds,
+    continuityPhases,
+    capabilities: ["generate", "seed", "custom-size", "candidate-count", "cancellation"],
+    modelId: governanceEntry.id,
+    workflow: {
+      "1": {
+        class_type: "DrawThingsPositive",
+        inputs: { positive: "positive" },
+      },
+      "2": {
+        class_type: "DrawThingsNegative",
+        inputs: { negative: "negative" },
+      },
+      "3": {
+        class_type: "DrawThingsSampler",
+        inputs: samplerInputs(inventoryEntry, defaults),
+      },
+      "4": {
+        class_type: "SaveImage",
+        inputs: {
+          filename_prefix: "evavo-draw-things",
+          images: ["3", 0],
+        },
+      },
+    },
+    bindings: {
+      positivePrompt: { nodeId: "1", input: "positive" },
+      negativePrompt: { nodeId: "2", input: "negative" },
+      width: { nodeId: "3", input: "width" },
+      height: { nodeId: "3", input: "height" },
+      seed: { nodeId: "3", input: "seed" },
+      candidateCount: { nodeId: "3", input: "batch_size" },
+      filenamePrefix: { nodeId: "4", input: "filename_prefix" },
+      referenceImages: [],
+    },
+    outputNodeIds: ["4"],
+    modelInventory: [
+      {
+        id: governanceEntry.id,
+        kind: "draw-things-model-bundle",
+        sha256: inventoryEntry.bundleSha256,
+      },
+    ],
+    runtimeInventory: [
+      {
+        id: "comfyui",
+        version: "local-main",
+        sha256: install.comfyMainSha256,
+      },
+      {
+        id: "draw-things-comfyui",
+        version: install.bridgeVersion,
+        sha256: bridgeRuntimeSha256,
+      },
+      {
+        id: "draw-things-grpc-server",
+        version: install.dockerImageVersion,
+        sha256: grpcRuntimeSha256,
+      },
+    ],
+    limits: {
+      maximumCandidates: 4,
+      maximumReferenceImages: 0,
+      maximumSourceBytes: 67108864,
+    },
   };
 }
 
@@ -818,23 +924,8 @@ export function buildDrawThingsCatalogDraft({
   const governance = validateGovernance(governanceRaw);
   const install = validateInstallManifest(installRaw);
   const installHash = hashJson(install);
-  // The runtime inventory capture hashes the exact on-disk manifest bytes. The
-  // pure compiler cannot reproduce whitespace, so callers must verify this
-  // equality before invoking this helper when they have those bytes.
   if (!inventory.installManifestSha256) fail("inventory is missing install manifest identity");
-  const { governanceEntry, inventoryEntry } = selectGovernedModel(
-    inventory,
-    governance,
-    modelId,
-  );
-  const profileId = safeId(
-    `dt-${governanceEntry.id}-generate`,
-    "generated Draw Things profileId",
-  );
-  const assetKinds = assetKindsForUses(governanceEntry.approvedUses);
-  const continuityPhases = governanceEntry.approvedUses.includes("sprite")
-    ? ["direction-master", "identity-master", "independent"]
-    : ["independent"];
+  const selected = selectGovernedModels(inventory, governance, modelId);
   const bridgeRuntimeSha256 = hashJson({
     bridgeCommit: install.bridgeCommit,
     bridgeVersion: install.bridgeVersion,
@@ -842,105 +933,48 @@ export function buildDrawThingsCatalogDraft({
   });
   const grpcRuntimeSha256 = install.dockerImageId.slice("sha256:".length);
   sha(grpcRuntimeSha256, "Draw Things local Docker image id");
-
+  const profiles = selected.map((pair) =>
+    drawThingsProfile(pair, install, bridgeRuntimeSha256, grpcRuntimeSha256),
+  );
+  const versionFingerprint = hashJson(
+    selected.map(({ governanceEntry, inventoryEntry }) => ({
+      id: governanceEntry.id,
+      bundleSha256: inventoryEntry.bundleSha256,
+      priority: Number(governanceEntry.priority ?? 170),
+      generationDefaults: generationDefaults(governanceEntry.generationDefaults),
+    })),
+  );
   const draft = {
     schemaVersion: CATALOG_DRAFT_SCHEMA,
-    catalogId: safeId(`evavo-local-draw-things-${governanceEntry.id}`, "catalogId"),
-    catalogVersion: `1.0.0-${inventoryEntry.bundleSha256.slice(0, 12)}`,
-    profiles: [
-      {
-        profileId,
-        label: `Draw Things local · ${inventoryEntry.name}`,
-        description:
-          "Pinned local-only Draw Things text generation through the reviewed EVAVO ComfyUI gRPC bridge. This base profile deliberately does not claim identity/reference/in-between capabilities.",
-        version: `1.0.0-${inventoryEntry.bundleSha256.slice(0, 12)}`,
-        priority: 170,
-        operations: ["generate"],
-        assetKinds,
-        continuityPhases,
-        capabilities: ["generate", "seed", "custom-size", "candidate-count", "cancellation"],
-        modelId: governanceEntry.id,
-        workflow: {
-          "1": {
-            class_type: "DrawThingsPositive",
-            inputs: { positive: "positive" },
-          },
-          "2": {
-            class_type: "DrawThingsNegative",
-            inputs: { negative: "negative" },
-          },
-          "3": {
-            class_type: "DrawThingsSampler",
-            inputs: samplerInputs(inventoryEntry),
-          },
-          "4": {
-            class_type: "SaveImage",
-            inputs: {
-              filename_prefix: "evavo-draw-things",
-              images: ["3", 0],
-            },
-          },
-        },
-        bindings: {
-          positivePrompt: { nodeId: "1", input: "positive" },
-          negativePrompt: { nodeId: "2", input: "negative" },
-          width: { nodeId: "3", input: "width" },
-          height: { nodeId: "3", input: "height" },
-          seed: { nodeId: "3", input: "seed" },
-          candidateCount: { nodeId: "3", input: "batch_size" },
-          filenamePrefix: { nodeId: "4", input: "filename_prefix" },
-          referenceImages: [],
-        },
-        outputNodeIds: ["4"],
-        modelInventory: [
-          {
-            id: governanceEntry.id,
-            kind: "draw-things-model-bundle",
-            sha256: inventoryEntry.bundleSha256,
-          },
-        ],
-        runtimeInventory: [
-          {
-            id: "comfyui",
-            version: "local-main",
-            sha256: install.comfyMainSha256,
-          },
-          {
-            id: "draw-things-comfyui",
-            version: install.bridgeVersion,
-            sha256: bridgeRuntimeSha256,
-          },
-          {
-            id: "draw-things-grpc-server",
-            version: install.dockerImageVersion,
-            sha256: grpcRuntimeSha256,
-          },
-        ],
-        limits: {
-          maximumCandidates: 4,
-          maximumReferenceImages: 0,
-          maximumSourceBytes: 67108864,
-        },
-      },
-    ],
+    catalogId: "evavo-local-draw-things",
+    catalogVersion: `1.0.0-${versionFingerprint.slice(0, 12)}`,
+    profiles,
   };
-
+  const modelEvidence = selected.map(({ governanceEntry, inventoryEntry }) => ({
+    modelId: governanceEntry.id,
+    inventoryId: inventoryEntry.id,
+    inventoryName: inventoryEntry.name,
+    inventoryFile: inventoryEntry.file,
+    modelVersion: inventoryEntry.version,
+    bundleSha256: inventoryEntry.bundleSha256,
+    source: canonical(governanceEntry.source),
+    license: canonical(governanceEntry.license),
+    approvedUses: [...governanceEntry.approvedUses].sort(),
+    generationDefaults: generationDefaults(governanceEntry.generationDefaults),
+    priority: Number(governanceEntry.priority ?? 170),
+    resourceClass: governanceEntry.resourceClass ?? "baseline",
+    reviewedBy: governanceEntry.reviewedBy,
+    reviewedAt: governanceEntry.reviewedAt,
+  }));
   return {
     draft,
     governanceEvidence: {
       schema: "evavo.draw-things-catalog-governance-evidence.v1",
       generatedAt: new Date().toISOString(),
-      modelId: governanceEntry.id,
-      inventoryId: inventoryEntry.id,
-      inventoryName: inventoryEntry.name,
-      inventoryFile: inventoryEntry.file,
-      modelVersion: inventoryEntry.version,
-      bundleSha256: inventoryEntry.bundleSha256,
-      source: canonical(governanceEntry.source),
-      license: canonical(governanceEntry.license),
-      approvedUses: [...governanceEntry.approvedUses].sort(),
-      reviewedBy: governanceEntry.reviewedBy,
-      reviewedAt: governanceEntry.reviewedAt,
+      policyId: governance.policyId ?? null,
+      policySha256: governance.policySha256 ?? null,
+      models: modelEvidence,
+      ...(modelEvidence.length === 1 ? modelEvidence[0] : {}),
       installManifestSha256: inventory.installManifestSha256,
       installCanonicalSha256: installHash,
       commercialUseApproved: true,
