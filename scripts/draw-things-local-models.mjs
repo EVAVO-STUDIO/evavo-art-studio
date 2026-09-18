@@ -845,6 +845,52 @@ function validateGovernance(value) {
     if (entry.policyId !== undefined) safeId(entry.policyId, `governance.models[${index}].policyId`);
     if (entry.policySha256 !== undefined) sha(entry.policySha256, `governance.models[${index}].policySha256`);
   }
+  const controls = governance.controls ?? [];
+  if (!Array.isArray(controls) || controls.length > 256) {
+    fail("governance.controls must contain at most 256 entries");
+  }
+  for (const [index, raw] of controls.entries()) {
+    const entry = object(raw, `governance.controls[${index}]`);
+    const id = safeId(entry.id, `governance.controls[${index}].id`);
+    if (ids.has(id)) fail(`duplicate governance asset id ${id}`);
+    ids.add(id);
+    text(entry.inventoryName, `governance.controls[${index}].inventoryName`, 512);
+    text(entry.inventoryFile, `governance.controls[${index}].inventoryFile`, 1024);
+    text(entry.version, `governance.controls[${index}].version`, 256);
+    sha(entry.bundleSha256, `governance.controls[${index}].bundleSha256`);
+    validateExpectedFiles(entry.expectedFiles, `governance.controls[${index}].expectedFiles`);
+    const license = object(entry.license, `governance.controls[${index}].license`);
+    if (license.commercialUse !== "allowed") {
+      fail(`governance control ${id} is not commercially approved`);
+    }
+    if (license.derivatives === "prohibited") {
+      fail(`governance control ${id} prohibits derivative use`);
+    }
+    if (!Array.isArray(entry.approvedRoles) || !entry.approvedRoles.length) {
+      fail(`governance.controls[${index}].approvedRoles must be non-empty`);
+    }
+    if (!Array.isArray(entry.compatibleModelIds) || !entry.compatibleModelIds.length) {
+      fail(`governance.controls[${index}].compatibleModelIds must be non-empty`);
+    }
+    entry.compatibleModelIds.forEach((modelId, modelIndex) =>
+      safeId(modelId, `governance.controls[${index}].compatibleModelIds[${modelIndex}]`),
+    );
+    if (
+      typeof entry.minimumVramGb !== "number" ||
+      !Number.isFinite(entry.minimumVramGb) ||
+      entry.minimumVramGb < 0 ||
+      entry.minimumVramGb > 64
+    ) {
+      fail(`governance.controls[${index}].minimumVramGb must be in [0, 64]`);
+    }
+    if (!Number.isInteger(entry.priority) || entry.priority < -1000 || entry.priority > 1000) {
+      fail(`governance.controls[${index}].priority must be an integer in [-1000, 1000]`);
+    }
+    text(entry.reviewedBy, `governance.controls[${index}].reviewedBy`, 256);
+    if (!Number.isFinite(Date.parse(entry.reviewedAt))) {
+      fail(`governance.controls[${index}].reviewedAt is invalid`);
+    }
+  }
   return governance;
 }
 
@@ -882,6 +928,30 @@ function selectGovernedModels(inventory, governance, requestedId) {
       left.governanceEntry.id.localeCompare(right.governanceEntry.id),
   );
   return pairs;
+}
+
+function selectPoseControl(inventory, governance, modelId) {
+  const candidates = [];
+  for (const governanceEntry of governance.controls ?? []) {
+    if (!governanceEntry.approvedRoles.includes("pose-control")) continue;
+    if (!governanceEntry.compatibleModelIds.includes(modelId)) continue;
+    const inventoryEntry = inventory.controls.find(
+      (control) =>
+        control.name === governanceEntry.inventoryName &&
+        control.file === governanceEntry.inventoryFile &&
+        control.version === governanceEntry.version &&
+        control.bundleSha256 === governanceEntry.bundleSha256,
+    );
+    if (!inventoryEntry) continue;
+    candidates.push({ governanceEntry, inventoryEntry });
+  }
+  candidates.sort(
+    (left, right) =>
+      Number(right.governanceEntry.priority ?? 0) -
+        Number(left.governanceEntry.priority ?? 0) ||
+      left.governanceEntry.id.localeCompare(right.governanceEntry.id),
+  );
+  return candidates[0] ?? null;
 }
 
 function assetKindsForUses(uses) {
@@ -1329,11 +1399,79 @@ function addInpaintProfile(base, pair) {
   return profile;
 }
 
+function addPoseControlProfile(base, pair, controlPair) {
+  if (!controlPair) return null;
+  const profile = cloneJson(addCanonicalIdentityReference(base, pair));
+  const { governanceEntry: controlGovernance, inventoryEntry: controlInventory } =
+    controlPair;
+  profile.profileId = profileSuffixId(base, "pose-ref");
+  profile.label = `${base.label} · identity + structural pose control`;
+  profile.description =
+    `${base.description} Uses the canonical identity as the base image and the separately governed ${controlInventory.name} asset through DrawThingsControlNet with Pose mode. This structural profile advertises pose-control only because the exact control asset is installed and policy-approved.`;
+  profile.version = `${base.version}-pose-ref`;
+  profile.priority = Number(base.priority) - 2;
+  profile.continuityPhases = ["key-pose", "repair", "independent"];
+  profile.capabilities = [
+    ...new Set([
+      ...base.capabilities,
+      "reference-images",
+      "multiple-reference-images",
+      "identity-reference",
+      "pose-control",
+    ]),
+  ];
+  profile.workflow["6"] = {
+    class_type: "LoadImage",
+    inputs: { image: "evavo-pose-control-placeholder.png" },
+  };
+  profile.workflow["7"] = {
+    class_type: "DrawThingsControlNet",
+    inputs: {
+      control_name: {
+        value: canonical(controlInventory.model),
+        content: `${controlInventory.name} (${controlInventory.version})`,
+      },
+      control_input_type: "Pose",
+      control_mode: "Balanced",
+      control_weight: 1,
+      control_start: 0,
+      control_end: 1,
+      global_average_pooling:
+        controlInventory.model?.global_average_pooling === true,
+      down_sampling_rate: 1,
+      target_blocks: "All",
+      invert_image: false,
+      image: ["6", 0],
+    },
+  };
+  profile.workflow["3"].inputs.control_net = ["7", 0];
+  profile.bindings.referenceImages = [
+    {
+      role: "canonical-identity",
+      nodeId: "5",
+      input: "image",
+    },
+    {
+      role: "pose-control",
+      nodeId: "6",
+      input: "image",
+    },
+  ];
+  profile.modelInventory.push({
+    id: controlGovernance.id,
+    kind: "draw-things-control-bundle",
+    sha256: controlInventory.bundleSha256,
+  });
+  profile.limits.maximumReferenceImages = 2;
+  return profile;
+}
+
 function drawThingsProfilesForPair(
   pair,
   install,
   bridgeRuntimeSha256,
   grpcRuntimeSha256,
+  poseControl,
 ) {
   const base = drawThingsProfile(
     pair,
@@ -1349,8 +1487,10 @@ function drawThingsProfilesForPair(
   const direction = addDirectionReferenceProfile(base, pair);
   const temporal = addTemporalReferenceProfile(base, pair);
   const inpaint = addInpaintProfile(base, pair);
+  const pose = addPoseControlProfile(base, pair, poseControl);
   if (direction) profiles.push(direction);
   if (temporal) profiles.push(temporal);
+  if (pose) profiles.push(pose);
   if (inpaint) profiles.push(inpaint);
   return profiles;
 }
@@ -1374,12 +1514,19 @@ export function buildDrawThingsCatalogDraft({
   });
   const grpcRuntimeSha256 = install.dockerImageId.slice("sha256:".length);
   sha(grpcRuntimeSha256, "Draw Things local Docker image id");
+  const poseControlByModelId = new Map(
+    selected.map((pair) => [
+      pair.governanceEntry.id,
+      selectPoseControl(inventory, governance, pair.governanceEntry.id),
+    ]),
+  );
   const profiles = selected.flatMap((pair) =>
     drawThingsProfilesForPair(
       pair,
       install,
       bridgeRuntimeSha256,
       grpcRuntimeSha256,
+      poseControlByModelId.get(pair.governanceEntry.id) ?? null,
     ),
   );
   const versionFingerprint = hashJson(
