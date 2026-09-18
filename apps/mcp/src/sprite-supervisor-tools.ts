@@ -9,6 +9,7 @@ import {
   compileAutomaticSpriteWorkflow,
   compileSpriteSupervisorWorkflow,
   compileVerifiedAnimationProviderBatch,
+  compileTwoStageAnimationClip,
   compileTwoStageAnimationProviderBatch,
   spriteSupervisorProtocolSummary,
 } from "@evavo/art-sprite-supervisor";
@@ -159,6 +160,31 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
           ),
           executionBoundary:
             "Compile-only: produces a durable supervisor workflow but does not submit runtime jobs or call providers.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_two_stage_animation_clip",
+    {
+      description:
+        "Compile one complete local 8-frame walk clip as a closed supervisor graph: pose-locked structural drafts, promoted key poses, runtime-bound temporal in-betweens, FLUX/Kontext refinements, alpha mastering, selection, promotion and manifest-bound family verification. Provider requests are locked to exact draw-things:* adapters from the supplied compiled catalog and cloud fallback is impossible.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult({
+          schemaVersion: "1.0",
+          compilation: compileTwoStageAnimationClip(
+            request as Parameters<
+              typeof compileTwoStageAnimationClip
+            >[0],
+          ),
+          executionBoundary:
+            "Compile-only: produces the complete durable supervisor workflow but does not submit runtime work or call providers.",
         });
       } catch (error: unknown) {
         return toolError(error);
