@@ -12,7 +12,10 @@ import {
 } from "@evavo/art-artifacts";
 import { writeGodotSpriteFramesImporter } from "@evavo/art-godot";
 import { buildSpriteAtlasPackage } from "@evavo/art-media";
-import { validateSpriteFamilyManifest } from "@evavo/art-sprite-family";
+import {
+  spriteFamilyManifestSha256,
+  validateSpriteFamilyManifest,
+} from "@evavo/art-sprite-family";
 import type { ProviderRegistry } from "@evavo/art-providers";
 import {
   LocalRuntimeRepository,
@@ -305,13 +308,19 @@ async function buildAtlasFromVerifiedFamily(
     evidenceArtifactId,
     "family evidence",
   );
+  const familyManifestSha256 = spriteFamilyManifestSha256(
+    familyManifest,
+  );
   if (
     evidenceArtifact.artifact.storageClass !== "evidence" ||
     evidenceArtifact.artifact.labels.artifactRole !==
       "sprite-family-consistency-evidence" ||
     evidenceArtifact.artifact.labels.qualityState !== "passed" ||
+    evidenceArtifact.artifact.labels.familyId !== familyManifest.familyId ||
     evidenceArtifact.body.passed !== true ||
+    evidenceArtifact.body.familyId !== familyManifest.familyId ||
     evidenceArtifact.body.manifestArtifactId !== manifestArtifactId ||
+    evidenceArtifact.body.manifestSha256 !== familyManifestSha256 ||
     !evidenceArtifact.artifact.sourceArtifacts.includes(manifestArtifactId)
   ) {
     throw new PermanentRuntimeError(
@@ -383,6 +392,18 @@ async function buildAtlasFromVerifiedFamily(
         throw new PermanentRuntimeError(
           "ATLAS_FAMILY_INPUT_LINEAGE_MISSING",
           `sprite.atlas.build inputArtifacts is missing verified composite ${compositeId}.`,
+        );
+      }
+      const generatedCompositeArtifactIds =
+        evidenceArtifact.body.generatedCompositeArtifactIds;
+      if (
+        !Array.isArray(generatedCompositeArtifactIds) ||
+        !generatedCompositeArtifactIds.includes(compositeId) ||
+        !evidenceArtifact.artifact.sourceArtifacts.includes(compositeId)
+      ) {
+        throw new PermanentRuntimeError(
+          "ATLAS_FAMILY_COMPOSITE_BINDING_INVALID",
+          `Verified composite ${frame.id} is not bound into the manifest-bound family evidence.`,
         );
       }
       const composite = await verifiedStoredArtifact(
