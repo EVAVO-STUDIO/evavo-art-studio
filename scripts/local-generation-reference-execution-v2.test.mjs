@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   attachProviderReferencesToLegacyManifest,
   framesForReferenceStage,
+  referenceAdapterId,
   prepareReferenceExecutionPlan,
   recordAcceptedArtifactResults,
 } from './local-generation-reference-execution-v2.mjs';
@@ -214,5 +215,65 @@ test('reference semantic rules fail closed before provider execution', () => {
       { artifactId: artifactB, role: 'previous-key-pose', required: true },
     ], capable, { operation: 'generate', assetKind: 'illustration', continuityPhase: 'in-between' }),
     /previous-key-pose and next-key-pose/u,
+  );
+});
+
+
+test('Draw Things automatic reference routing maps exact role sets to reviewed profile families', () => {
+  const base = 'draw-things:dt-flux2-klein-4b-q6p-generate';
+  assert.equal(
+    referenceAdapterId(base, [
+      { role: 'canonical-identity' },
+    ]),
+    `${base}-identity-ref`,
+  );
+  assert.equal(
+    referenceAdapterId(base, [
+      { role: 'canonical-identity' },
+      { role: 'direction-master' },
+    ]),
+    `${base}-direction-ref`,
+  );
+  assert.equal(
+    referenceAdapterId(base, [
+      { role: 'canonical-identity' },
+      { role: 'previous-key-pose' },
+      { role: 'next-key-pose' },
+    ]),
+    `${base}-temporal-ref`,
+  );
+});
+
+test('Draw Things automatic reference routing fails closed for unsupported role combinations', () => {
+  const base = 'draw-things:dt-flux2-klein-4b-q6p-generate';
+  assert.throws(
+    () =>
+      referenceAdapterId(base, [
+        { role: 'canonical-identity' },
+        { role: 'palette-reference' },
+      ]),
+    /no automatic Draw Things reference profile matches roles/u,
+  );
+});
+
+test('Draw Things reference routing accepts an already specialized adapter unchanged', () => {
+  const specialized =
+    'draw-things:dt-flux2-klein-4b-q6p-generate-temporal-ref';
+  assert.equal(
+    referenceAdapterId(specialized, [
+      { role: 'canonical-identity' },
+      { role: 'previous-key-pose' },
+      { role: 'next-key-pose' },
+    ]),
+    specialized,
+  );
+});
+
+test('Draw Things reference routing may defer exact adapter choice to V1 capability routing', () => {
+  assert.equal(
+    referenceAdapterId(null, [
+      { role: 'canonical-identity' },
+    ]),
+    null,
   );
 });
