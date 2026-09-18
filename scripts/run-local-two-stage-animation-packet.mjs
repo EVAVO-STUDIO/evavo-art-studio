@@ -93,7 +93,7 @@ function assertLeaseEnvironment() {
   }
 }
 
-async function loadPacket(filePath) {
+export async function loadPacket(filePath) {
   const info = await lstat(filePath);
   if (!info.isFile() || info.isSymbolicLink()) {
     fail("execution packet must be one regular non-symlink file");
@@ -135,7 +135,7 @@ function canonical(value) {
   return stableStringify(normalizeJson(value));
 }
 
-function assertProviderTask(task) {
+export function assertProviderTask(task) {
   const expectedOperation = PROVIDER_TASK_KINDS.get(task.kind);
   if (!expectedOperation) return;
   const payload = record(task.payloadTemplate, task.id + ".payloadTemplate");
@@ -177,7 +177,7 @@ function assertProviderTask(task) {
   }
 }
 
-function containsForbiddenExecutableField(value) {
+export function containsForbiddenExecutableField(value) {
   if (Array.isArray(value)) {
     return value.some(containsForbiddenExecutableField);
   }
@@ -196,7 +196,7 @@ function containsForbiddenExecutableField(value) {
   return false;
 }
 
-function validateWorkflow(input) {
+export function validateWorkflow(input) {
   const supplied = record(input, "workflow");
   const request = record(supplied.request, "workflow.request");
   const compiled = compileSpriteSupervisorWorkflow(request);
@@ -520,20 +520,26 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  process.stderr.write(
-    JSON.stringify({
-      schemaVersion: 1,
-      kind: RECEIPT_KIND,
-      ok: false,
-      error:
-        error instanceof Error ? error.message : String(error),
-      sharedGpuLeaseAttested:
-        process.env.EVAVO_CREATIVE_GPU_LEASE_HELD === "true",
-      localOnly: true,
-      cloudFallbackAllowed: false,
-      networkDownloadAuthorityGranted: false,
-    }) + "\n",
-  );
-  process.exitCode = 2;
-});
+const directlyInvoked =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (directlyInvoked) {
+  main().catch((error) => {
+    process.stderr.write(
+      JSON.stringify({
+        schemaVersion: 1,
+        kind: RECEIPT_KIND,
+        ok: false,
+        error:
+          error instanceof Error ? error.message : String(error),
+        sharedGpuLeaseAttested:
+          process.env.EVAVO_CREATIVE_GPU_LEASE_HELD === "true",
+        localOnly: true,
+        cloudFallbackAllowed: false,
+        networkDownloadAuthorityGranted: false,
+      }) + "\n",
+    );
+    process.exitCode = 2;
+  });
+}
