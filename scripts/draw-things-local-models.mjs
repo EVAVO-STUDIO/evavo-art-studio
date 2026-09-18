@@ -2102,6 +2102,7 @@ export function buildDrawThingsCatalogDraft({
     resourceClass: governanceEntry.resourceClass ?? "baseline",
     reviewedBy: governanceEntry.reviewedBy,
     reviewedAt: governanceEntry.reviewedAt,
+    externalStores: canonical(governanceEntry.externalStores ?? []),
   }));
   const controlEvidence = (governance.controls ?? [])
     .map((governanceEntry) => {
@@ -2128,6 +2129,7 @@ export function buildDrawThingsCatalogDraft({
         license: canonical(governanceEntry.license),
         reviewedBy: governanceEntry.reviewedBy,
         reviewedAt: governanceEntry.reviewedAt,
+        externalStores: canonical(governanceEntry.externalStores ?? []),
       };
     })
     .filter(Boolean);
@@ -2171,6 +2173,7 @@ export function buildDrawThingsCatalogDraft({
       ...(modelEvidence.length === 1 ? modelEvidence[0] : {}),
       installManifestSha256: inventory.installManifestSha256,
       installCanonicalSha256: installHash,
+      provisionReceipt: governance.provisionReceipt ?? null,
       commercialUseApproved: true,
       arbitraryModelSelectionAllowed: false,
       automaticModelDownloadAllowed: false,
@@ -2218,6 +2221,7 @@ function parseArguments(argv) {
     "--governance",
     "--governance-output",
     "--policy",
+    "--provision-receipt",
     "--model",
     "--draft-output",
     "--evidence-output",
@@ -2266,20 +2270,70 @@ async function runInventory(args) {
   };
 }
 
-async function deriveGovernance(inventory, policyPath) {
+function policyRequiresProvisionReceipt(policyRaw) {
+  const policy = object(policyRaw, "Draw Things approved model policy");
+  const entries = [
+    ...(Array.isArray(policy.models) ? policy.models : []),
+    ...(Array.isArray(policy.controls) ? policy.controls : []),
+  ];
+  return entries.some(
+    (entry) =>
+      entry &&
+      typeof entry === "object" &&
+      Array.isArray(entry.expectedExternalStores) &&
+      entry.expectedExternalStores.length > 0,
+  );
+}
+
+async function readProvisionReceiptForPolicy(
+  inventory,
+  policyRaw,
+  provisionReceiptPath,
+) {
+  if (!policyRequiresProvisionReceipt(policyRaw)) {
+    return null;
+  }
+  const receiptPath =
+    provisionReceiptPath ?? defaultProvisionReceipt();
+  const receipt = await jsonFile(
+    receiptPath,
+    "Draw Things Local Compute model provision receipt",
+  );
+  const evidence = validateDrawThingsProvisionReceipt(receipt, inventory);
+  return {
+    path: path.resolve(receiptPath),
+    value: receipt,
+    evidence,
+  };
+}
+
+async function deriveGovernance(
+  inventory,
+  policyPath,
+  provisionReceiptPath,
+) {
   const policyDocument = await jsonFileWithSha(
     policyPath ?? defaultPolicyPath(),
     "Draw Things approved model policy",
+  );
+  const receiptDocument = await readProvisionReceiptForPolicy(
+    inventory,
+    policyDocument.value,
+    provisionReceiptPath,
   );
   const governance = governanceFromPolicy(
     inventory,
     policyDocument.value,
     policyDocument.sha256,
+    receiptDocument?.value ?? null,
   );
   return {
     governance,
     policyPath: policyDocument.path,
     policySha256: policyDocument.sha256,
+    provisionReceiptPath: receiptDocument?.path ?? null,
+    provisionReceiptSha256:
+      receiptDocument?.evidence.receiptSha256 ?? null,
   };
 }
 
@@ -2289,7 +2343,11 @@ async function runGovern(args) {
   const inventory = validateInventory(
     await jsonFile(inventoryPath, "Draw Things inventory"),
   );
-  const derived = await deriveGovernance(inventory, args.get("--policy"));
+  const derived = await deriveGovernance(
+    inventory,
+    args.get("--policy"),
+    args.get("--provision-receipt"),
+  );
   await atomicJson(output, derived.governance);
   return {
     ok: true,
@@ -2297,6 +2355,12 @@ async function runGovern(args) {
     inventory: path.resolve(inventoryPath),
     policy: derived.policyPath,
     policySha256: derived.policySha256,
+    provisionReceipt: derived.provisionReceiptPath
+      ? {
+          path: derived.provisionReceiptPath,
+          sha256: derived.provisionReceiptSha256,
+        }
+      : null,
     output: path.resolve(output),
     approvedModelCount: derived.governance.models.length,
     approvedModels: derived.governance.models.map((model) => ({
@@ -2366,15 +2430,45 @@ async function runCompile(args) {
     governance = validateGovernance(
       await jsonFile(governancePath, "Draw Things model governance"),
     );
+    if (governance.provisionReceipt) {
+      const currentReceiptPath =
+        args.get("--provision-receipt") ?? defaultProvisionReceipt();
+      const currentReceipt = validateDrawThingsProvisionReceipt(
+        await jsonFile(
+          currentReceiptPath,
+          "Draw Things Local Compute model provision receipt",
+        ),
+        inventory,
+      );
+      if (
+        currentReceipt.receiptSha256 !==
+        governance.provisionReceipt.receiptSha256
+      ) {
+        fail(
+          "saved Draw Things governance is bound to a different Local Compute model provision receipt",
+        );
+      }
+    }
     governanceSource = path.resolve(governancePath);
   } else {
-    const derived = await deriveGovernance(inventory, args.get("--policy"));
+    const derived = await deriveGovernance(
+      inventory,
+      args.get("--policy"),
+      args.get("--provision-receipt"),
+    );
     governance = validateGovernance(derived.governance);
     await atomicJson(governanceOutput, governance);
     governanceSource = path.resolve(governanceOutput);
     policySource = {
       path: derived.policyPath,
       sha256: derived.policySha256,
+      ...(derived.provisionReceiptPath
+        ? {
+            provisionReceiptPath: derived.provisionReceiptPath,
+            provisionReceiptSha256:
+              derived.provisionReceiptSha256,
+          }
+        : {}),
     };
   }
 
