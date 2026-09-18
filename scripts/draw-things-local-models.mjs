@@ -355,14 +355,43 @@ async function inventoryModel(modelRaw, fileIndex) {
   }
   const unique = [...new Set(references)];
   const components = [];
+  const seenPhysical = new Set();
   for (const reference of unique) {
     const located = locateComponent(fileIndex, reference);
     if (!located.sizeBytes) fail(`model component is empty: ${located.relative}`);
-    components.push({
-      relativePath: located.relative,
-      sizeBytes: located.sizeBytes,
-      sha256: await hashFile(located.full),
-    });
+    if (!seenPhysical.has(located.relative.toLowerCase())) {
+      components.push({
+        relativePath: located.relative,
+        sizeBytes: located.sizeBytes,
+        sha256: await hashFile(located.full),
+      });
+      seenPhysical.add(located.relative.toLowerCase());
+    }
+    const tensorData = `${located.full}-tensordata`;
+    try {
+      const tensorInfo = await lstat(tensorData);
+      if (tensorInfo.isSymbolicLink() || !tensorInfo.isFile()) {
+        fail(`model tensor sidecar is not a regular file: ${located.relative}-tensordata`);
+      }
+      if (!tensorInfo.size) {
+        fail(`model tensor sidecar is empty: ${located.relative}-tensordata`);
+      }
+      const tensorRelative = `${located.relative}-tensordata`;
+      if (!seenPhysical.has(tensorRelative.toLowerCase())) {
+        components.push({
+          relativePath: tensorRelative,
+          sizeBytes: tensorInfo.size,
+          sha256: await hashFile(tensorData),
+        });
+        seenPhysical.add(tensorRelative.toLowerCase());
+      }
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        // Monolithic Draw Things checkpoint: no external tensor store is expected.
+      } else {
+        throw error;
+      }
+    }
   }
   components.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
   const metadataSha256 = hashJson(model);
