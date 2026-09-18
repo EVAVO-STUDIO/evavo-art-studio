@@ -29,13 +29,56 @@ function hydrateAuthoredReferenceInputs(plan) {
 
 export function referenceAdapterId(baseAdapterId, references) {
   if (!references?.length) return baseAdapterId ?? null;
-  if (references.length !== 1) {
-    fail('automatic quality-matched reference routing currently supports exactly one resolved reference per scene');
+  if (baseAdapterId == null) return null;
+  if (typeof baseAdapterId !== 'string') {
+    fail('automatic reference routing requires a reviewed adapter ID');
   }
-  if (typeof baseAdapterId !== 'string' || !baseAdapterId.startsWith('comfyui:')) {
-    fail('automatic reference routing requires a comfyui: base adapter ID');
+
+  if (baseAdapterId.startsWith('draw-things:')) {
+    if (
+      baseAdapterId.endsWith('-identity-ref') ||
+      baseAdapterId.endsWith('-direction-ref') ||
+      baseAdapterId.endsWith('-temporal-ref')
+    ) {
+      return baseAdapterId;
+    }
+    if (!baseAdapterId.endsWith('-generate')) {
+      fail('Draw Things automatic reference routing requires a base *-generate adapter');
+    }
+    const roles = new Set(references.map((reference) => reference?.role));
+    if ([...roles].some((role) => typeof role !== 'string' || !role)) {
+      fail('resolved Draw Things reference is missing its role');
+    }
+    if (roles.size === 1 && roles.has('canonical-identity')) {
+      return `${baseAdapterId}-identity-ref`;
+    }
+    if (
+      roles.size === 2 &&
+      roles.has('canonical-identity') &&
+      roles.has('direction-master')
+    ) {
+      return `${baseAdapterId}-direction-ref`;
+    }
+    if (
+      roles.size === 3 &&
+      roles.has('canonical-identity') &&
+      roles.has('previous-key-pose') &&
+      roles.has('next-key-pose')
+    ) {
+      return `${baseAdapterId}-temporal-ref`;
+    }
+    fail(
+      `no automatic Draw Things reference profile matches roles: ${[...roles].sort().join(', ')}`,
+    );
+  }
+
+  if (!baseAdapterId.startsWith('comfyui:')) {
+    fail('automatic reference routing requires a comfyui: or draw-things: base adapter ID');
   }
   if (baseAdapterId.includes('-reference-')) return baseAdapterId;
+  if (references.length !== 1) {
+    fail('automatic ComfyUI quality-matched reference routing currently supports exactly one resolved reference per scene');
+  }
   const role = references[0]?.role;
   if (typeof role !== 'string' || !role) fail('resolved reference is missing its role');
   return `${baseAdapterId}-reference-${role}`;
