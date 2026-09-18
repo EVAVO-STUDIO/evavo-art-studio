@@ -342,7 +342,10 @@ export async function runLocalGenerationBatch(argv = process.argv.slice(2)) {
     schema: 'evavo.local-generation-batch-receipt.v2', status, campaignId: plan.campaignId, runId,
     startedAt, completedAt: new Date().toISOString(), batchSize: plan.batchSize,
     expectedImages: plan.frames.reduce((sum, frame) => sum + frame.candidateCount, 0), actualImages: outputs.length,
-    generationMode: plan.mode, consistencyMode: plan.consistencyMode, qualityProfile: plan.qualityProfile,
+    generationMode: plan.mode,
+    consistencyMode: plan.consistencyMode,
+    qualityProfile: plan.qualityProfile,
+    providerBackend: plan.provider?.backend ?? 'comfyui',
     manifestProvenance: {
       sourceManifestSha256,
       sourceManifestByteLength,
