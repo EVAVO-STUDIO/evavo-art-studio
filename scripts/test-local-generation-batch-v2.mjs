@@ -18,6 +18,7 @@ const nodeTests = [
   'scripts/local-generation-managed-runtime-policy-v2.test.mjs',
   'scripts/local-generation-reference-graph-v2.test.mjs',
   'scripts/local-generation-reference-execution-v2.test.mjs',
+  'scripts/run-local-art-batch-entry.test.mjs',
   'scripts/local-generation-model-plan-v2.test.mjs',
   'scripts/local-generation-v1-reference-bridge.test.mjs',
   'tests/local-generation-manifest-provenance-v1.test.mjs',
