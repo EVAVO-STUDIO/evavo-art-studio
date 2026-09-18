@@ -5,7 +5,11 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { validateLocalGenerationCampaign } from "./run-local-generation-campaign.mjs";
+import {
+  drawThingsResourceRouting,
+  routeScene,
+  validateLocalGenerationCampaign,
+} from "./run-local-generation-campaign.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAXIMUM_RESPONSE_BYTES = 16 * 1024 * 1024;
@@ -46,35 +50,6 @@ async function readJson(filePath, label) {
   }
 }
 
-function requiredCapabilities(scene) {
-  const capabilities = new Set(["generate", "cancellation", "seed", "custom-size"]);
-  if (scene.candidateCount > 1) capabilities.add("candidate-count");
-  return [...capabilities].sort();
-}
-
-function routeScene(catalog, scene) {
-  const required = requiredCapabilities(scene);
-  const profiles = catalog.profiles
-    .filter((profile) => {
-      const adapterId = `comfyui:${profile.profileId}`;
-      if (scene.adapterId && adapterId !== scene.adapterId) return false;
-      return (
-        profile.operations.includes("generate") &&
-        profile.assetKinds.includes(scene.assetKind) &&
-        profile.continuityPhases.includes(scene.continuityPhase) &&
-        required.every((capability) => profile.capabilities.includes(capability)) &&
-        profile.limits.maximumCandidates >= scene.candidateCount
-      );
-    })
-    .sort((left, right) => Number(right.priority ?? 0) - Number(left.priority ?? 0));
-  if (!profiles.length) {
-    fail(
-      `no reviewed local ComfyUI profile can execute scene ${scene.id} (${scene.assetKind}/${scene.continuityPhase}; ${required.join(",")})`,
-    );
-  }
-  return profiles[0];
-}
-
 async function boundedJson(url) {
   const response = await fetch(url, {
     redirect: "error",
@@ -113,7 +88,7 @@ function choiceList(definition, inputName) {
   return null;
 }
 
-function runtimeProfileEvidence(profile, objectInfo) {
+function runtimeProfileEvidence(profile, objectInfo, backend) {
   const classTypes = [...new Set(profile.nodeInventory.map((entry) => entry.classType))].sort();
   const missingClasses = classTypes.filter((classType) => !isRecord(objectInfo[classType]));
   const modelSelections = [];
@@ -138,7 +113,7 @@ function runtimeProfileEvidence(profile, objectInfo) {
   const missingSelections = modelSelections.filter((entry) => !entry.available);
   return {
     profileId: profile.profileId,
-    adapterId: `comfyui:${profile.profileId}`,
+    adapterId: `${backend === "draw-things" ? "draw-things" : "comfyui"}:${profile.profileId}`,
     modelId: profile.modelId,
     profileSha256: profile.profileSha256,
     workflowSha256: profile.workflowSha256,
@@ -179,10 +154,30 @@ async function main() {
   const objectInfo = await boundedJson(`${campaign.provider.baseUrl}/object_info`);
   if (!isRecord(objectInfo)) fail("ComfyUI object_info response is not an object");
 
-  const routeProfiles = campaign.scenes.map((scene) => ({ sceneId: scene.id, profile: routeScene(catalog, scene) }));
+  const resourceRouting =
+    campaign.provider.backend === "draw-things"
+      ? await drawThingsResourceRouting(campaign.provider.catalogPath, process.env)
+      : null;
+  const routeProfiles = campaign.scenes.map((scene) => {
+    const route = routeScene(
+      catalog,
+      scene,
+      campaign.provider.backend,
+      resourceRouting,
+    );
+    const profile = catalog.profiles.find(
+      (entry) => entry.profileId === route.profileId,
+    );
+    if (!profile) {
+      fail(`routed profile ${route.profileId} is absent from the validated catalog`);
+    }
+    return { sceneId: scene.id, route, profile };
+  });
   const profileMap = new Map();
   for (const { profile } of routeProfiles) profileMap.set(profile.profileId, profile);
-  const runtimeProfiles = [...profileMap.values()].map((profile) => runtimeProfileEvidence(profile, objectInfo));
+  const runtimeProfiles = [...profileMap.values()].map((profile) =>
+    runtimeProfileEvidence(profile, objectInfo, campaign.provider.backend),
+  );
   const notReady = runtimeProfiles.filter((profile) => !profile.ready);
 
   const receipt = {
