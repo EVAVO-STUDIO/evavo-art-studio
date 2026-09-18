@@ -48,7 +48,7 @@ function provisionReceipt({
     kind: "evavo-draw-things-model-provision-receipt-v1",
     ok: true,
     stack: "default",
-    completedAt: 1_758_000_000.25,
+    completedAt: "2026-09-18T05:00:00Z",
     modelsRoot: "C:\\EVAVO\\AI\\DrawThings\\Models",
     sourceOrigin: "https://static.libnnc.org/",
     stackManifestSha256: "7".repeat(64),
