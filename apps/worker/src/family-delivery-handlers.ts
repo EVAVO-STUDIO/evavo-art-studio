@@ -649,6 +649,60 @@ async function assertFamilyArtifacts(
   };
 }
 
+async function configuredGodotExecutable(): Promise<string> {
+  const configured = process.env.EVAVO_GODOT_EXECUTABLE?.trim();
+  if (!configured) {
+    fail(
+      "SPRITE_FAMILY_DELIVERY_GODOT_EXECUTABLE_MISSING",
+      "godot.runImporter=true requires EVAVO_GODOT_EXECUTABLE. The payload may not select an executable.",
+    );
+  }
+  if (!path.isAbsolute(configured)) {
+    fail(
+      "SPRITE_FAMILY_DELIVERY_GODOT_EXECUTABLE_INVALID",
+      "EVAVO_GODOT_EXECUTABLE must be one absolute operator-configured file path.",
+    );
+  }
+  const lexical = path.resolve(configured);
+  let lexicalInfo;
+  try {
+    lexicalInfo = await lstat(lexical);
+  } catch (error: unknown) {
+    fail(
+      "SPRITE_FAMILY_DELIVERY_GODOT_EXECUTABLE_INVALID",
+      "EVAVO_GODOT_EXECUTABLE could not be inspected: " +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
+  if (!lexicalInfo.isFile() || lexicalInfo.isSymbolicLink()) {
+    fail(
+      "SPRITE_FAMILY_DELIVERY_GODOT_EXECUTABLE_INVALID",
+      "EVAVO_GODOT_EXECUTABLE must be a regular non-symlink file.",
+    );
+  }
+  return await realpath(lexical);
+}
+
+async function assertGodotProject(projectPath: string): Promise<void> {
+  const projectFile = path.join(projectPath, "project.godot");
+  let info;
+  try {
+    info = await lstat(projectFile);
+  } catch (error: unknown) {
+    fail(
+      "SPRITE_FAMILY_DELIVERY_GODOT_PROJECT_INVALID",
+      "Godot project root must contain project.godot: " +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
+  if (!info.isFile() || info.isSymbolicLink()) {
+    fail(
+      "SPRITE_FAMILY_DELIVERY_GODOT_PROJECT_INVALID",
+      "project.godot must be a regular non-symlink file.",
+    );
+  }
+}
+
 async function ingestFile(
   context: Parameters<RuntimeJobHandler>[0],
   filePath: string,
@@ -796,6 +850,7 @@ export function createFamilyDeliveryHandlers(
           roots,
           "godot.projectPath",
         );
+        await assertGodotProject(projectPath);
         outputDirectory = path.resolve(
           projectPath,
           payload.godot.outputRelativeDirectory,
@@ -914,13 +969,7 @@ export function createFamilyDeliveryHandlers(
         let resourceArtifactId: ArtifactId | undefined;
         if (payload.godot.runImporter) {
           const godotExecutable =
-            process.env.EVAVO_GODOT_EXECUTABLE?.trim();
-          if (!godotExecutable) {
-            fail(
-              "SPRITE_FAMILY_DELIVERY_GODOT_EXECUTABLE_MISSING",
-              "godot.runImporter=true requires EVAVO_GODOT_EXECUTABLE. The payload may not select an executable.",
-            );
-          }
+            await configuredGodotExecutable();
           await runGodotSpriteFramesImport({
             godotExecutable,
             projectPath,
