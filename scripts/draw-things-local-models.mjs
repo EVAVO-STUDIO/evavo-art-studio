@@ -933,10 +933,26 @@ function componentMap(model) {
   return result;
 }
 
-export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
+export function governanceFromPolicy(
+  inventoryRaw,
+  policyRaw,
+  policySha256,
+  provisionReceiptRaw = null,
+) {
   const inventory = validateInventory(inventoryRaw);
   const policy = validateApprovedPolicy(policyRaw);
   const policyDigest = sha(policySha256, "policySha256");
+  const requiresProvisionReceipt = [...policy.models, ...policy.controls].some(
+    (entry) => entry.expectedExternalStores.length > 0,
+  );
+  const receiptEvidence =
+    provisionReceiptRaw === null
+      ? requiresProvisionReceipt
+        ? fail(
+            "Draw Things approved policy requires a Local Compute model provision receipt for external tensor stores",
+          )
+        : null
+      : validateDrawThingsProvisionReceipt(provisionReceiptRaw, inventory);
   const models = [];
   for (const policyModel of policy.models) {
     const observed = inventory.models.find(
@@ -947,13 +963,34 @@ export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
     );
     if (!observed) continue;
     const components = componentMap(observed);
-    const expected = new Map(policyModel.expectedFiles.map((entry) => [entry.name, entry.sha256]));
+    const expected = new Map(
+      policyModel.expectedFiles.map((entry) => [entry.name, entry.sha256]),
+    );
+    const externalNames = new Set(
+      policyModel.expectedExternalStores.map((entry) => entry.name),
+    );
+    for (const name of externalNames) {
+      if (expected.has(name)) {
+        fail(
+          `policy model ${policyModel.id} declares ${name} as both a committed file and an external store`,
+        );
+      }
+    }
     for (const [name, expectedSha] of expected) {
-      if (components.get(name) !== expectedSha) {
+      const observedComponent = components.get(name);
+      if (!observedComponent || observedComponent.sha256 !== expectedSha) {
         fail(`policy model ${policyModel.id} expected exact file ${name} with SHA-256 ${expectedSha}, but current inventory differs`);
       }
     }
-    const unexpected = [...components.keys()].filter((name) => !expected.has(name));
+    const externalStores = resolveExternalStores(
+      policyModel,
+      components,
+      receiptEvidence,
+      `policy model ${policyModel.id}`,
+    );
+    const unexpected = [...components.keys()].filter(
+      (name) => !expected.has(name) && !externalNames.has(name),
+    );
     if (unexpected.length) {
       fail(`policy model ${policyModel.id} contains unreviewed physical components: ${unexpected.join(", ")}`);
     }
@@ -964,6 +1001,7 @@ export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
       version: policyModel.version,
       bundleSha256: sha(observed.bundleSha256, `inventory ${policyModel.id}.bundleSha256`),
       expectedFiles: policyModel.expectedFiles,
+      ...(externalStores.length ? { externalStores } : {}),
       source: policyModel.source,
       license: policyModel.license,
       approvedUses: policyModel.approvedUses,
@@ -992,13 +1030,34 @@ export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
     );
     if (!observed) continue;
     const components = componentMap(observed);
-    const expected = new Map(policyControl.expectedFiles.map((entry) => [entry.name, entry.sha256]));
+    const expected = new Map(
+      policyControl.expectedFiles.map((entry) => [entry.name, entry.sha256]),
+    );
+    const externalNames = new Set(
+      policyControl.expectedExternalStores.map((entry) => entry.name),
+    );
+    for (const name of externalNames) {
+      if (expected.has(name)) {
+        fail(
+          `policy control ${policyControl.id} declares ${name} as both a committed file and an external store`,
+        );
+      }
+    }
     for (const [name, expectedSha] of expected) {
-      if (components.get(name) !== expectedSha) {
+      const observedComponent = components.get(name);
+      if (!observedComponent || observedComponent.sha256 !== expectedSha) {
         fail(`policy control ${policyControl.id} expected exact file ${name} with SHA-256 ${expectedSha}, but current inventory differs`);
       }
     }
-    const unexpected = [...components.keys()].filter((name) => !expected.has(name));
+    const externalStores = resolveExternalStores(
+      policyControl,
+      components,
+      receiptEvidence,
+      `policy control ${policyControl.id}`,
+    );
+    const unexpected = [...components.keys()].filter(
+      (name) => !expected.has(name) && !externalNames.has(name),
+    );
     if (unexpected.length) {
       fail(`policy control ${policyControl.id} contains unreviewed physical components: ${unexpected.join(", ")}`);
     }
@@ -1015,6 +1074,7 @@ export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
       version: policyControl.version,
       bundleSha256: sha(observed.bundleSha256, `inventory control ${policyControl.id}.bundleSha256`),
       expectedFiles: policyControl.expectedFiles,
+      ...(externalStores.length ? { externalStores } : {}),
       source: policyControl.source,
       license: policyControl.license,
       approvedRoles: policyControl.approvedRoles,
@@ -1037,6 +1097,17 @@ export function governanceFromPolicy(inventoryRaw, policyRaw, policySha256) {
     reviewedAt: policy.reviewedAt,
     models,
     controls,
+    ...(receiptEvidence
+      ? {
+          provisionReceipt: {
+            receiptSha256: receiptEvidence.receiptSha256,
+            stackManifestSha256: receiptEvidence.stackManifestSha256,
+            sourceOrigin: receiptEvidence.sourceOrigin,
+            installManifestSha256: receiptEvidence.installManifestSha256,
+            bootstrapPolicy: receiptEvidence.bootstrapPolicy,
+          },
+        }
+      : {}),
   };
 }
 
