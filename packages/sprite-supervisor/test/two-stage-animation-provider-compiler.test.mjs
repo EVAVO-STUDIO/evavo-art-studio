@@ -386,7 +386,7 @@ test("compiles key-pose frames through SDXL structural control then FLUX edit", 
       frame.finalValidationRequest.references.map((entry) => entry.role),
       ["base-image", "canonical-identity", "direction-master"],
     );
-    assert.ok(frame.taskIds.length === 8);
+    assert.ok(frame.taskIds.length === 9);
   }
 
   const tasks = result.supervisorRequest.tasks;
@@ -404,7 +404,7 @@ test("compiles key-pose frames through SDXL structural control then FLUX edit", 
   );
   assert.equal(
     tasks.filter((task) => task.kind === "art.candidate.select").length,
-    2,
+    4,
   );
   assert.equal(
     tasks.filter((task) => task.kind === "art.candidate.promote").length,
@@ -441,6 +441,42 @@ test("compiles key-pose frames through SDXL structural control then FLUX edit", 
   assert.deepEqual(
     final.payloadTemplate.references[0].artifactId,
     { $artifact: result.frames[0].structuralArtifactRole },
+  );
+
+  const selections = tasks.filter(
+    (task) => task.kind === "art.candidate.select",
+  );
+  const poseSelection = selections.find(
+    (task) =>
+      task.payloadTemplate.referenceRole ===
+      "pose-locked-structural-draft",
+  );
+  const identitySelection = selections.find(
+    (task) =>
+      task.payloadTemplate.referenceRole ===
+      "direction-identity-lock",
+  );
+  assert.ok(poseSelection);
+  assert.ok(identitySelection);
+  assert.equal(identitySelection.payloadTemplate.referenceArtifactId, artifact("b"));
+  assert.equal(
+    identitySelection.payloadTemplate.policy.requireReferenceLineage,
+    false,
+  );
+  assert.deepEqual(
+    identitySelection.payloadTemplate.candidateArtifactIds,
+    { $artifacts: identitySelection.requiredArtifactRoles[0] },
+  );
+  const promotion = tasks.find(
+    (task) => task.kind === "art.candidate.promote",
+  );
+  assert.ok(promotion);
+  assert.deepEqual(
+    promotion.payloadTemplate.selectionEvidenceArtifactId,
+    { $artifact: promotion.requiredArtifactRoles[0] },
+  );
+  assert.ok(
+    promotion.dependencyTaskIds.includes(identitySelection.id),
   );
 });
 
@@ -639,6 +675,13 @@ test("full-clip release is gated by one manifest-bound family verification task"
   assert.equal(familyTasks.length, 1);
   const family = familyTasks[0];
   assert.equal(family.payloadTemplate.frames.length, 8);
+  assert.ok(
+    family.payloadTemplate.frames.every(
+      (frame) =>
+        frame.baseline ===
+        result.supervisorRequest.spritePlan.godot.ySortOrigin.y,
+    ),
+  );
   assert.equal(family.payloadTemplate.layerDefinitions.length, 1);
   assert.equal(
     family.payloadTemplate.layerDefinitions[0].role,
