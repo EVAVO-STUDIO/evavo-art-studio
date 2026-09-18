@@ -135,6 +135,14 @@ function defaultPolicyPath() {
   return path.join(ROOT, "config", "draw-things-approved-model-policy.v1.json");
 }
 
+function defaultProvisionReceipt(environment = process.env) {
+  return path.join(
+    defaultRuntimeRoot(environment),
+    "state",
+    "model-stack-receipt.json",
+  );
+}
+
 function safeLoopbackBaseUrl(value) {
   let url;
   try {
@@ -560,6 +568,227 @@ function validateExpectedFiles(value, label) {
   });
 }
 
+function validateExpectedExternalStores(value, label) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 32) {
+    fail(`${label} must contain at most 32 external stores`);
+  }
+  const names = new Set();
+  return value.map((raw, index) => {
+    const entry = object(raw, `${label}[${index}]`);
+    const name = text(entry.name, `${label}[${index}].name`, 256);
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u.test(name) ||
+      names.has(name) ||
+      !name.endsWith(".ckpt-tensordata")
+    ) {
+      fail(`${label}[${index}].name must be one unique safe .ckpt-tensordata file`);
+    }
+    names.add(name);
+    const sizeBytes = entry.sizeBytes;
+    if (
+      !Number.isInteger(sizeBytes) ||
+      sizeBytes < 1 ||
+      sizeBytes > 16 * 1024 * 1024 * 1024
+    ) {
+      fail(`${label}[${index}].sizeBytes is invalid`);
+    }
+    if (entry.verification !== "evavo-provision-receipt-sha256") {
+      fail(
+        `${label}[${index}].verification must be evavo-provision-receipt-sha256`,
+      );
+    }
+    return {
+      name,
+      sizeBytes,
+      verification: "evavo-provision-receipt-sha256",
+    };
+  });
+}
+
+function provisionReceiptFileMap(receipt) {
+  const result = new Map();
+  for (const collectionName of ["models", "controls"]) {
+    const collection = receipt[collectionName] ?? [];
+    if (!Array.isArray(collection)) {
+      fail(`Draw Things provision receipt ${collectionName} must be an array`);
+    }
+    for (const [assetIndex, rawAsset] of collection.entries()) {
+      const asset = object(
+        rawAsset,
+        `Draw Things provision receipt ${collectionName}[${assetIndex}]`,
+      );
+      if (!Array.isArray(asset.files)) {
+        fail(
+          `Draw Things provision receipt ${collectionName}[${assetIndex}].files must be an array`,
+        );
+      }
+      for (const [fileIndex, rawFile] of asset.files.entries()) {
+        const file = object(
+          rawFile,
+          `Draw Things provision receipt ${collectionName}[${assetIndex}].files[${fileIndex}]`,
+        );
+        const name = text(
+          file.name,
+          `Draw Things provision receipt file name`,
+          256,
+        );
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u.test(name)) {
+          fail(`Draw Things provision receipt file name is unsafe: ${name}`);
+        }
+        const sizeBytes = file.sizeBytes;
+        if (
+          !Number.isInteger(sizeBytes) ||
+          sizeBytes < 1 ||
+          sizeBytes > 16 * 1024 * 1024 * 1024
+        ) {
+          fail(`Draw Things provision receipt file ${name} has invalid sizeBytes`);
+        }
+        const evidence = {
+          sha256: sha(
+            file.sha256,
+            `Draw Things provision receipt file ${name}.sha256`,
+          ),
+          sizeBytes,
+          verificationMode: text(
+            file.verificationMode,
+            `Draw Things provision receipt file ${name}.verificationMode`,
+            64,
+          ),
+        };
+        const existing = result.get(name);
+        if (
+          existing &&
+          (existing.sha256 !== evidence.sha256 ||
+            existing.sizeBytes !== evidence.sizeBytes ||
+            existing.verificationMode !== evidence.verificationMode)
+        ) {
+          fail(`Draw Things provision receipt conflicts for file ${name}`);
+        }
+        result.set(name, evidence);
+      }
+    }
+  }
+  return result;
+}
+
+export function validateDrawThingsProvisionReceipt(value, inventoryRaw) {
+  const inventory = validateInventory(inventoryRaw);
+  const receipt = object(value, "Draw Things model provision receipt");
+  if (
+    receipt.schemaVersion !== 1 ||
+    receipt.kind !== "evavo-draw-things-model-provision-receipt-v1" ||
+    receipt.ok !== true
+  ) {
+    fail("Draw Things model provision receipt has an unsupported contract");
+  }
+  const receiptSha256 = sha(
+    receipt.receiptSha256,
+    "Draw Things model provision receipt.receiptSha256",
+  );
+  const body = Object.fromEntries(
+    Object.entries(receipt).filter(([key]) => key !== "receiptSha256"),
+  );
+  if (hashJson(body) !== receiptSha256) {
+    fail("Draw Things model provision receipt failed its canonical SHA-256");
+  }
+  if (receipt.sourceOrigin !== "https://static.libnnc.org/") {
+    fail("Draw Things model provision receipt source origin is not approved");
+  }
+  const installManifestSha256 = sha(
+    receipt.installManifestSha256,
+    "Draw Things model provision receipt.installManifestSha256",
+  );
+  if (installManifestSha256 !== inventory.installManifestSha256) {
+    fail(
+      "Draw Things model provision receipt was created for a different install manifest",
+    );
+  }
+  const stackManifestSha256 = sha(
+    receipt.stackManifestSha256,
+    "Draw Things model provision receipt.stackManifestSha256",
+  );
+  if (
+    receipt.networkProvisioningAuthorized !== true ||
+    receipt.normalServiceDownloadAuthorityChanged !== false ||
+    receipt.remoteFallbackAllowed !== false ||
+    receipt.callerSelectedUrl !== false ||
+    receipt.callerSelectedFileHash !== false ||
+    receipt.everyAdmittedFileHasFullSha256 !== true ||
+    receipt.externalStoreBootstrapPolicy !==
+      "fixed-official-origin+committed-size then receipt-pinned SHA-256"
+  ) {
+    fail(
+      "Draw Things model provision receipt does not preserve the fixed-origin receipt-pinned trust policy",
+    );
+  }
+  return {
+    receiptSha256,
+    stackManifestSha256,
+    sourceOrigin: receipt.sourceOrigin,
+    installManifestSha256,
+    bootstrapPolicy: receipt.externalStoreBootstrapPolicy,
+    files: provisionReceiptFileMap(receipt),
+  };
+}
+
+function resolveExternalStores(
+  policyEntry,
+  components,
+  receiptEvidence,
+  label,
+) {
+  const expectedStores = policyEntry.expectedExternalStores ?? [];
+  const result = [];
+  for (const store of expectedStores) {
+    if (!receiptEvidence) {
+      fail(
+        `${label} requires Draw Things provision-receipt evidence for external tensor store ${store.name}`,
+      );
+    }
+    const observed = components.get(store.name);
+    if (!observed) {
+      fail(`${label} external tensor store is absent: ${store.name}`);
+    }
+    if (observed.sizeBytes !== store.sizeBytes) {
+      fail(
+        `${label} external tensor store ${store.name} expected ${store.sizeBytes} bytes but current inventory has ${observed.sizeBytes}`,
+      );
+    }
+    const receiptFile = receiptEvidence.files.get(store.name);
+    if (!receiptFile) {
+      fail(
+        `${label} external tensor store ${store.name} is absent from the trusted provision receipt`,
+      );
+    }
+    if (
+      receiptFile.sizeBytes !== store.sizeBytes ||
+      receiptFile.sha256 !== observed.sha256
+    ) {
+      fail(
+        `${label} external tensor store ${store.name} does not match its receipt-pinned SHA-256 and size`,
+      );
+    }
+    if (
+      !new Set(["official-origin-size", "receipt-sha256"]).has(
+        receiptFile.verificationMode,
+      )
+    ) {
+      fail(
+        `${label} external tensor store ${store.name} has unsupported receipt verification mode ${receiptFile.verificationMode}`,
+      );
+    }
+    result.push({
+      name: store.name,
+      sizeBytes: store.sizeBytes,
+      sha256: observed.sha256,
+      verification: "evavo-provision-receipt-sha256",
+      provisionReceiptSha256: receiptEvidence.receiptSha256,
+    });
+  }
+  return result;
+}
+
 function validateApprovedPolicy(value) {
   const policy = object(value, "Draw Things approved model policy");
   if (policy.schema !== POLICY_SCHEMA) fail(`policy must use ${POLICY_SCHEMA}`);
@@ -599,6 +828,10 @@ function validateApprovedPolicy(value) {
       inventoryFile: text(entry.inventoryFile, `policy.models[${index}].inventoryFile`, 1024),
       version: text(entry.version, `policy.models[${index}].version`, 256),
       expectedFiles: validateExpectedFiles(entry.expectedFiles, `policy.models[${index}].expectedFiles`),
+      expectedExternalStores: validateExpectedExternalStores(
+        entry.expectedExternalStores,
+        `policy.models[${index}].expectedExternalStores`,
+      ),
       source: canonical(object(entry.source, `policy.models[${index}].source`)),
       license: canonical(license),
       approvedUses: [...new Set(entry.approvedUses.map((use, useIndex) =>
@@ -662,6 +895,10 @@ function validateApprovedPolicy(value) {
       inventoryFile: text(entry.inventoryFile, `policy.controls[${index}].inventoryFile`, 1024),
       version: text(entry.version, `policy.controls[${index}].version`, 256),
       expectedFiles: validateExpectedFiles(entry.expectedFiles, `policy.controls[${index}].expectedFiles`),
+      expectedExternalStores: validateExpectedExternalStores(
+        entry.expectedExternalStores,
+        `policy.controls[${index}].expectedExternalStores`,
+      ),
       source: canonical(object(entry.source, `policy.controls[${index}].source`)),
       license: canonical(license),
       approvedRoles,
@@ -684,7 +921,14 @@ function componentMap(model) {
     const relativePath = text(item.relativePath, "inventory component.relativePath", 2048);
     const name = path.posix.basename(relativePath.replace(/\\/gu, "/"));
     if (result.has(name)) fail(`inventory model contains duplicate component basename ${name}`);
-    result.set(name, sha(item.sha256, `inventory component ${name}.sha256`));
+    const sizeBytes = item.sizeBytes;
+    if (!Number.isInteger(sizeBytes) || sizeBytes < 1) {
+      fail(`inventory component ${name}.sizeBytes is invalid`);
+    }
+    result.set(name, {
+      sha256: sha(item.sha256, `inventory component ${name}.sha256`),
+      sizeBytes,
+    });
   }
   return result;
 }
