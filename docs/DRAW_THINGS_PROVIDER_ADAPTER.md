@@ -30,7 +30,7 @@ A future native gRPC adapter remains possible, but only after Art Studio can pin
 
 A compiled ComfyUI profile is admitted as Draw Things only when its exact node inventory contains `DrawThingsSampler`. It is registered as `draw-things:<profileId>` instead of `comfyui:<profileId>`.
 
-The adapter records the normal ComfyUI catalog/profile/workflow/runtime/model evidence plus the Draw Things profile hash, official sampler boundary, delegated adapter identity, operator-declared local/remote gRPC status, and explicit proof that no direct Art Studio gRPC client or candidate approval was used.
+The adapter records the normal ComfyUI catalog/profile/workflow/runtime/model evidence plus the Draw Things profile hash, official sampler boundary, delegated adapter identity, the exact gRPC server/port/TLS values pinned inside the reviewed workflow, and explicit proof that no direct Art Studio gRPC client or candidate approval was used. Remote Draw Things endpoints are rejected unless the immutable workflow enables TLS.
 
 ## External service and licence boundary
 
@@ -66,22 +66,23 @@ docker run --rm --gpus all `
 
 Pin an exact reviewed image digest for production rather than relying on `:latest`, and record that digest in the runtime inventory. Pin the official ComfyUI bridge to an exact reviewed commit as well.
 
+The normal EVAVO ComfyUI service intentionally disables every custom node and should remain unchanged. Run Draw Things through a separate dedicated ComfyUI bridge instance on port `8193`. Start that instance with custom nodes disabled by default and whitelist only the pinned Draw Things bridge, for example `--disable-all-custom-nodes --whitelist-custom-nodes draw-things-comfyui --disable-api-nodes --disable-auto-launch`. This keeps the ordinary core-only generation path isolated from the GPL bridge and from unrelated custom nodes.
+
 ## Art Studio worker configuration
 
 ```powershell
 $env:EVAVO_ART_DRAWTHINGS_CATALOG = "C:\EVAVO\draw-things\catalog.json"
 $env:EVAVO_ART_DRAWTHINGS_CATALOG_ROOT = "C:\EVAVO\draw-things"
-$env:EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL = "http://127.0.0.1:8192"
+$env:EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL = "http://127.0.0.1:8193"
 $env:EVAVO_ART_DRAWTHINGS_COMFYUI_DEDICATED_INSTANCE = "true"
 $env:EVAVO_ART_DRAWTHINGS_COMFYUI_ALLOW_REMOTE = "false"
-$env:EVAVO_ART_DRAWTHINGS_GRPC_REMOTE = "false"
 ```
 
-The same bounded timeout, JSON, upload and output controls are available under the `EVAVO_ART_DRAWTHINGS_COMFYUI_*` prefix. `EVAVO_ART_DRAWTHINGS_GRPC_REMOTE` is an operator assertion about the endpoint configured inside the bridge; a loopback ComfyUI URL does not prove that the bridge itself points at a local server.
+The same bounded timeout, JSON, upload and output controls are available under the `EVAVO_ART_DRAWTHINGS_COMFYUI_*` prefix. The Draw Things gRPC target is not controlled by an environment flag: `server`, `port` and `use_tls` are pinned inside the reviewed `DrawThingsSampler` workflow and therefore participate in the catalog/profile hashes.
 
 ## Building the reviewed workflow catalog
 
-Do not accept arbitrary workflows from ChatGPT, Claude, MCP callers or runtime payloads. Install and pin the official bridge, build and review a workflow containing `DrawThingsSampler` and any required Draw Things ControlNet/LoRA nodes, export it in ComfyUI API format, include exact model/runtime hashes, then compile it with the existing deterministic ComfyUI catalog compiler. Point `EVAVO_ART_DRAWTHINGS_CATALOG` at that compiled catalog.
+Do not accept arbitrary workflows from ChatGPT, Claude, MCP callers or runtime payloads. Install and pin the official bridge, build and review a workflow containing `DrawThingsSampler` and any required Draw Things ControlNet/LoRA nodes, and pin its `server`, `port` and `use_tls` fields. For the canonical local service use `127.0.0.1`, `7859` and `false`. Export it in ComfyUI API format, include exact model/runtime hashes, then compile it with the existing deterministic ComfyUI catalog compiler. Point `EVAVO_ART_DRAWTHINGS_CATALOG` at that compiled catalog.
 
 The wrapper does not weaken ComfyUI validation: the workflow remains self-hashed and only declared bindings can be mutated at execution time.
 
@@ -103,9 +104,7 @@ ChatGPT, Claude and trusted agents should work at intent level rather than raw s
 
 ## Single-GPU rule
 
-Until the shared GPU lease layer is active, keep local provider worker concurrency at `1`, do not run independent interactive ComfyUI or Draw Things generations concurrently, and fail cleanly instead of racing large model loads into OOM.
-
-The next runtime slice should add a machine-local GPU lease and capacity record covering loaded engine, loaded model, free VRAM, estimated job VRAM and interactive/background priority.
+EVAVO Local Compute already provides the machine-wide creative GPU lease broker with resource estimates, priorities, starvation protection and per-GPU collision avoidance. Draw Things-backed Art Studio jobs must stay behind that same broker rather than inventing a second lock. Keep direct local provider worker concurrency at `1` when bypassing the broker, and never run independent interactive ComfyUI or Draw Things generations against the same GPU while a lease is active.
 
 ## Production acceptance
 
