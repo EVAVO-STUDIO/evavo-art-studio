@@ -128,5 +128,40 @@
       "resourceClass": "baseline",
       "notes": "Stable lower-memory fallback route. Commercial use remains subject to the OpenRAIL++ use-based restrictions and redistribution conditions."
     }
+  ],
+  "controls": [
+    {
+      "id": "xinsir-union-promax-sdxl-1.0",
+      "inventoryName": "Xinsir Union ProMax (SDXL, ControlNet)",
+      "inventoryFile": "controlnet_xinsir_union_promax_sdxl_1.0_f16.ckpt",
+      "version": "sdxl_base_v0.9",
+      "expectedFiles": [
+        {
+          "name": "controlnet_xinsir_union_promax_sdxl_1.0_f16.ckpt",
+          "sha256": "5c532b48949ec0464758f1fa987d9a5bf1ce768735c72699939671fe380939fd"
+        }
+      ],
+      "source": {
+        "publisher": "xinsir",
+        "url": "https://huggingface.co/xinsir/controlnet-union-sdxl-1.0"
+      },
+      "license": {
+        "id": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0",
+        "commercialUse": "allowed",
+        "derivatives": "allowed",
+        "redistribution": "allowed"
+      },
+      "approvedRoles": [
+        "pose-control"
+      ],
+      "compatibleModelIds": [
+        "sdxl-base-1.0-8bit"
+      ],
+      "minimumVramGb": 8,
+      "priority": 180,
+      "notes": "Structural pose-control dependency for SDXL animation drafting. Kept separate from the base checkpoint and only admitted for pose-control workflows."
+    }
   ]
 }
