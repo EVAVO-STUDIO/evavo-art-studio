@@ -18,6 +18,9 @@ import {
   compileEvaDenseMotionFamilyReleaseManifestV2,
   readEvaDenseMotionFamilyApprovalFileV2,
 } from './project-art/eva-dense-motion-family-release-manifest-v2.mjs';
+import {
+  stageEvaDenseMotionFamilyHumanReviewEvidenceV1,
+} from './project-art/eva-dense-motion-family-human-review-evidence-stage-v1.mjs';
 
 const MAXIMUM_JSON_BYTES = 32 * 1024 * 1024;
 
@@ -131,6 +134,37 @@ function fingerprint(values) {
   return 0;
 }
 
+function stageReview(values) {
+  required(values, [
+    '--family-evidence-root', '--source-review', '--destination-path', '--role',
+    '--actor-id', '--family-evidence-fingerprint', '--decision', '--reviewed-at',
+  ]);
+  const result = stageEvaDenseMotionFamilyHumanReviewEvidenceV1({
+    familyEvidenceRoot: realDirectory(values.get('--family-evidence-root'), 'familyEvidenceRoot'),
+    sourceEvidenceFile: path.resolve(values.get('--source-review')),
+    destinationRelativePath: values.get('--destination-path'),
+    expected: {
+      role: values.get('--role'),
+      actorId: values.get('--actor-id'),
+      familyEvidenceFingerprint: values.get('--family-evidence-fingerprint'),
+      decision: values.get('--decision'),
+      reviewedAt: values.get('--reviewed-at'),
+    },
+  });
+  process.stdout.write(`${JSON.stringify({
+    status: result.status,
+    reviewerEvidence: {
+      evidencePath: result.evidencePath,
+      evidenceSha256: result.evidenceSha256,
+    },
+    byteLength: result.byteLength,
+    contentTransformed: result.contentTransformed,
+    humanDecisionCreated: result.humanDecisionCreated,
+    automaticDecision: result.automaticDecision,
+  }, null, 2)}\n`);
+  return 0;
+}
+
 function manifest(values) {
   required(values, [
     '--fingerprint-plan', '--owner-approval', '--creative-director-approval',
@@ -166,6 +200,7 @@ export function main(argv = process.argv.slice(2)) {
   try {
     const { command, values } = parsePairs(argv);
     if (command === 'fingerprint') return fingerprint(values);
+    if (command === 'stage-review') return stageReview(values);
     if (command === 'manifest') return manifest(values);
     fail('EVA_DENSE_FAMILY_MANIFEST_V2_CLI_COMMAND_INVALID', command);
   } catch (error) {
