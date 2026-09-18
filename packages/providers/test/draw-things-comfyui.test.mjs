@@ -10,7 +10,15 @@ import {
   createDrawThingsComfyUIProviderAdapters,
 } from "../dist/index.js";
 
-function profile(profileId, classType = DRAW_THINGS_SAMPLER_CLASS) {
+function profile(
+  profileId,
+  {
+    classType = DRAW_THINGS_SAMPLER_CLASS,
+    server = "127.0.0.1",
+    port = "7859",
+    useTls = false,
+  } = {},
+) {
   return {
     profileId,
     label: profileId,
@@ -37,6 +45,9 @@ function profile(profileId, classType = DRAW_THINGS_SAMPLER_CLASS) {
           width: 512,
           height: 512,
           batch_size: 1,
+          server,
+          port,
+          use_tls: useTls,
         },
       },
     },
@@ -64,12 +75,12 @@ function profile(profileId, classType = DRAW_THINGS_SAMPLER_CLASS) {
       },
       {
         id: "draw-things-comfyui",
-        version: "2026.09.11",
+        version: "1.11.1",
         sha256: "c".repeat(64),
       },
       {
         id: "draw-things-grpc-server",
-        version: "2026.09.11",
+        version: "v26.0910.1",
         sha256: "d".repeat(64),
       },
     ],
@@ -90,15 +101,14 @@ function catalog(profiles) {
   });
 }
 
-test("Draw Things bridge exposes distinct provider identities without leaking ordinary ComfyUI profiles", () => {
+test("Draw Things bridge exposes distinct local provider identity from immutable workflow endpoint", () => {
   const compiled = catalog([
     profile("draw-things-sprite"),
-    profile("ordinary-comfy", "KSampler"),
+    profile("ordinary-comfy", { classType: "KSampler" }),
   ]);
   const adapters = createDrawThingsComfyUIProviderAdapters({
     catalog: compiled,
     dedicatedInstance: true,
-    drawThingsRemote: false,
   });
 
   assert.equal(adapters.length, 1);
@@ -115,14 +125,15 @@ test("Draw Things bridge exposes distinct provider identities without leaking or
   assert.ok(adapter.descriptor.capabilities.includes("generate"));
 });
 
-test("Draw Things bridge fails closed when the catalog has no DrawThingsSampler", () => {
-  const compiled = catalog([profile("ordinary-comfy", "KSampler")]);
+test("Draw Things bridge fails closed when catalog has no DrawThingsSampler", () => {
+  const compiled = catalog([
+    profile("ordinary-comfy", { classType: "KSampler" }),
+  ]);
   assert.throws(
     () =>
       createDrawThingsComfyUIProviderAdapters({
         catalog: compiled,
         dedicatedInstance: true,
-        drawThingsRemote: false,
       }),
     (error) => {
       assert.ok(error instanceof ProviderError);
@@ -133,12 +144,17 @@ test("Draw Things bridge fails closed when the catalog has no DrawThingsSampler"
   );
 });
 
-test("Draw Things bridge marks remote gRPC execution conservatively", () => {
-  const compiled = catalog([profile("draw-things-remote")]);
+test("Draw Things bridge derives remote data policy from reviewed TLS endpoint", () => {
+  const compiled = catalog([
+    profile("draw-things-remote", {
+      server: "gpu.example.com",
+      port: "7859",
+      useTls: true,
+    }),
+  ]);
   const [adapter] = createDrawThingsComfyUIProviderAdapters({
     catalog: compiled,
     dedicatedInstance: true,
-    drawThingsRemote: true,
   });
 
   assert.equal(adapter.descriptor.dataPolicy.remote, true);
@@ -149,5 +165,57 @@ test("Draw Things bridge marks remote gRPC execution conservatively", () => {
   assert.equal(
     DRAW_THINGS_COMFYUI_PROVIDER_EVIDENCE_SCHEMA,
     "evavo.draw-things-comfyui-provider-evidence.v1",
+  );
+});
+
+test("Draw Things bridge rejects a remote gRPC endpoint without TLS", () => {
+  const compiled = catalog([
+    profile("draw-things-remote-insecure", {
+      server: "gpu.example.com",
+      port: "7859",
+      useTls: false,
+    }),
+  ]);
+  assert.throws(
+    () =>
+      createDrawThingsComfyUIProviderAdapters({
+        catalog: compiled,
+        dedicatedInstance: true,
+      }),
+    (error) => {
+      assert.ok(error instanceof ProviderError);
+      assert.equal(error.code, "DRAW_THINGS_REMOTE_TLS_REQUIRED");
+      return true;
+    },
+  );
+});
+
+test("Draw Things bridge rejects ambiguous sampler endpoints in one reviewed profile", () => {
+  const base = profile("draw-things-ambiguous");
+  base.workflow["2"] = {
+    class_type: DRAW_THINGS_SAMPLER_CLASS,
+    inputs: {
+      prompt: "second sampler",
+      seed: 2,
+      width: 512,
+      height: 512,
+      batch_size: 1,
+      server: "localhost",
+      port: "7860",
+      use_tls: false,
+    },
+  };
+  const compiled = catalog([base]);
+  assert.throws(
+    () =>
+      createDrawThingsComfyUIProviderAdapters({
+        catalog: compiled,
+        dedicatedInstance: true,
+      }),
+    (error) => {
+      assert.ok(error instanceof ProviderError);
+      assert.equal(error.code, "DRAW_THINGS_ENDPOINT_AMBIGUOUS");
+      return true;
+    },
   );
 });
