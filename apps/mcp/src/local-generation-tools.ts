@@ -735,6 +735,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
         drawThingsCommissioning: {
           prepareTool: "prepare_draw_things_local_provider",
           provisionTool: "provision_draw_things_local_provider",
+          fullClipExecutionTool: "run_two_stage_animation_clip_local",
           prepareDownloads: false,
           provisionRequiresOperatorEnablement: true,
           provisionEnablementEnvironment:
@@ -780,6 +781,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
           "list local campaign outputs",
           "return selected generated images through MCP",
           "return exact receipt and output paths",
+          "for complete walk-cycle production use run_two_stage_animation_clip_local: it prepares Draw Things, compiles a local-only SDXL pose-control -> FLUX refinement supervisor graph, acquires the shared GPU lease, verifies the family and optionally builds atlas/Godot delivery artifacts",
         ],
         outputRoot: campaignOutputRoot(),
         matureContent: "clearly-adult mature-nonexplicit only",
@@ -970,6 +972,27 @@ export function registerLocalGenerationTools(server: McpServer): void {
         );
       } catch (error: unknown) {
         return toolError("DRAW_THINGS_PROVISIONING_FAILED", error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "run_two_stage_animation_clip_local",
+    {
+      description:
+        "Execute one complete reviewed local sprite walk cycle through the shared GPU lease. The tool automatically prepares the already-provisioned Draw Things service without downloads, loads the canonical governed catalog, compiles SDXL/Xinsir pose-locked structural drafts plus FLUX/Kontext refinements, binds promoted key poses into in-betweens, alpha-masters/ranks/promotes frames, verifies the complete family, and optionally produces atlas/Godot delivery artifacts. Cloud fallback and caller-selected catalogs/executables are not allowed.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult(
+          await executeTwoStageAnimationClip(request),
+        );
+      } catch (error: unknown) {
+        return toolError(
+          "TWO_STAGE_ANIMATION_EXECUTION_FAILED",
+          error,
+        );
       }
     },
   );
