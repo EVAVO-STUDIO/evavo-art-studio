@@ -272,6 +272,7 @@ export async function fetchDrawThingsFilesInfo(
   const value = await boundedJsonResponse(response, "Draw Things files_info");
   const record = object(value, "Draw Things files_info");
   if (!Array.isArray(record.models)) fail("Draw Things files_info.models must be an array");
+  if (!Array.isArray(record.controlNets)) fail("Draw Things files_info.controlNets must be an array");
   return record;
 }
 
@@ -453,6 +454,13 @@ export async function captureDrawThingsInventory(options = {}) {
     left.file.localeCompare(right.file) ||
     left.bundleSha256.localeCompare(right.bundleSha256),
   );
+  const controls = [];
+  for (const raw of fileInfo.controlNets) controls.push(await inventoryModel(raw, index));
+  controls.sort((left, right) =>
+    left.name.localeCompare(right.name) ||
+    left.file.localeCompare(right.file) ||
+    left.bundleSha256.localeCompare(right.bundleSha256),
+  );
   const rawCategoryCounts = {};
   for (const [key, value] of Object.entries(fileInfo)) {
     if (Array.isArray(value)) rawCategoryCounts[key] = value.length;
@@ -464,6 +472,7 @@ export async function captureDrawThingsInventory(options = {}) {
     grpcEndpoint: `${install.grpcHost}:${install.grpcPort}`,
     installManifestSha256,
     models,
+    controls,
     rawCategoryCounts,
   };
 }
@@ -474,6 +483,9 @@ function validateInventory(value) {
   sha(inventory.installManifestSha256, "inventory.installManifestSha256");
   if (!Array.isArray(inventory.models) || inventory.models.length > 512) {
     fail("inventory.models must contain at most 512 models");
+  }
+  if (!Array.isArray(inventory.controls) || inventory.controls.length > 512) {
+    fail("inventory.controls must contain at most 512 controls");
   }
   return inventory;
 }
