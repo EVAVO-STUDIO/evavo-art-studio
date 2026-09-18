@@ -1,6 +1,8 @@
 {
   "schema": "evavo.draw-things-approved-model-policy.v1",
   "policyId": "evavo-draw-things-production-2026-09",
+  "reviewedBy": "EVAVO Studio",
+  "reviewedAt": "2026-09-18T03:47:00Z",
   "models": [
     {
       "id": "flux2-klein-4b-q6p",
