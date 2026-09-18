@@ -707,3 +707,68 @@ test("full-clip graph remains local-only at every provider task", async () => {
     assert.equal(task.payloadTemplate.selection.allowFallback, false);
   }
 });
+
+
+test("full-clip delivery chains verified family artifacts into atlas packaging", async () => {
+  const batch = await request("hero-walk-right:keys");
+  const {
+    batchId: _batchId,
+    keyPoseArtifactIds: _keyPoseArtifactIds,
+    finalCandidatesPerFrame: _finalCandidatesPerFrame,
+    ...clipInput
+  } = batch;
+  const result = compileTwoStageAnimationClip({
+    ...clipInput,
+    keyPoseCandidatesPerFrame: 1,
+    inBetweenCandidatesPerFrame: 1,
+    delivery: {
+      outputDirectory: "C:\\EVAVO\\ArtStudio\\deliveries\\hero-walk-right",
+      atlasId: "hero-walk-right-atlas",
+      godotProjectPath: "C:\\GitRepos\\game-project",
+    },
+  });
+
+  const atlasTasks = result.supervisorRequest.tasks.filter(
+    (task) => task.kind === "sprite.atlas.build",
+  );
+  assert.equal(atlasTasks.length, 1);
+  const atlas = atlasTasks[0];
+  assert.deepEqual(atlas.requiredArtifactRoles, [
+    result.familyManifestRole,
+    result.familyEvidenceRole,
+    result.familyCompositeRole,
+  ]);
+  assert.deepEqual(atlas.payloadTemplate.familyManifestArtifactId, {
+    $artifact: result.familyManifestRole,
+  });
+  assert.deepEqual(atlas.payloadTemplate.familyEvidenceArtifactId, {
+    $artifact: result.familyEvidenceRole,
+  });
+  assert.equal(atlas.payloadTemplate.atlasId, "hero-walk-right-atlas");
+  assert.equal(
+    atlas.payloadTemplate.godotProjectPath,
+    "C:\\GitRepos\\game-project",
+  );
+  assert.ok(result.atlasImageRole);
+  assert.ok(result.atlasDataRole);
+  assert.ok(result.atlasEvidenceRole);
+  assert.ok(result.godotDescriptorRole);
+  assert.ok(result.godotImporterRole);
+  assert.ok(
+    result.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
+      result.atlasEvidenceRole,
+    ),
+  );
+  assert.ok(
+    result.supervisorRequest.policy.requiredReleaseArtifactRoles.includes(
+      result.godotDescriptorRole,
+    ),
+  );
+  assert.ok(
+    atlas.outputBindings.some(
+      (binding) =>
+        binding.role === result.atlasEvidenceRole &&
+        binding.labels.qualityState === "passed",
+    ),
+  );
+});
