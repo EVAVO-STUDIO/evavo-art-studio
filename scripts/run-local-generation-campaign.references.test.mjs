@@ -244,3 +244,107 @@ test('ComfyUI backend does not route through DrawThingsSampler profiles', () => 
     /no reviewed local ComfyUI profile/u,
   );
 });
+
+
+test('broker-admitted VRAM routes Draw Things to baseline when quality headroom is unavailable', () => {
+  const input = campaign([]);
+  input.provider = {
+    backend: 'draw-things',
+    baseUrl: 'http://127.0.0.1:8193',
+    catalogPath: 'C:\\temp\\draw-things-catalog.json',
+  };
+  const scene = validateLocalGenerationCampaign(input, {}).scenes[0];
+  const required = requiredCapabilityProfile(scene);
+  const quality = {
+    profileId: 'flux-quality',
+    modelId: 'flux-quality-model',
+    priority: 220,
+    operations: ['generate'],
+    assetKinds: ['illustration'],
+    continuityPhases: ['key-pose'],
+    capabilities: required,
+    limits: { maximumCandidates: 4, maximumReferenceImages: 0 },
+    nodeInventory: [{ nodeId: '3', classType: 'DrawThingsSampler' }],
+  };
+  const baseline = {
+    ...quality,
+    profileId: 'sdxl-baseline',
+    modelId: 'sdxl-baseline-model',
+    priority: 140,
+  };
+  const resourceClassByModel = new Map([
+    ['flux-quality-model', 'quality'],
+    ['sdxl-baseline-model', 'baseline'],
+  ]);
+
+  const lowHeadroom = routeScene(
+    { profiles: [quality, baseline] },
+    scene,
+    'draw-things',
+    {
+      restricted: true,
+      availableVramGb: 7.5,
+      resourceClassByModel,
+    },
+  );
+  assert.equal(lowHeadroom.adapterId, 'draw-things:sdxl-baseline');
+
+  const highHeadroom = routeScene(
+    { profiles: [quality, baseline] },
+    scene,
+    'draw-things',
+    {
+      restricted: true,
+      availableVramGb: 9,
+      resourceClassByModel,
+    },
+  );
+  assert.equal(highHeadroom.adapterId, 'draw-things:flux-quality');
+});
+
+test('quality-only Draw Things temporal route fails closed below its VRAM class threshold', () => {
+  const input = campaign([
+    { artifactId: artifactA, role: 'canonical-identity', required: true },
+    { artifactId: artifactA, role: 'previous-key-pose', required: true },
+    { artifactId: artifactB, role: 'next-key-pose', required: true },
+  ]);
+  input.provider = {
+    backend: 'draw-things',
+    baseUrl: 'http://127.0.0.1:8193',
+    catalogPath: 'C:\\temp\\draw-things-catalog.json',
+  };
+  input.scenes[0].assetKind = 'sprite-frame';
+  input.scenes[0].continuityPhase = 'in-between';
+  const scene = validateLocalGenerationCampaign(input, {}).scenes[0];
+  const required = requiredCapabilityProfile(scene);
+  const temporal = {
+    profileId: 'flux-temporal',
+    modelId: 'flux-quality-model',
+    priority: 217,
+    operations: ['generate'],
+    assetKinds: ['sprite-frame'],
+    continuityPhases: ['in-between'],
+    capabilities: required,
+    limits: { maximumCandidates: 4, maximumReferenceImages: 3 },
+    nodeInventory: [
+      { nodeId: '3', classType: 'DrawThingsSampler' },
+      { nodeId: '8', classType: 'DrawThingsHints' },
+    ],
+  };
+  assert.throws(
+    () =>
+      routeScene(
+        { profiles: [temporal] },
+        scene,
+        'draw-things',
+        {
+          restricted: true,
+          availableVramGb: 7.5,
+          resourceClassByModel: new Map([
+            ['flux-quality-model', 'quality'],
+          ]),
+        },
+      ),
+    /no reviewed local Draw Things profile/u,
+  );
+});
