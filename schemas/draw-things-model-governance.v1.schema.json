@@ -281,6 +281,43 @@
           "policySha256": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "externalStores": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "sizeBytes",
+                "sha256",
+                "verification",
+                "provisionReceiptSha256"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 17179869184
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "verification": {
+                  "const": "evavo-provision-receipt-sha256"
+                },
+                "provisionReceiptSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
           }
         }
       }
@@ -502,7 +539,75 @@
           "notes": {
             "type": "string",
             "maxLength": 4096
+          },
+          "externalStores": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "sizeBytes",
+                "sha256",
+                "verification",
+                "provisionReceiptSha256"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 17179869184
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "verification": {
+                  "const": "evavo-provision-receipt-sha256"
+                },
+                "provisionReceiptSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
           }
+        }
+      }
+    },
+    "provisionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptSha256",
+        "stackManifestSha256",
+        "sourceOrigin",
+        "installManifestSha256",
+        "bootstrapPolicy"
+      ],
+      "properties": {
+        "receiptSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "stackManifestSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceOrigin": {
+          "const": "https://static.libnnc.org/"
+        },
+        "installManifestSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bootstrapPolicy": {
+          "const": "fixed-official-origin+committed-size then receipt-pinned SHA-256"
         }
       }
     }
