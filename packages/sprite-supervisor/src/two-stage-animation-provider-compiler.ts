@@ -579,7 +579,6 @@ function tasksForFrame(
   const frameId = source.frameId ?? source.assetId;
   const structuralRole = artifactRole("structural-raw", frameId);
   const structuralMasterRole = artifactRole("structural-master", frameId);
-  const finalCandidateRole = artifactRole("final-candidate", frameId);
   const finalMasteredRole = artifactRole("final-mastered", frameId);
   const selectionEvidenceRole = artifactRole("selection-evidence", frameId);
   const selectedRole = artifactRole("selected", frameId);
@@ -674,6 +673,10 @@ function tasksForFrame(
     const suffix = String(candidate).padStart(2, "0");
     const finalTaskId = taskToken("final", frameId, suffix);
     const finalMasterTaskId = taskToken("final-master", frameId, suffix);
+    const candidateRole = artifactRole(
+      "final-candidate-" + suffix,
+      frameId,
+    );
     finalTaskIds.push(finalTaskId);
     finalMasterTaskIds.push(finalMasterTaskId);
     tasks.push({
@@ -699,7 +702,7 @@ function tasksForFrame(
       ],
       outputBindings: [
         {
-          role: finalCandidateRole,
+          role: candidateRole,
           source: "output-artifact-labels",
           labels: {
             artifactRole: "provider-candidate",
@@ -725,9 +728,9 @@ function tasksForFrame(
       queue: "media",
       kind: "art.candidate.master-alpha",
       dependencyTaskIds: [finalTaskId],
-      requiredArtifactRoles: [finalCandidateRole],
+      requiredArtifactRoles: [candidateRole],
       payloadTemplate: masterPayload(
-        finalCandidateRole,
+        candidateRole,
         finalProxy,
         request.background.matteColour,
       ),
