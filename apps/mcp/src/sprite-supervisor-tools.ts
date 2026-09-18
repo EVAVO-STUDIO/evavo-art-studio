@@ -9,6 +9,7 @@ import {
   compileAutomaticSpriteWorkflow,
   compileSpriteSupervisorWorkflow,
   compileVerifiedAnimationProviderBatch,
+  compileTwoStageAnimationProviderBatch,
   spriteSupervisorProtocolSummary,
 } from "@evavo/art-sprite-supervisor";
 
@@ -133,6 +134,31 @@ export function registerSpriteSupervisorTools(server: McpServer): void {
           ),
           executionBoundary:
             "Compile-only: pose-control bindings are verified, but no provider execution, runtime submission, approval, promotion, repository mutation or deployment occurs.",
+        });
+      } catch (error: unknown) {
+        return toolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compile_two_stage_animation_provider_batch",
+    {
+      description:
+        "Compile a fully local two-stage sprite-animation production workflow: verified SDXL pose-control structural drafts first, then exact Draw Things Kontext edit refinements, alpha mastering, automatic candidate selection and promoted frame masters. The compiled catalog is part of the input so both stages are locked to exact draw-things:* adapter IDs and cannot fall back to cloud providers.",
+      inputSchema: z.object({ request: z.unknown() }),
+    },
+    async ({ request }) => {
+      try {
+        return textResult({
+          schemaVersion: "1.0",
+          compilation: compileTwoStageAnimationProviderBatch(
+            request as Parameters<
+              typeof compileTwoStageAnimationProviderBatch
+            >[0],
+          ),
+          executionBoundary:
+            "Compile-only: produces a durable supervisor workflow but does not submit runtime jobs or call providers.",
         });
       } catch (error: unknown) {
         return toolError(error);
