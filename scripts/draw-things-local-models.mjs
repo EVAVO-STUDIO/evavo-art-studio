@@ -1345,6 +1345,120 @@ function addEditProfile(base, pair) {
   return profile;
 }
 
+function editHintReferenceProfile(
+  base,
+  pair,
+  suffix,
+  label,
+  continuityPhases,
+  hints,
+  capabilities,
+) {
+  if (!supportsKontextReferences(pair)) return null;
+  const profile = cloneJson(addEditProfile(base, pair));
+  profile.profileId = profileSuffixId(base, suffix);
+  profile.label = `${base.label} · ${label}`;
+  profile.description =
+    `${base.description} Uses the structural draft as the Kontext base image and reviewed moodboard hints for ${label}. This graph is for final refinement after a structural pass; it does not accept pose-control directly.`;
+  profile.version = `${base.version}-${suffix}`;
+  profile.priority = Number(base.priority) - 5 - hints.length;
+  profile.continuityPhases = continuityPhases;
+  profile.capabilities = [
+    ...new Set([
+      ...profile.capabilities,
+      "multiple-reference-images",
+      ...capabilities,
+    ]),
+  ];
+  const bindings = [
+    {
+      role: "base-image",
+      nodeId: "5",
+      input: "image",
+    },
+  ];
+  const nodeIds = ["6", "7", "9", "10"];
+  const hintEntries = [];
+  hints.forEach((hint, index) => {
+    const nodeId = nodeIds[index];
+    profile.workflow[nodeId] = {
+      class_type: "LoadImage",
+      inputs: { image: `evavo-${hint.role}-placeholder.png` },
+    };
+    bindings.push({
+      role: hint.role,
+      nodeId,
+      input: "image",
+    });
+    hintEntries.push({ nodeId, weight: hint.weight });
+  });
+  profile.workflow["8"] = drawThingsHintsNode(hintEntries);
+  profile.workflow["3"].inputs.hints = ["8", 0];
+  profile.bindings.referenceImages = bindings;
+  profile.limits.maximumReferenceImages = bindings.length;
+  return profile;
+}
+
+function addEditIdentityReferenceProfile(base, pair) {
+  return editHintReferenceProfile(
+    base,
+    pair,
+    "edit-identity-ref",
+    "structural draft + canonical identity",
+    ["key-pose", "repair", "independent"],
+    [{ role: "canonical-identity", weight: 1 }],
+    ["identity-reference"],
+  );
+}
+
+function addEditDirectionReferenceProfile(base, pair) {
+  return editHintReferenceProfile(
+    base,
+    pair,
+    "edit-direction-ref",
+    "structural draft + identity + direction",
+    ["key-pose", "repair", "independent"],
+    [
+      { role: "canonical-identity", weight: 1 },
+      { role: "direction-master", weight: 0.85 },
+    ],
+    ["identity-reference", "direction-reference"],
+  );
+}
+
+function addEditTemporalReferenceProfile(base, pair) {
+  return editHintReferenceProfile(
+    base,
+    pair,
+    "edit-temporal-ref",
+    "structural draft + identity + temporal neighbours",
+    ["in-between", "repair"],
+    [
+      { role: "canonical-identity", weight: 1 },
+      { role: "previous-key-pose", weight: 0.8 },
+      { role: "next-key-pose", weight: 0.8 },
+    ],
+    ["identity-reference", "temporal-reference"],
+  );
+}
+
+function addEditDirectionTemporalReferenceProfile(base, pair) {
+  return editHintReferenceProfile(
+    base,
+    pair,
+    "edit-direction-temporal-ref",
+    "structural draft + identity + direction + temporal neighbours",
+    ["in-between", "repair"],
+    [
+      { role: "canonical-identity", weight: 1 },
+      { role: "direction-master", weight: 0.85 },
+      { role: "previous-key-pose", weight: 0.8 },
+      { role: "next-key-pose", weight: 0.8 },
+    ],
+    ["identity-reference", "direction-reference", "temporal-reference"],
+  );
+}
+
 function supportsNativeInpaint(pair) {
   return drawThingsModifier(pair) === "inpainting";
 }
@@ -1486,10 +1600,19 @@ function drawThingsProfilesForPair(
   ];
   const direction = addDirectionReferenceProfile(base, pair);
   const temporal = addTemporalReferenceProfile(base, pair);
+  const editIdentity = addEditIdentityReferenceProfile(base, pair);
+  const editDirection = addEditDirectionReferenceProfile(base, pair);
+  const editTemporal = addEditTemporalReferenceProfile(base, pair);
+  const editDirectionTemporal =
+    addEditDirectionTemporalReferenceProfile(base, pair);
   const inpaint = addInpaintProfile(base, pair);
   const pose = addPoseControlProfile(base, pair, poseControl);
   if (direction) profiles.push(direction);
   if (temporal) profiles.push(temporal);
+  if (editIdentity) profiles.push(editIdentity);
+  if (editDirection) profiles.push(editDirection);
+  if (editTemporal) profiles.push(editTemporal);
+  if (editDirectionTemporal) profiles.push(editDirectionTemporal);
   if (pose) profiles.push(pose);
   if (inpaint) profiles.push(inpaint);
   return profiles;
