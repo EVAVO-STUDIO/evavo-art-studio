@@ -316,22 +316,50 @@ function lockRequestToProfile(
   });
 }
 
+interface RuntimeTemporalBinding {
+  readonly previousRole?: string;
+  readonly nextRole?: string;
+  readonly dependencyTaskIds?: readonly string[];
+}
+
 function finalTemplate(
   request: NormalizedProviderCandidateRequest,
   structuralRole: string,
   candidateOrdinal: number,
+  runtimeTemporal?: RuntimeTemporalBinding,
 ): JsonValue {
   const input = requestInput(request) as unknown as Record<string, unknown>;
-  const references = request.references.map((reference) =>
-    reference.role === "base-image"
-      ? {
-          ...reference,
-          artifactId: { $artifact: structuralRole },
-          note:
-            "Supervisor-bound structural draft from the pose-control stage.",
-        }
-      : reference,
-  );
+  const references = request.references.map((reference) => {
+    if (reference.role === "base-image") {
+      return {
+        ...reference,
+        artifactId: { $artifact: structuralRole },
+        note:
+          "Supervisor-bound structural draft from the pose-control stage.",
+      };
+    }
+    if (
+      reference.role === "previous-key-pose" &&
+      runtimeTemporal?.previousRole
+    ) {
+      return {
+        ...reference,
+        artifactId: { $artifact: runtimeTemporal.previousRole },
+        note: "Supervisor-bound promoted previous key-pose master.",
+      };
+    }
+    if (
+      reference.role === "next-key-pose" &&
+      runtimeTemporal?.nextRole
+    ) {
+      return {
+        ...reference,
+        artifactId: { $artifact: runtimeTemporal.nextRole },
+        note: "Supervisor-bound promoted next key-pose master.",
+      };
+    }
+    return reference;
+  });
   return normalizeJson({
     ...input,
     requestId:
@@ -552,6 +580,7 @@ function tasksForFrame(
   source: NormalizedProviderCandidateRequest,
   catalog: ComfyUIWorkflowCatalog,
   candidateCount: number,
+  runtimeTemporal?: RuntimeTemporalBinding,
 ): Readonly<{
   frame: TwoStageAnimationFrameCompilation;
   tasks: readonly SpriteSupervisorTaskInput[];
@@ -686,14 +715,43 @@ function tasksForFrame(
       title: "Refine final " + frameId + " candidate " + candidate,
       queue: "provider",
       kind: "art.candidate.edit",
-      dependencyTaskIds: [structuralTaskId],
-      requiredArtifactRoles: [structuralRole],
+      dependencyTaskIds: [
+        structuralTaskId,
+        ...(runtimeTemporal?.dependencyTaskIds ?? []),
+      ],
+      requiredArtifactRoles: [
+        structuralRole,
+        ...(runtimeTemporal?.previousRole
+          ? [runtimeTemporal.previousRole]
+          : []),
+        ...(runtimeTemporal?.nextRole
+          ? [runtimeTemporal.nextRole]
+          : []),
+      ],
       staticInputArtifacts: uniqueArtifactIds(
-        finalProxy.references.filter(
-          (reference) => reference.role !== "base-image",
-        ),
+        finalProxy.references.filter((reference) => {
+          if (reference.role === "base-image") return false;
+          if (
+            reference.role === "previous-key-pose" &&
+            runtimeTemporal?.previousRole
+          ) {
+            return false;
+          }
+          if (
+            reference.role === "next-key-pose" &&
+            runtimeTemporal?.nextRole
+          ) {
+            return false;
+          }
+          return true;
+        }),
       ),
-      payloadTemplate: finalTemplate(finalProxy, structuralRole, candidate),
+      payloadTemplate: finalTemplate(
+        finalProxy,
+        structuralRole,
+        candidate,
+        runtimeTemporal,
+      ),
       requiredCapabilities: [
         "provider.edit",
         "provider.reference-lock",
