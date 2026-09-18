@@ -11,6 +11,10 @@ import { compileBatchPlan } from './local-generation-batch-v2.mjs';
 import { assertModelPlanExecutable, normalizeModelPlan } from './local-generation-model-plan-v2.mjs';
 import { prepareReferenceExecutionPlan, referenceAdapterId } from './local-generation-reference-execution-v2.mjs';
 import { validateProviderReferenceInputs } from './local-generation-reference-graph-v2.mjs';
+import {
+  drawThingsResourceRouting,
+  routeScene,
+} from './run-local-generation-campaign.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BATCH_SCHEMA = 'evavo.local-generation-batch.v2';
@@ -36,6 +40,29 @@ function localAppData() {
 function defaultCatalog() {
   return process.env.EVAVO_ART_COMFYUI_CATALOG?.trim() || path.join(localAppData(), 'EVAVO', 'AI', 'ComfyUI', 'catalog.json');
 }
+function defaultDrawThingsCatalog() {
+  return process.env.EVAVO_ART_DRAWTHINGS_CATALOG?.trim()
+    || path.join(localAppData(), 'EVAVO', 'AI', 'DrawThings', 'catalog.json');
+}
+function providerBackend(document) {
+  const backend = document.provider?.backend ?? 'comfyui';
+  if (!['comfyui', 'draw-things'].includes(backend)) {
+    fail('provider.backend must be comfyui or draw-things');
+  }
+  return backend;
+}
+function providerBaseUrl(document, backend, port) {
+  if (document.provider?.baseUrl) return document.provider.baseUrl;
+  if (backend === 'draw-things') {
+    return process.env.EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL?.trim()
+      || 'http://127.0.0.1:8193';
+  }
+  return `http://127.0.0.1:${port}`;
+}
+function providerCatalogPath(document, backend) {
+  if (document.provider?.catalogPath) return document.provider.catalogPath;
+  return backend === 'draw-things' ? defaultDrawThingsCatalog() : defaultCatalog();
+}
 function qualityAdapter(document) {
   const explicit = document.provider?.adapterId;
   if (explicit) return explicit;
@@ -60,23 +87,90 @@ async function jsonWithBytes(file, label) {
   } catch (error) { fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
 }
 function providerProfile(catalog, adapterId) {
-  if (!catalog || !Array.isArray(catalog.profiles)) fail('ComfyUI catalog has no profiles');
-  const profileId = adapterId.startsWith('comfyui:') ? adapterId.slice('comfyui:'.length) : adapterId;
+  if (!catalog || !Array.isArray(catalog.profiles)) fail('local provider catalog has no profiles');
+  if (typeof adapterId !== 'string' || !/^(?:comfyui|draw-things):/u.test(adapterId)) {
+    fail(`invalid reviewed provider adapter ID ${String(adapterId)}`);
+  }
+  const profileId = adapterId.slice(adapterId.indexOf(':') + 1);
   const profile = catalog.profiles.find((candidate) => candidate?.profileId === profileId);
   if (!profile) fail(`reviewed provider profile ${profileId} is not present in the physical catalog`);
   return profile;
 }
-function validateReferencePlan(referencePlan, catalog, baseAdapterId) {
+function assertDrawThingsQualityContract(source) {
+  const overrides = source.quality_overrides ?? source.qualityOverrides ?? {};
+  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
+    fail('quality_overrides must be an object');
+  }
+  const allowed = new Set(['width', 'height', 'outputFormat']);
+  const unsupported = Object.keys(overrides).filter((key) => !allowed.has(key));
+  if (unsupported.length) {
+    fail(
+      `Draw Things V2 uses governed model sampling defaults; unsupported quality_overrides: ${unsupported.sort().join(', ')}`,
+    );
+  }
+  const modelPlan = normalizeModelPlan(source.model_plan ?? source.modelPlan ?? {});
+  if (modelPlan.modelId || modelPlan.modelProfile || modelPlan.loras.length) {
+    fail(
+      'Draw Things V2 model_plan is not caller-selectable; model choice is governed by the compiled catalog and GPU resource routing',
+    );
+  }
+}
+function frameRouteShape(referencePlan, frame, adapterId = null) {
+  const references = frame.shot?.referenceInputs ?? [];
+  return Object.freeze({
+    id: frame.id,
+    adapterId,
+    assetKind:
+      frame.shot?.assetKind ??
+      (referencePlan.mode === 'sprite' ? 'sprite-frame' : 'illustration'),
+    continuityPhase: frame.continuityPhase,
+    candidateCount: frame.candidateCount,
+    references,
+  });
+}
+function validateReferencePlan(referencePlan, catalog, baseAdapterId, options = {}) {
+  const backend = options.backend ?? 'comfyui';
   let referenceInputCount = 0;
-  const adapterIds = new Set([baseAdapterId]);
+  const adapterIds = new Set();
+  const routes = [];
+  if (baseAdapterId) adapterIds.add(baseAdapterId);
+
   for (const frame of referencePlan.frames) {
     const referenceInputs = frame.shot?.referenceInputs ?? [];
     referenceInputCount += referenceInputs.length;
-    if (!referenceInputs.length) continue;
-    const adapterId = referenceAdapterId(baseAdapterId, referenceInputs);
+    let adapterId = baseAdapterId;
+
+    if (backend === 'draw-things') {
+      if (referenceInputs.length && baseAdapterId) {
+        adapterId = referenceAdapterId(baseAdapterId, referenceInputs);
+      }
+      const route = routeScene(
+        catalog,
+        frameRouteShape(referencePlan, frame, adapterId),
+        'draw-things',
+        options.resourceRouting ?? null,
+      );
+      adapterId = route.adapterId;
+      routes.push(route);
+    } else {
+      if (referenceInputs.length) {
+        adapterId = referenceAdapterId(baseAdapterId, referenceInputs);
+      }
+      if (!adapterId) {
+        fail('ComfyUI V2 requires a reviewed base adapter ID');
+      }
+      routes.push(Object.freeze({
+        sceneId: frame.id,
+        adapterId,
+        profileId: adapterId.slice('comfyui:'.length),
+      }));
+    }
+
     adapterIds.add(adapterId);
     const profile = providerProfile(catalog, adapterId);
-    const assetKind = frame.shot?.assetKind ?? (referencePlan.mode === 'sprite' ? 'sprite-frame' : 'illustration');
+    const assetKind =
+      frame.shot?.assetKind ??
+      (referencePlan.mode === 'sprite' ? 'sprite-frame' : 'illustration');
     validateProviderReferenceInputs(referenceInputs, profile, {
       label: `shot ${frame.id} reference_inputs`,
       operation: 'generate',
@@ -89,6 +183,7 @@ function validateReferencePlan(referencePlan, catalog, baseAdapterId) {
     stages: referencePlan.referenceGraph.stages,
     hasDependencies: referencePlan.referenceGraph.hasDependencies,
     adapterIds: Object.freeze([...adapterIds].sort()),
+    routes: Object.freeze(routes),
   });
 }
 async function prepareManifest(sourcePath, port) {
@@ -106,13 +201,24 @@ async function prepareManifest(sourcePath, port) {
     fail(`batch prompt/plan audit failed (${audit.score}/100): ${errors.join(', ')}`);
   }
 
+  const backend = providerBackend(source);
+  if (backend === 'draw-things') assertDrawThingsQualityContract(source);
   const bound = JSON.parse(JSON.stringify(source));
+  const baseUrl = providerBaseUrl(source, backend, port);
+  const catalogPath = providerCatalogPath(source, backend);
+  const explicitAdapterId = source.provider?.adapterId ?? null;
+  const adapterId =
+    backend === 'draw-things'
+      ? explicitAdapterId
+      : qualityAdapter(bound);
   bound.provider = {
     ...(bound.provider ?? {}),
-    baseUrl: `http://127.0.0.1:${port}`,
-    catalogPath: defaultCatalog(),
-    adapterId: qualityAdapter(bound),
+    backend,
+    baseUrl,
+    catalogPath,
+    ...(adapterId ? { adapterId } : {}),
   };
+  if (!adapterId) delete bound.provider.adapterId;
   bound.evavoProvenance = {
     schema: 'evavo.local-generation-manifest-provenance.v1',
     sourceManifestSha256: sourceInput.sha256,
@@ -120,15 +226,36 @@ async function prepareManifest(sourcePath, port) {
     governedEntry: 'run-local-art-batch-entry-v2',
   };
 
-  const catalog = await json(bound.provider.catalogPath, 'physical ComfyUI catalog');
-  const baseProfile = providerProfile(catalog, bound.provider.adapterId);
+  const catalog = await json(
+    bound.provider.catalogPath,
+    'physical local provider catalog',
+  );
   const modelPlan = normalizeModelPlan(bound.model_plan ?? bound.modelPlan ?? {});
-  if (modelPlan.modelId || modelPlan.modelProfile || modelPlan.loras.length) {
-    assertModelPlanExecutable(modelPlan, baseProfile);
+  let baseProfile = null;
+  if (backend === 'comfyui') {
+    baseProfile = providerProfile(catalog, bound.provider.adapterId);
+    if (modelPlan.modelId || modelPlan.modelProfile || modelPlan.loras.length) {
+      assertModelPlanExecutable(modelPlan, baseProfile);
+    }
   }
+  const resourceRouting =
+    backend === 'draw-things'
+      ? await drawThingsResourceRouting(bound.provider.catalogPath)
+      : null;
 
   const referencePlan = prepareReferenceExecutionPlan(plan);
-  const referencePreflight = validateReferencePlan(referencePlan, catalog, bound.provider.adapterId);
+  const referencePreflight = validateReferencePlan(
+    referencePlan,
+    catalog,
+    bound.provider.adapterId ?? null,
+    {
+      backend,
+      resourceRouting,
+    },
+  );
+  if (backend === 'draw-things' && bound.provider.adapterId) {
+    baseProfile = providerProfile(catalog, bound.provider.adapterId);
+  }
 
   const sourceBytes = sourceInput.bytes;
   const boundBytes = Buffer.from(`${JSON.stringify(bound, null, 2)}\n`, 'utf8');
@@ -145,12 +272,22 @@ async function prepareManifest(sourcePath, port) {
   await writeFile(auditPath, `${JSON.stringify(audit, null, 2)}\n`, 'utf8');
   await writeFile(providerPath, `${JSON.stringify({
     schema: 'evavo.local-generation-provider-selection.v2',
-    adapterId: bound.provider.adapterId,
-    profileId: baseProfile.profileId,
-    profileSha256: baseProfile.profileSha256 ?? null,
-    workflowSha256: baseProfile.workflowSha256 ?? null,
-    modelId: baseProfile.modelId ?? null,
+    backend,
+    adapterId: bound.provider.adapterId ?? null,
+    profileId: baseProfile?.profileId ?? null,
+    profileSha256: baseProfile?.profileSha256 ?? null,
+    workflowSha256: baseProfile?.workflowSha256 ?? null,
+    modelId: baseProfile?.modelId ?? null,
     modelPlanSha256: modelPlan.sha256,
+    frameRoutes: referencePreflight.routes,
+    resourceRouting:
+      resourceRouting === null
+        ? null
+        : {
+            availableVramGb: resourceRouting.availableVramGb,
+            evidencePath: resourceRouting.evidencePath,
+            restricted: resourceRouting.restricted,
+          },
     catalogPath: bound.provider.catalogPath,
     catalogSha256: catalog.catalogSha256 ?? null,
     promptAuditScore: audit.score,
@@ -164,8 +301,13 @@ async function prepareManifest(sourcePath, port) {
   }, null, 2)}\n`, 'utf8');
   return Object.freeze({
     original, execution, auditPath, providerPath, fingerprint,
-    adapterId: bound.provider.adapterId, catalogPath: bound.provider.catalogPath, baseUrl: bound.provider.baseUrl,
-    auditScore: audit.score, auditWarnings: audit.counts.warnings, profileId: baseProfile.profileId,
+    backend,
+    adapterId: bound.provider.adapterId ?? null,
+    catalogPath: bound.provider.catalogPath,
+    baseUrl: bound.provider.baseUrl,
+    auditScore: audit.score,
+    auditWarnings: audit.counts.warnings,
+    profileId: baseProfile?.profileId ?? null,
     referenceInputCount: referencePreflight.referenceInputCount,
     referenceStages: referencePreflight.stages,
     referenceAdapterIds: referencePreflight.adapterIds,
@@ -174,26 +316,50 @@ async function prepareManifest(sourcePath, port) {
   });
 }
 async function runManaged(args, manifest, port) {
-  const managed = path.join(ROOT, 'scripts', 'run-local-art-batch-managed.mjs');
-  const childArgs = [managed, '--manifest', manifest.execution, '--port', String(port)];
+  const drawThings = manifest.backend === 'draw-things';
+  const managed = drawThings
+    ? path.join(ROOT, 'scripts', 'run-local-generation-batch.mjs')
+    : path.join(ROOT, 'scripts', 'run-local-art-batch-managed.mjs');
+  const childArgs = drawThings
+    ? [managed, '--manifest', manifest.execution]
+    : [managed, '--manifest', manifest.execution, '--port', String(port)];
   if (args.get('--output-root')) childArgs.push('--output-root', args.get('--output-root'));
   if (args.get('--actor')) childArgs.push('--actor', args.get('--actor'));
   await new Promise((resolve, reject) => {
+    const env = {
+      ...process.env,
+    };
+    if (drawThings) {
+      delete env.EVAVO_ART_COMFYUI_CATALOG;
+      delete env.EVAVO_ART_COMFYUI_BASE_URL;
+      env.EVAVO_ART_DRAWTHINGS_CATALOG = manifest.catalogPath;
+      env.EVAVO_ART_DRAWTHINGS_CATALOG_ROOT = path.dirname(manifest.catalogPath);
+      env.EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL = manifest.baseUrl;
+      env.EVAVO_ART_DRAWTHINGS_COMFYUI_ALLOW_REMOTE = 'false';
+      env.EVAVO_ART_DRAWTHINGS_COMFYUI_DEDICATED_INSTANCE = 'true';
+    } else {
+      env.EVAVO_ART_COMFYUI_CATALOG = manifest.catalogPath;
+      env.EVAVO_ART_COMFYUI_BASE_URL = manifest.baseUrl;
+      env.EVAVO_ART_COMFYUI_ALLOW_REMOTE = 'false';
+      env.EVAVO_ART_COMFYUI_DEDICATED_INSTANCE = 'true';
+    }
     const child = spawn(process.execPath, childArgs, {
       cwd: ROOT,
-      env: {
-        ...process.env,
-        EVAVO_ART_COMFYUI_CATALOG: manifest.catalogPath,
-        EVAVO_ART_COMFYUI_BASE_URL: manifest.baseUrl,
-        EVAVO_ART_COMFYUI_ALLOW_REMOTE: 'false',
-        EVAVO_ART_COMFYUI_DEDICATED_INSTANCE: 'true',
-      },
+      env,
       stdio: 'inherit',
       windowsHide: true,
       shell: false,
     });
     child.once('error', reject);
-    child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`managed local batch exited ${code}`)));
+    child.once('exit', (code) =>
+      code === 0
+        ? resolve()
+        : reject(
+            new Error(
+              `${drawThings ? 'Draw Things' : 'managed ComfyUI'} local batch exited ${code}`,
+            ),
+          ),
+    );
   });
 }
 
@@ -209,7 +375,9 @@ export async function runLocalArtBatchEntry(argv = process.argv.slice(2)) {
     sourceManifestSha256: manifest.sourceManifestSha256, executionManifestSha256: manifest.executionManifestSha256,
     promptAudit: manifest.auditPath, providerSelection: manifest.providerPath,
     auditScore: manifest.auditScore, auditWarnings: manifest.auditWarnings,
-    adapterId: manifest.adapterId, profileId: manifest.profileId,
+    backend: manifest.backend,
+    adapterId: manifest.adapterId,
+    profileId: manifest.profileId,
     catalogPath: manifest.catalogPath, baseUrl: manifest.baseUrl,
     referenceInputCount: manifest.referenceInputCount, referenceStages: manifest.referenceStages,
     referenceAdapterIds: manifest.referenceAdapterIds,
