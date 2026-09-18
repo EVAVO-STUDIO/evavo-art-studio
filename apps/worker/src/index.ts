@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-import { readFile, realpath } from "node:fs/promises";
+import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { hostname } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   LocalArtifactStore,
+  sha256,
   type ArtifactId,
   type JsonValue,
 } from "@evavo/art-artifacts";
 import { writeGodotSpriteFramesImporter } from "@evavo/art-godot";
 import { buildSpriteAtlasPackage } from "@evavo/art-media";
+import { validateSpriteFamilyManifest } from "@evavo/art-sprite-family";
 import type { ProviderRegistry } from "@evavo/art-providers";
 import {
   LocalRuntimeRepository,
@@ -142,15 +144,326 @@ async function ingestFile(
   mediaType: string,
   storageClass: "runtime" | "manifest" | "evidence" | "source",
   labels: Readonly<Record<string, string>>,
+  sourceArtifacts: readonly ArtifactId[] = [],
 ): Promise<ArtifactId> {
   const artifact = await context.putArtifact(await readFile(filePath), {
     mediaType,
     storageClass,
     fileName: path.basename(filePath),
+    sourceArtifacts,
     labels,
     metadata: { generatedPath: filePath },
   });
   return artifact.artifactId;
+}
+
+const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/u;
+
+function requiredArtifactId(value: JsonValue | undefined, name: string): ArtifactId {
+  if (typeof value !== "string" || !ARTIFACT_ID.test(value)) {
+    throw new PermanentRuntimeError(
+      "RUNTIME_HANDLER_PAYLOAD_INVALID",
+      `${name} must use artifact_<sha256> format.`,
+    );
+  }
+  return value as ArtifactId;
+}
+
+async function verifiedStoredArtifact(
+  context: Parameters<RuntimeJobHandler>[0],
+  artifactId: ArtifactId,
+  label: string,
+) {
+  const [artifact, verification] = await Promise.all([
+    context.artifacts.get(artifactId),
+    context.artifacts.verify(artifactId),
+  ]);
+  if (
+    !artifact ||
+    !verification.exists ||
+    !verification.descriptorValid ||
+    !verification.contentValid
+  ) {
+    throw new PermanentRuntimeError(
+      "RUNTIME_HANDLER_ARTIFACT_INVALID",
+      `${label} failed immutable artifact verification: ${artifactId}`,
+    );
+  }
+  return artifact;
+}
+
+function jsonObject(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new PermanentRuntimeError(
+      "RUNTIME_HANDLER_PAYLOAD_INVALID",
+      `${label} must contain one JSON object.`,
+    );
+  }
+  return value as Record<string, unknown>;
+}
+
+async function parsedJsonArtifact(
+  context: Parameters<RuntimeJobHandler>[0],
+  artifactId: ArtifactId,
+  label: string,
+): Promise<Readonly<{ artifact: Awaited<ReturnType<typeof verifiedStoredArtifact>>; body: Record<string, unknown> }>> {
+  const artifact = await verifiedStoredArtifact(context, artifactId, label);
+  if (artifact.mediaType !== "application/json") {
+    throw new PermanentRuntimeError(
+      "RUNTIME_HANDLER_ARTIFACT_MEDIA_INVALID",
+      `${label} must be application/json.`,
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse((await context.artifacts.read(artifactId)).toString("utf8"));
+  } catch {
+    throw new PermanentRuntimeError(
+      "RUNTIME_HANDLER_ARTIFACT_JSON_INVALID",
+      `${label} is not valid JSON.`,
+    );
+  }
+  return { artifact, body: jsonObject(parsed, label) };
+}
+
+function atlasSafeId(value: string, fallback: string): string {
+  const result = value
+    .replace(/[^A-Za-z0-9._-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 128);
+  return result && /^[A-Za-z0-9]/u.test(result) ? result : fallback;
+}
+
+async function buildAtlasFromVerifiedFamily(
+  context: Parameters<RuntimeJobHandler>[0],
+  payload: Readonly<Record<string, JsonValue>>,
+  allowedRoots: readonly string[],
+) {
+  const manifestArtifactId = requiredArtifactId(
+    payload.familyManifestArtifactId,
+    "familyManifestArtifactId",
+  );
+  const evidenceArtifactId = requiredArtifactId(
+    payload.familyEvidenceArtifactId,
+    "familyEvidenceArtifactId",
+  );
+  const declaredInputs = new Set(context.job.spec.inputArtifacts);
+  for (const artifactId of [manifestArtifactId, evidenceArtifactId]) {
+    if (!declaredInputs.has(artifactId)) {
+      throw new PermanentRuntimeError(
+        "ATLAS_FAMILY_INPUT_LINEAGE_MISSING",
+        `sprite.atlas.build inputArtifacts is missing ${artifactId}.`,
+      );
+    }
+  }
+
+  const manifestArtifact = await parsedJsonArtifact(
+    context,
+    manifestArtifactId,
+    "family manifest",
+  );
+  if (
+    manifestArtifact.artifact.storageClass !== "manifest" ||
+    manifestArtifact.artifact.labels.artifactRole !==
+      "sprite-family-normalized-manifest"
+  ) {
+    throw new PermanentRuntimeError(
+      "ATLAS_FAMILY_MANIFEST_STATE_INVALID",
+      "familyManifestArtifactId must identify a normalized sprite-family manifest artifact.",
+    );
+  }
+  const familyManifest = validateSpriteFamilyManifest(manifestArtifact.body);
+
+  const evidenceArtifact = await parsedJsonArtifact(
+    context,
+    evidenceArtifactId,
+    "family evidence",
+  );
+  if (
+    evidenceArtifact.artifact.storageClass !== "evidence" ||
+    evidenceArtifact.artifact.labels.artifactRole !==
+      "sprite-family-consistency-evidence" ||
+    evidenceArtifact.artifact.labels.qualityState !== "passed" ||
+    evidenceArtifact.body.passed !== true ||
+    evidenceArtifact.body.manifestArtifactId !== manifestArtifactId ||
+    !evidenceArtifact.artifact.sourceArtifacts.includes(manifestArtifactId)
+  ) {
+    throw new PermanentRuntimeError(
+      "ATLAS_FAMILY_EVIDENCE_STATE_INVALID",
+      "familyEvidenceArtifactId must be one passed manifest-bound sprite-family consistency artifact.",
+    );
+  }
+
+  const frameEvidenceRaw = evidenceArtifact.body.frameEvidence;
+  if (!Array.isArray(frameEvidenceRaw) || frameEvidenceRaw.length !== familyManifest.frames.length) {
+    throw new PermanentRuntimeError(
+      "ATLAS_FAMILY_EVIDENCE_FRAME_SET_INVALID",
+      "Family evidence frame set does not match the normalized family manifest.",
+    );
+  }
+  const evidenceByFrame = new Map<string, Record<string, unknown>>();
+  for (const [index, raw] of frameEvidenceRaw.entries()) {
+    const item = jsonObject(raw, `family evidence frameEvidence[${index}]`);
+    if (typeof item.frameId !== "string" || item.passed !== true) {
+      throw new PermanentRuntimeError(
+        "ATLAS_FAMILY_EVIDENCE_FRAME_INVALID",
+        "Every family evidence frame must identify a passed frame.",
+      );
+    }
+    evidenceByFrame.set(item.frameId, item);
+  }
+
+  const outputDirectory = requiredString(
+    payload.outputDirectory,
+    "outputDirectory",
+  );
+  const canonicalOutput = await assertExistingPathWithinRoots(
+    await (async () => {
+      const lexical = path.resolve(outputDirectory);
+      await mkdir(lexical, { recursive: true });
+      return lexical;
+    })(),
+    allowedRoots,
+    "outputDirectory",
+  );
+  const workspace = path.join(
+    canonicalOutput,
+    ".evavo-family-atlas-" +
+      sha256(manifestArtifactId + evidenceArtifactId).slice(0, 16),
+  );
+  await rm(workspace, { recursive: true, force: true });
+  await mkdir(workspace, { recursive: true });
+
+  const sourceArtifactIds: ArtifactId[] = [
+    manifestArtifactId,
+    evidenceArtifactId,
+  ];
+  const atlasFrames: Array<{
+    id: string;
+    path: string;
+    pivot: { x: number; y: number };
+    tags: string[];
+  }> = [];
+  const animationGroups = new Map<
+    string,
+    Array<{ frameId: string; durationMs: number; sourceFrameIndex: number }>
+  >();
+
+  try {
+    for (const [index, frame] of familyManifest.frames.entries()) {
+      const evidence = evidenceByFrame.get(frame.id);
+      const compositeValue = evidence?.generatedCompositeArtifactId;
+      const compositeId = requiredArtifactId(
+        typeof compositeValue === "string" ? compositeValue : undefined,
+        `frameEvidence[${frame.id}].generatedCompositeArtifactId`,
+      );
+      if (!declaredInputs.has(compositeId)) {
+        throw new PermanentRuntimeError(
+          "ATLAS_FAMILY_INPUT_LINEAGE_MISSING",
+          `sprite.atlas.build inputArtifacts is missing verified composite ${compositeId}.`,
+        );
+      }
+      const composite = await verifiedStoredArtifact(
+        context,
+        compositeId,
+        `verified family composite ${frame.id}`,
+      );
+      if (
+        composite.mediaType !== "image/png" ||
+        composite.labels.artifactRole !== "layered-frame-composite" ||
+        composite.labels.qualityState !== "passed"
+      ) {
+        throw new PermanentRuntimeError(
+          "ATLAS_FAMILY_COMPOSITE_STATE_INVALID",
+          `Verified composite ${frame.id} is not one quality-passed layered-frame-composite PNG.`,
+        );
+      }
+      sourceArtifactIds.push(compositeId);
+      const atlasFrameId = "frame-" + String(index).padStart(4, "0");
+      const fileName = atlasFrameId + ".png";
+      await writeFile(
+        path.join(workspace, fileName),
+        await context.artifacts.read(compositeId),
+      );
+      atlasFrames.push({
+        id: atlasFrameId,
+        path: fileName,
+        pivot: frame.pivot,
+        tags: [frame.animation, frame.direction, frame.id],
+      });
+      const groupName = atlasSafeId(
+        frame.animation + "-" + frame.direction,
+        "animation-" + String(animationGroups.size + 1),
+      );
+      const group = animationGroups.get(groupName) ?? [];
+      group.push({
+        frameId: atlasFrameId,
+        durationMs: Math.max(1, Math.round(frame.durationMs)),
+        sourceFrameIndex: frame.frameIndex,
+      });
+      animationGroups.set(groupName, group);
+    }
+
+    const loopFlag =
+      typeof familyManifest.metadata === "object" &&
+      familyManifest.metadata !== null &&
+      !Array.isArray(familyManifest.metadata) &&
+      (familyManifest.metadata as Record<string, JsonValue>).loop === true;
+    const atlasId = atlasSafeId(
+      typeof payload.atlasId === "string"
+        ? payload.atlasId
+        : familyManifest.familyId + "-atlas",
+      "verified-family-atlas",
+    );
+    const atlasManifest = {
+      schemaVersion: "1.0",
+      atlasId,
+      frames: atlasFrames,
+      animations: [...animationGroups.entries()].map(([name, frames]) => ({
+        name,
+        loopMode: loopFlag ? "linear" : "none",
+        frames: [...frames]
+          .sort((left, right) => left.sourceFrameIndex - right.sourceFrameIndex)
+          .map(({ frameId, durationMs }) => ({ frameId, durationMs })),
+      })),
+      settings: {
+        alphaPolicy: "required",
+        maximumWidth: 4096,
+        maximumHeight: 4096,
+        padding: 2,
+        extrusion: 1,
+        trim: false,
+        alphaThreshold: 8,
+        powerOfTwo: "preferred",
+        textureFiltering: "nearest",
+        pngCompressionLevel: 9,
+      },
+      output: {
+        imageFileName: atlasId + ".png",
+        dataFileName: atlasId + ".atlas.json",
+        evidenceFileName: atlasId + ".evidence.json",
+      },
+    };
+    const manifestPath = path.join(workspace, "atlas-manifest.json");
+    await writeFile(
+      manifestPath,
+      JSON.stringify(atlasManifest, null, 2) + "\n",
+      "utf8",
+    );
+    const atlas = await buildSpriteAtlasPackage(
+      manifestPath,
+      canonicalOutput,
+      { allowedRoots },
+    );
+    return {
+      atlas,
+      sourceArtifactIds: [...new Set(sourceArtifactIds)].sort(),
+      familyManifestArtifactId: manifestArtifactId,
+      familyEvidenceArtifactId: evidenceArtifactId,
+    };
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 }
 
 export function createBuiltinHandlers(
@@ -166,20 +479,48 @@ export function createBuiltinHandlers(
       );
     }
     const payload = context.job.spec.payload;
-    const manifestPath = requiredString(payload.manifestPath, "manifestPath");
-    const outputDirectory = requiredString(
-      payload.outputDirectory,
-      "outputDirectory",
-    );
-    const atlas = await buildSpriteAtlasPackage(manifestPath, outputDirectory, {
-      allowedRoots,
-    });
+    const familyMode =
+      typeof payload.familyManifestArtifactId === "string" ||
+      typeof payload.familyEvidenceArtifactId === "string";
+    let atlas;
+    let atlasSourceArtifacts: readonly ArtifactId[] = [];
+    let familyBinding:
+      | Readonly<{
+          familyManifestArtifactId: ArtifactId;
+          familyEvidenceArtifactId: ArtifactId;
+        }>
+      | undefined;
+    if (familyMode) {
+      const built = await buildAtlasFromVerifiedFamily(
+        context,
+        payload,
+        allowedRoots,
+      );
+      atlas = built.atlas;
+      atlasSourceArtifacts = built.sourceArtifactIds;
+      familyBinding = {
+        familyManifestArtifactId: built.familyManifestArtifactId,
+        familyEvidenceArtifactId: built.familyEvidenceArtifactId,
+      };
+    } else {
+      const manifestPath = requiredString(payload.manifestPath, "manifestPath");
+      const outputDirectory = requiredString(
+        payload.outputDirectory,
+        "outputDirectory",
+      );
+      atlas = await buildSpriteAtlasPackage(manifestPath, outputDirectory, {
+        allowedRoots,
+      });
+    }
     const outputArtifacts: ArtifactId[] = [];
     outputArtifacts.push(
       await ingestFile(context, atlas.imagePath, "image/png", "runtime", {
         atlasId: atlas.packageData.atlasId,
         artifactRole: "atlas-image",
-      }),
+        ...(familyBinding
+          ? { familyEvidenceArtifactId: familyBinding.familyEvidenceArtifactId }
+          : {}),
+      }, atlasSourceArtifacts),
       await ingestFile(
         context,
         atlas.dataPath,
@@ -250,6 +591,15 @@ export function createBuiltinHandlers(
         imagePath: atlas.imagePath,
         dataPath: atlas.dataPath,
         evidencePath: atlas.evidencePath,
+        ...(familyBinding
+          ? {
+              familyManifestArtifactId:
+                familyBinding.familyManifestArtifactId,
+              familyEvidenceArtifactId:
+                familyBinding.familyEvidenceArtifactId,
+              sourceArtifactCount: atlasSourceArtifacts.length,
+            }
+          : {}),
         ...(godot
           ? {
               godotDescriptorPath: godot.descriptorPath,
