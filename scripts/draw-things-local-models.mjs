@@ -164,6 +164,24 @@ async function jsonFile(file, label) {
   }
 }
 
+async function jsonFileWithSha(file, label) {
+  const resolved = path.resolve(file);
+  const info = await lstat(resolved);
+  if (!info.isFile() || info.isSymbolicLink() || info.size < 1 || info.size > MAX_JSON_BYTES) {
+    fail(`${label} must be a regular bounded JSON file`);
+  }
+  const bytes = await readFile(resolved);
+  try {
+    return {
+      path: resolved,
+      value: JSON.parse(bytes.toString("utf8")),
+      sha256: hashBytes(bytes),
+    };
+  } catch (error) {
+    fail(`${label} is invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 async function atomicJson(file, value) {
   const output = path.resolve(file);
   await mkdir(path.dirname(output), { recursive: true });
@@ -1000,9 +1018,13 @@ async function compileCatalog(draft) {
 }
 
 function parseArguments(argv) {
-  if (!argv.length) fail("usage: draw-things-local-models <inventory|compile> [--name value ...]");
+  if (!argv.length) {
+    fail("usage: draw-things-local-models <inventory|govern|compile> [--name value ...]");
+  }
   const command = argv[0];
-  if (!new Set(["inventory", "compile"]).has(command)) fail(`unsupported command ${command}`);
+  if (!new Set(["inventory", "govern", "compile"]).has(command)) {
+    fail(`unsupported command ${command}`);
+  }
   const args = new Map();
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index];
@@ -1018,11 +1040,15 @@ function parseArguments(argv) {
     "--output",
     "--inventory",
     "--governance",
+    "--governance-output",
+    "--policy",
     "--model",
     "--draft-output",
     "--evidence-output",
   ]);
-  for (const key of args.keys()) if (!allowed.has(key)) fail(`unsupported argument ${key}`);
+  for (const key of args.keys()) {
+    if (!allowed.has(key)) fail(`unsupported argument ${key}`);
+  }
   return { command, args };
 }
 
@@ -1055,30 +1081,109 @@ async function runInventory(args) {
   };
 }
 
+async function deriveGovernance(inventory, policyPath) {
+  const policyDocument = await jsonFileWithSha(
+    policyPath ?? defaultPolicyPath(),
+    "Draw Things approved model policy",
+  );
+  const governance = governanceFromPolicy(
+    inventory,
+    policyDocument.value,
+    policyDocument.sha256,
+  );
+  return {
+    governance,
+    policyPath: policyDocument.path,
+    policySha256: policyDocument.sha256,
+  };
+}
+
+async function runGovern(args) {
+  const inventoryPath = args.get("--inventory") ?? defaultInventoryPath();
+  const output = args.get("--output") ?? defaultGovernancePath();
+  const inventory = validateInventory(
+    await jsonFile(inventoryPath, "Draw Things inventory"),
+  );
+  const derived = await deriveGovernance(inventory, args.get("--policy"));
+  await atomicJson(output, derived.governance);
+  return {
+    ok: true,
+    command: "govern",
+    inventory: path.resolve(inventoryPath),
+    policy: derived.policyPath,
+    policySha256: derived.policySha256,
+    output: path.resolve(output),
+    approvedModelCount: derived.governance.models.length,
+    approvedModels: derived.governance.models.map((model) => ({
+      id: model.id,
+      bundleSha256: model.bundleSha256,
+      priority: model.priority,
+      resourceClass: model.resourceClass,
+    })),
+    authority: {
+      modelDownload: false,
+      modelPolicyMutation: false,
+      generation: false,
+      candidateApproval: false,
+    },
+  };
+}
+
 async function runCompile(args) {
-  const installManifestPath = args.get("--install-manifest") ?? defaultInstallManifest();
+  const installManifestPath =
+    args.get("--install-manifest") ?? defaultInstallManifest();
   const inventoryPath = args.get("--inventory") ?? defaultInventoryPath();
   const governancePath = args.get("--governance");
-  if (!governancePath) fail("compile requires --governance <file>");
+  if (governancePath && args.get("--policy")) {
+    fail("--governance and --policy are mutually exclusive");
+  }
+  const governanceOutput =
+    args.get("--governance-output") ?? defaultGovernancePath();
   const draftOutput = args.get("--draft-output") ?? defaultCatalogDraft();
   const output = args.get("--output") ?? defaultCatalog();
-  const evidenceOutput = args.get("--evidence-output") ?? defaultGovernanceEvidence();
+  const evidenceOutput =
+    args.get("--evidence-output") ?? defaultGovernanceEvidence();
 
   const rawInstallBytes = await readFile(path.resolve(installManifestPath));
   const installManifestSha256 = hashBytes(rawInstallBytes);
   let install;
   try {
-    install = validateInstallManifest(JSON.parse(rawInstallBytes.toString("utf8")));
+    install = validateInstallManifest(
+      JSON.parse(rawInstallBytes.toString("utf8")),
+    );
   } catch (error) {
-    fail(`install manifest is invalid: ${error instanceof Error ? error.message : String(error)}`);
+    fail(
+      `install manifest is invalid: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
-  const inventory = validateInventory(await jsonFile(inventoryPath, "Draw Things inventory"));
-  if (inventory.installManifestSha256 !== installManifestSha256) {
-    fail("Draw Things inventory was captured against a different install manifest; recapture inventory first");
-  }
-  const governance = validateGovernance(
-    await jsonFile(governancePath, "Draw Things model governance"),
+  const inventory = validateInventory(
+    await jsonFile(inventoryPath, "Draw Things inventory"),
   );
+  if (inventory.installManifestSha256 !== installManifestSha256) {
+    fail(
+      "Draw Things inventory was captured against a different install manifest; recapture inventory first",
+    );
+  }
+
+  let governance;
+  let governanceSource;
+  let policySource = null;
+  if (governancePath) {
+    governance = validateGovernance(
+      await jsonFile(governancePath, "Draw Things model governance"),
+    );
+    governanceSource = path.resolve(governancePath);
+  } else {
+    const derived = await deriveGovernance(inventory, args.get("--policy"));
+    governance = validateGovernance(derived.governance);
+    await atomicJson(governanceOutput, governance);
+    governanceSource = path.resolve(governanceOutput);
+    policySource = {
+      path: derived.policyPath,
+      sha256: derived.policySha256,
+    };
+  }
+
   const built = buildDrawThingsCatalogDraft({
     inventory,
     governance,
@@ -1093,7 +1198,10 @@ async function runCompile(args) {
     catalogSha256: catalog.catalogSha256,
     profileIds: catalog.profiles.map((profile) => profile.profileId),
     profileSha256: Object.fromEntries(
-      catalog.profiles.map((profile) => [profile.profileId, profile.profileSha256]),
+      catalog.profiles.map((profile) => [
+        profile.profileId,
+        profile.profileSha256,
+      ]),
     ),
   };
   await atomicJson(draftOutput, built.draft);
@@ -1103,15 +1211,19 @@ async function runCompile(args) {
     ok: true,
     command: "compile",
     inventory: path.resolve(inventoryPath),
-    governance: path.resolve(governancePath),
+    governance: governanceSource,
+    policy: policySource,
     draftOutput: path.resolve(draftOutput),
     output: path.resolve(output),
     evidenceOutput: path.resolve(evidenceOutput),
     catalogId: catalog.catalogId,
     catalogSha256: catalog.catalogSha256,
-    adapters: catalog.profiles.map((profile) => `draw-things:${profile.profileId}`),
+    adapters: catalog.profiles.map(
+      (profile) => `draw-things:${profile.profileId}`,
+    ),
     authority: {
       modelDownload: false,
+      modelPolicyMutation: false,
       generation: false,
       candidateApproval: false,
       publication: false,
@@ -1121,7 +1233,12 @@ async function runCompile(args) {
 
 async function main() {
   const { command, args } = parseArguments(process.argv.slice(2));
-  const result = command === "inventory" ? await runInventory(args) : await runCompile(args);
+  const result =
+    command === "inventory"
+      ? await runInventory(args)
+      : command === "govern"
+        ? await runGovern(args)
+        : await runCompile(args);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
