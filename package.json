@@ -152,7 +152,7 @@
     "game-hud:check": "node --check tools/game_hud_review.mjs && node --test tools/game_hud_review.test.mjs",
     "provider:drawthings:inventory": "node scripts/draw-things-local-models.mjs inventory",
     "provider:drawthings:catalog:compile": "pnpm --filter @evavo/art-providers build && node scripts/draw-things-local-models.mjs compile",
-    "provider:drawthings:model:check": "node --check scripts/draw-things-local-models.mjs && node --test scripts/draw-things-local-models.test.mjs",
+    "provider:drawthings:model:check": "pnpm --filter @evavo/art-providers build && node --check scripts/draw-things-local-models.mjs && node --test scripts/draw-things-local-models.test.mjs",
     "provider:drawthings:govern": "node scripts/draw-things-local-models.mjs govern"
   },
   "workspaces": [
