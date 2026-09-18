@@ -11,6 +11,7 @@ export { compileArtDirectionJob } from "./public-jobs.js";
 export * from "./layered-production.js";
 export * from "./art-production-orchestrator.js";
 export * from "./animation-director.js";
+export * from "./animation-authored-director.js";
 export * from "./animation-routing.js";
 export * from "./animation-cel-handoff.js";
 export * from "./animation-pose-control.js";
