@@ -932,6 +932,208 @@ function drawThingsProfile(pair, install, bridgeRuntimeSha256, grpcRuntimeSha256
   };
 }
 
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function drawThingsModifier(pair) {
+  const raw = pair?.inventoryEntry?.model?.modifier;
+  return typeof raw === "string" ? raw.trim().toLowerCase() : "";
+}
+
+function supportsKontextReferences(pair) {
+  return new Set(["kontext", "kontext_kv"]).has(drawThingsModifier(pair));
+}
+
+function profileSuffixId(base, suffix) {
+  return safeId(
+    `${base.profileId}-${suffix}`,
+    `generated Draw Things ${suffix} profileId`,
+  );
+}
+
+function addCanonicalIdentityReference(base, pair) {
+  const profile = cloneJson(base);
+  profile.profileId = profileSuffixId(base, "identity-ref");
+  profile.label = `${base.label} · canonical identity reference`;
+  profile.description =
+    `${base.description} Adds one reviewed canonical image input. ` +
+    (supportsKontextReferences(pair)
+      ? "The Kontext model consumes the base image as a reference image; sampler strength remains fixed so EVAVO reference-strength semantics are not inverted."
+      : "The fallback model uses fixed-strength img2img conditioning; this profile does not claim multi-reference temporal consistency.");
+  profile.version = `${base.version}-identity-ref`;
+  profile.priority = Number(base.priority) - 1;
+  profile.continuityPhases = [
+    "direction-master",
+    "key-pose",
+    "repair",
+    "independent",
+  ];
+  profile.capabilities = [
+    ...new Set([
+      ...base.capabilities,
+      "reference-images",
+      "identity-reference",
+    ]),
+  ];
+  profile.workflow["5"] = {
+    class_type: "LoadImage",
+    inputs: { image: "evavo-canonical-identity-placeholder.png" },
+  };
+  profile.workflow["3"].inputs.image = ["5", 0];
+  profile.workflow["3"].inputs.strength = supportsKontextReferences(pair)
+    ? 1
+    : 0.55;
+  profile.bindings.referenceImages = [
+    {
+      role: "canonical-identity",
+      nodeId: "5",
+      input: "image",
+    },
+  ];
+  profile.limits.maximumReferenceImages = 1;
+  return profile;
+}
+
+function drawThingsHintsNode(entries) {
+  const inputs = {
+    type: "(None selected)",
+    weight: 1,
+    type_2: "(None selected)",
+    weight_2: 1,
+    type_3: "(None selected)",
+    weight_3: 1,
+    type_4: "(None selected)",
+    weight_4: 1,
+  };
+  entries.forEach((entry, index) => {
+    const suffix = index === 0 ? "" : `_${index + 1}`;
+    inputs[`type${suffix}`] = "Shuffle (Moodboard)";
+    inputs[`weight${suffix}`] = entry.weight;
+    inputs[`image${suffix}`] = [entry.nodeId, 0];
+  });
+  return {
+    class_type: "DrawThingsHints",
+    inputs,
+  };
+}
+
+function addDirectionReferenceProfile(base, pair) {
+  if (!supportsKontextReferences(pair)) return null;
+  const profile = cloneJson(addCanonicalIdentityReference(base, pair));
+  profile.profileId = profileSuffixId(base, "direction-ref");
+  profile.label = `${base.label} · identity + direction references`;
+  profile.description =
+    `${base.description} Uses the canonical identity as the Kontext base reference and one direction master as a Draw Things shuffle reference. This exact graph advertises direction-reference capability but no temporal-reference capability.`;
+  profile.version = `${base.version}-direction-ref`;
+  profile.priority = Number(base.priority) - 2;
+  profile.continuityPhases = ["key-pose", "repair", "independent"];
+  profile.capabilities = [
+    ...new Set([
+      ...base.capabilities,
+      "reference-images",
+      "multiple-reference-images",
+      "identity-reference",
+      "direction-reference",
+    ]),
+  ];
+  profile.workflow["6"] = {
+    class_type: "LoadImage",
+    inputs: { image: "evavo-direction-master-placeholder.png" },
+  };
+  profile.workflow["8"] = drawThingsHintsNode([
+    { nodeId: "6", weight: 0.85 },
+  ]);
+  profile.workflow["3"].inputs.hints = ["8", 0];
+  profile.bindings.referenceImages = [
+    {
+      role: "canonical-identity",
+      nodeId: "5",
+      input: "image",
+    },
+    {
+      role: "direction-master",
+      nodeId: "6",
+      input: "image",
+    },
+  ];
+  profile.limits.maximumReferenceImages = 2;
+  return profile;
+}
+
+function addTemporalReferenceProfile(base, pair) {
+  if (!supportsKontextReferences(pair)) return null;
+  const profile = cloneJson(addCanonicalIdentityReference(base, pair));
+  profile.profileId = profileSuffixId(base, "temporal-ref");
+  profile.label = `${base.label} · identity + temporal key references`;
+  profile.description =
+    `${base.description} Uses the canonical identity as the Kontext base reference and previous/next key poses as Draw Things shuffle references. This graph is the reviewed local in-between/repair route.`;
+  profile.version = `${base.version}-temporal-ref`;
+  profile.priority = Number(base.priority) - 3;
+  profile.continuityPhases = ["key-pose", "in-between", "repair"];
+  profile.capabilities = [
+    ...new Set([
+      ...base.capabilities,
+      "reference-images",
+      "multiple-reference-images",
+      "identity-reference",
+      "temporal-reference",
+    ]),
+  ];
+  profile.workflow["6"] = {
+    class_type: "LoadImage",
+    inputs: { image: "evavo-previous-key-pose-placeholder.png" },
+  };
+  profile.workflow["7"] = {
+    class_type: "LoadImage",
+    inputs: { image: "evavo-next-key-pose-placeholder.png" },
+  };
+  profile.workflow["8"] = drawThingsHintsNode([
+    { nodeId: "6", weight: 0.8 },
+    { nodeId: "7", weight: 0.8 },
+  ]);
+  profile.workflow["3"].inputs.hints = ["8", 0];
+  profile.bindings.referenceImages = [
+    {
+      role: "canonical-identity",
+      nodeId: "5",
+      input: "image",
+    },
+    {
+      role: "previous-key-pose",
+      nodeId: "6",
+      input: "image",
+    },
+    {
+      role: "next-key-pose",
+      nodeId: "7",
+      input: "image",
+    },
+  ];
+  profile.limits.maximumReferenceImages = 3;
+  return profile;
+}
+
+function drawThingsProfilesForPair(
+  pair,
+  install,
+  bridgeRuntimeSha256,
+  grpcRuntimeSha256,
+) {
+  const base = drawThingsProfile(
+    pair,
+    install,
+    bridgeRuntimeSha256,
+    grpcRuntimeSha256,
+  );
+  const profiles = [base, addCanonicalIdentityReference(base, pair)];
+  const direction = addDirectionReferenceProfile(base, pair);
+  const temporal = addTemporalReferenceProfile(base, pair);
+  if (direction) profiles.push(direction);
+  if (temporal) profiles.push(temporal);
+  return profiles;
+}
+
 export function buildDrawThingsCatalogDraft({
   inventory: inventoryRaw,
   governance: governanceRaw,
@@ -951,8 +1153,13 @@ export function buildDrawThingsCatalogDraft({
   });
   const grpcRuntimeSha256 = install.dockerImageId.slice("sha256:".length);
   sha(grpcRuntimeSha256, "Draw Things local Docker image id");
-  const profiles = selected.map((pair) =>
-    drawThingsProfile(pair, install, bridgeRuntimeSha256, grpcRuntimeSha256),
+  const profiles = selected.flatMap((pair) =>
+    drawThingsProfilesForPair(
+      pair,
+      install,
+      bridgeRuntimeSha256,
+      grpcRuntimeSha256,
+    ),
   );
   const versionFingerprint = hashJson(
     selected.map(({ governanceEntry, inventoryEntry }) => ({
