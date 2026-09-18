@@ -347,7 +347,7 @@ async function invokeLocalCompute(manifestPath: string): Promise<{
 async function invokeDrawThingsCommission(
   mode: "Prepare" | "Provision",
   options: Readonly<{
-    stack?: "default" | "quality" | "fallback";
+    stack?: "default" | "quality" | "fallback" | "structural";
     confirmation?: string;
   }> = {},
 ): Promise<unknown> {
@@ -534,7 +534,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
             "EVAVO_ART_DRAWTHINGS_MCP_ALLOW_PROVISIONING=true",
           provisionConfirmation:
             "PROVISION-EVAVO-DRAW-THINGS-STACK-v1",
-          provisionStacks: ["default", "quality", "fallback"],
+          provisionStacks: ["default", "quality", "fallback", "structural"],
         },
         providerBackends: {
           comfyui: {
@@ -741,7 +741,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
       description:
         "Explicitly provision the pinned Draw Things runtime and hash-pinned local model stack, then prepare the governed Art Studio catalog. This can download several GB and is disabled unless the trusted MCP process separately enables Draw Things provisioning. It never accepts arbitrary URLs, hashes, models or workflows.",
       inputSchema: z.object({
-        stack: z.enum(["default", "quality", "fallback"]).default("default"),
+        stack: z.enum(["default", "quality", "fallback", "structural"]).default("default"),
         confirmation: z.literal("PROVISION-EVAVO-DRAW-THINGS-STACK-v1"),
       }),
     },
