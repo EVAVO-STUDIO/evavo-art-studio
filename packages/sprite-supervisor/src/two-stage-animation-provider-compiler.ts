@@ -374,7 +374,7 @@ function selectionPolicy(): JsonValue {
   return normalizeJson({
     profile: "custom",
     allowAutomaticSelection: true,
-    requireReferenceLineage: true,
+    requireReferenceLineage: false,
     requireQualityPassed: true,
     allowedCandidateRoles: ["provider-candidate-alpha-master"],
     alphaVisibleThreshold: 8,
