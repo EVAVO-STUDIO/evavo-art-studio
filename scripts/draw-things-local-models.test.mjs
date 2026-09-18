@@ -110,7 +110,7 @@ test("builds a governed Draw Things profile from exact local model identity", ()
     result.draft.schemaVersion,
     "evavo.comfyui-workflow-catalog-draft.v1",
   );
-  assert.equal(result.draft.profiles.length, 2);
+  assert.equal(result.draft.profiles.length, 3);
   const profile = result.draft.profiles.find(
     (entry) => entry.profileId === "dt-fixture-xl-generate",
   );
@@ -467,7 +467,7 @@ test("catalog carries multiple governed models and sorts them by routing priorit
     },
     install: install(),
   });
-  assert.equal(draft.profiles.length, 4);
+  assert.equal(draft.profiles.length, 6);
   const primaryBase = draft.profiles.find(
     (profile) => profile.profileId === "dt-fixture-xl-generate",
   );
@@ -529,7 +529,7 @@ test("Kontext models get capability-honest direction and temporal reference prof
     governance: governance({ priority: 220 }),
     install: install(),
   });
-  assert.equal(draft.profiles.length, 4);
+  assert.equal(draft.profiles.length, 5);
 
   const base = draft.profiles.find(
     (profile) => profile.profileId === "dt-fixture-xl-generate",
@@ -590,7 +590,7 @@ test("non-Kontext fallback never advertises direction or temporal reference capa
     governance: governance({ priority: 140 }),
     install: install(),
   });
-  assert.equal(draft.profiles.length, 2);
+  assert.equal(draft.profiles.length, 3);
   for (const profile of draft.profiles) {
     assert.ok(!profile.capabilities.includes("direction-reference"));
     assert.ok(!profile.capabilities.includes("temporal-reference"));
@@ -618,8 +618,113 @@ test("reference profiles stay below their no-reference base route priority", () 
   assert.equal(byId.get("dt-fixture-xl-generate-identity-ref").priority, 49);
   assert.equal(byId.get("dt-fixture-xl-generate-direction-ref").priority, 48);
   assert.equal(byId.get("dt-fixture-xl-generate-temporal-ref").priority, 47);
+  assert.equal(byId.get("dt-fixture-xl-generate-edit").priority, 46);
 });
 
+
+test("every governed model gets a capability-honest local edit profile", () => {
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: inventory(),
+    governance: governance({ priority: 140 }),
+    install: install(),
+  });
+  const edit = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-edit",
+  );
+  assert.ok(edit);
+  assert.deepEqual(edit.operations, ["edit"]);
+  assert.ok(edit.capabilities.includes("edit"));
+  assert.ok(edit.capabilities.includes("reference-images"));
+  assert.ok(!edit.capabilities.includes("generate"));
+  assert.ok(!edit.capabilities.includes("mask"));
+  assert.equal(edit.workflow["5"].class_type, "LoadImage");
+  assert.deepEqual(edit.workflow["3"].inputs.image, ["5", 0]);
+  assert.equal(edit.workflow["3"].inputs.strength, 0.35);
+  assert.deepEqual(edit.bindings.referenceImages, [
+    {
+      role: "base-image",
+      nodeId: "5",
+      input: "image",
+    },
+  ]);
+  assert.equal(edit.limits.maximumReferenceImages, 1);
+  assert.ok(!draft.profiles.some((profile) => profile.profileId.endsWith("-inpaint")));
+});
+
+test("Kontext edit keeps full source-image reference strength without claiming mask capability", () => {
+  const kontextInventory = inventory({
+    model: {
+      name: "Fixture XL",
+      file: "fixture_xl.safetensors",
+      version: "sdxl",
+      prefix: "",
+      modifier: "kontext",
+    },
+  });
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: kontextInventory,
+    governance: governance({ priority: 220 }),
+    install: install(),
+  });
+  const edit = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-edit",
+  );
+  assert.ok(edit);
+  assert.equal(edit.workflow["3"].inputs.strength, 1);
+  assert.ok(edit.capabilities.includes("edit"));
+  assert.ok(!edit.capabilities.includes("inpaint"));
+  assert.ok(!edit.capabilities.includes("mask"));
+});
+
+test("true inpainting models alone get a masked inpaint profile", () => {
+  const inpaintInventory = inventory({
+    model: {
+      name: "Fixture XL",
+      file: "fixture_xl.safetensors",
+      version: "sdxl",
+      prefix: "",
+      modifier: "inpainting",
+    },
+  });
+  const { draft } = buildDrawThingsCatalogDraft({
+    inventory: inpaintInventory,
+    governance: governance({ priority: 160 }),
+    install: install(),
+  });
+  const inpaint = draft.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-inpaint",
+  );
+  assert.ok(inpaint);
+  assert.deepEqual(inpaint.operations, ["inpaint"]);
+  assert.ok(inpaint.capabilities.includes("inpaint"));
+  assert.ok(inpaint.capabilities.includes("reference-images"));
+  assert.ok(inpaint.capabilities.includes("multiple-reference-images"));
+  assert.ok(inpaint.capabilities.includes("mask"));
+  assert.ok(!inpaint.capabilities.includes("generate"));
+  assert.equal(inpaint.workflow["5"].class_type, "LoadImage");
+  assert.equal(inpaint.workflow["6"].class_type, "LoadImageMask");
+  assert.equal(inpaint.workflow["6"].inputs.channel, "red");
+  assert.deepEqual(inpaint.workflow["3"].inputs.image, ["5", 0]);
+  assert.deepEqual(inpaint.workflow["3"].inputs.mask, ["6", 0]);
+  assert.deepEqual(
+    inpaint.bindings.referenceImages.map((reference) => reference.role),
+    ["base-image", "mask"],
+  );
+  assert.equal(inpaint.limits.maximumReferenceImages, 2);
+
+  const compiled = compileComfyUIWorkflowCatalog(draft);
+  const compiledInpaint = compiled.profiles.find(
+    (profile) => profile.profileId === "dt-fixture-xl-generate-inpaint",
+  );
+  assert.ok(compiledInpaint);
+  assert.deepEqual(compiledInpaint.operations, ["inpaint"]);
+  assert.ok(compiledInpaint.capabilities.includes("mask"));
+  assert.ok(
+    compiledInpaint.nodeInventory.some(
+      (node) => node.classType === "LoadImageMask",
+    ),
+  );
+});
 
 test("generated Kontext reference profiles compile through the real governed catalog validator", () => {
   const kontextInventory = inventory({
@@ -640,7 +745,7 @@ test("generated Kontext reference profiles compile through the real governed cat
     install: install(),
   });
   const compiled = compileComfyUIWorkflowCatalog(draft);
-  assert.equal(compiled.profiles.length, 4);
+  assert.equal(compiled.profiles.length, 5);
   const temporal = compiled.profiles.find(
     (profile) => profile.profileId === "dt-fixture-xl-generate-temporal-ref",
   );
