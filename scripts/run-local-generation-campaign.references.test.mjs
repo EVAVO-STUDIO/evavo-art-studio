@@ -348,3 +348,60 @@ test('quality-only Draw Things temporal route fails closed below its VRAM class 
     /no reviewed local Draw Things profile/u,
   );
 });
+
+
+test('profile-specific Draw Things VRAM floor gates structural pose control', () => {
+  const input = campaign([
+    { artifactId: artifactA, role: 'canonical-identity', required: true },
+    { artifactId: artifactB, role: 'pose-control', required: true },
+  ]);
+  input.provider = {
+    backend: 'draw-things',
+    baseUrl: 'http://127.0.0.1:8193',
+    catalogPath: 'C:\\temp\\draw-things-catalog.json',
+  };
+  input.scenes[0].assetKind = 'sprite-frame';
+  input.scenes[0].continuityPhase = 'key-pose';
+  const scene = validateLocalGenerationCampaign(input, {}).scenes[0];
+  const required = requiredCapabilityProfile(scene);
+  assert.ok(required.includes('pose-control'));
+  assert.ok(required.includes('identity-reference'));
+
+  const pose = {
+    profileId: 'sdxl-pose-ref',
+    modelId: 'sdxl-baseline-model',
+    priority: 138,
+    operations: ['generate'],
+    assetKinds: ['sprite-frame'],
+    continuityPhases: ['key-pose'],
+    capabilities: required,
+    limits: { maximumCandidates: 4, maximumReferenceImages: 2 },
+    nodeInventory: [
+      { nodeId: '3', classType: 'DrawThingsSampler' },
+      { nodeId: '7', classType: 'DrawThingsControlNet' },
+    ],
+  };
+  const routing = {
+    restricted: true,
+    availableVramGb: 7.5,
+    resourceClassByModel: new Map([
+      ['sdxl-baseline-model', 'baseline'],
+    ]),
+    minimumVramGbByProfile: new Map([
+      ['sdxl-pose-ref', 8],
+    ]),
+  };
+  assert.throws(
+    () => routeScene({ profiles: [pose] }, scene, 'draw-things', routing),
+    /no reviewed local Draw Things profile/u,
+  );
+
+  routing.availableVramGb = 8;
+  const route = routeScene(
+    { profiles: [pose] },
+    scene,
+    'draw-things',
+    routing,
+  );
+  assert.equal(route.adapterId, 'draw-things:sdxl-pose-ref');
+});
