@@ -12,6 +12,7 @@ import { compileComfyUIWorkflowCatalog } from "@evavo/art-providers";
 
 import {
   compileAutomaticSpriteWorkflow,
+  compileTwoStageAnimationClip,
   compileTwoStageAnimationProviderBatch,
 } from "../dist/index.js";
 import { buildDrawThingsCatalogDraft } from "../../../scripts/draw-things-local-models.mjs";
@@ -504,4 +505,205 @@ test("two-stage compiler rejects sprite-plan and Animation Director canvas drift
     () => compileTwoStageAnimationProviderBatch(input),
     /spritePlan canvas/u,
   );
+});
+
+
+test("full-clip compiler binds promoted key poses into all in-betweens", async () => {
+  const batch = await request("hero-walk-right:keys");
+  const {
+    batchId: _batchId,
+    keyPoseArtifactIds: _keyPoseArtifactIds,
+    finalCandidatesPerFrame: _finalCandidatesPerFrame,
+    ...clipInput
+  } = batch;
+  const result = compileTwoStageAnimationClip({
+    ...clipInput,
+    keyPoseCandidatesPerFrame: 2,
+    inBetweenCandidatesPerFrame: 2,
+  });
+
+  assert.equal(result.frames.length, 8);
+  assert.equal(result.supervisorRequest.policy.maximumActiveChildren, 1);
+  assert.deepEqual(
+    result.supervisorRequest.policy.requiredReleaseArtifactRoles,
+    ["two-stage.family-evidence", "two-stage.family-manifest"],
+  );
+
+  const frame1 = result.frames.find(
+    (frame) => frame.frameId === "hero-walk-right:f001",
+  );
+  const frame5 = result.frames.find(
+    (frame) => frame.frameId === "hero-walk-right:f005",
+  );
+  assert.ok(frame1);
+  assert.ok(frame5);
+
+  const inBetweenTask = result.supervisorRequest.tasks.find(
+    (task) =>
+      task.kind === "art.candidate.edit" &&
+      task.payloadTemplate.frameId === "hero-walk-right:f002",
+  );
+  assert.ok(inBetweenTask);
+  const previous = inBetweenTask.payloadTemplate.references.find(
+    (reference) => reference.role === "previous-key-pose",
+  );
+  const next = inBetweenTask.payloadTemplate.references.find(
+    (reference) => reference.role === "next-key-pose",
+  );
+  assert.deepEqual(previous.artifactId, {
+    $artifact: frame1.finalMasterRole,
+  });
+  assert.deepEqual(next.artifactId, {
+    $artifact: frame5.finalMasterRole,
+  });
+  assert.ok(
+    inBetweenTask.requiredArtifactRoles.includes(frame1.finalMasterRole),
+  );
+  assert.ok(
+    inBetweenTask.requiredArtifactRoles.includes(frame5.finalMasterRole),
+  );
+  assert.ok(
+    inBetweenTask.dependencyTaskIds.some((id) =>
+      id.includes("two-promote-"),
+    ),
+  );
+  assert.equal(
+    inBetweenTask.staticInputArtifacts.includes(artifact("c")),
+    false,
+  );
+  assert.equal(
+    inBetweenTask.staticInputArtifacts.includes(artifact("d")),
+    false,
+  );
+});
+
+test("full-clip compiler reverses loop-side temporal dependencies for frames 6-8", async () => {
+  const batch = await request("hero-walk-right:keys");
+  const {
+    batchId: _batchId,
+    keyPoseArtifactIds: _keyPoseArtifactIds,
+    finalCandidatesPerFrame: _finalCandidatesPerFrame,
+    ...clipInput
+  } = batch;
+  const result = compileTwoStageAnimationClip({
+    ...clipInput,
+    keyPoseCandidatesPerFrame: 1,
+    inBetweenCandidatesPerFrame: 1,
+  });
+  const frame1 = result.frames.find(
+    (frame) => frame.frameId === "hero-walk-right:f001",
+  );
+  const frame5 = result.frames.find(
+    (frame) => frame.frameId === "hero-walk-right:f005",
+  );
+  const frame6 = result.supervisorRequest.tasks.find(
+    (task) =>
+      task.kind === "art.candidate.edit" &&
+      task.payloadTemplate.frameId === "hero-walk-right:f006",
+  );
+  assert.ok(frame1);
+  assert.ok(frame5);
+  assert.ok(frame6);
+  const temporal = Object.fromEntries(
+    frame6.payloadTemplate.references
+      .filter((reference) =>
+        ["previous-key-pose", "next-key-pose"].includes(reference.role),
+      )
+      .map((reference) => [reference.role, reference.artifactId]),
+  );
+  assert.deepEqual(temporal["previous-key-pose"], {
+    $artifact: frame5.finalMasterRole,
+  });
+  assert.deepEqual(temporal["next-key-pose"], {
+    $artifact: frame1.finalMasterRole,
+  });
+});
+
+test("full-clip release is gated by one manifest-bound family verification task", async () => {
+  const batch = await request("hero-walk-right:keys");
+  const {
+    batchId: _batchId,
+    keyPoseArtifactIds: _keyPoseArtifactIds,
+    finalCandidatesPerFrame: _finalCandidatesPerFrame,
+    ...clipInput
+  } = batch;
+  const result = compileTwoStageAnimationClip({
+    ...clipInput,
+    keyPoseCandidatesPerFrame: 1,
+    inBetweenCandidatesPerFrame: 1,
+  });
+
+  const familyTasks = result.supervisorRequest.tasks.filter(
+    (task) => task.kind === "sprite.family.verify",
+  );
+  assert.equal(familyTasks.length, 1);
+  const family = familyTasks[0];
+  assert.equal(family.payloadTemplate.frames.length, 8);
+  assert.equal(family.payloadTemplate.layerDefinitions.length, 1);
+  assert.equal(
+    family.payloadTemplate.layerDefinitions[0].role,
+    "identity-core",
+  );
+  assert.equal(
+    family.payloadTemplate.policy.requireQualityPassed,
+    true,
+  );
+  assert.equal(
+    family.payloadTemplate.policy.requireDeclaredComposite,
+    false,
+  );
+  assert.equal(
+    family.payloadTemplate.policy.minimumLoopClosureSimilarity,
+    0.5,
+  );
+  assert.equal(family.requiredArtifactRoles.length, 8);
+  assert.equal(family.dependencyTaskIds.length, 8);
+  assert.ok(
+    family.outputBindings.some(
+      (binding) =>
+        binding.role === result.familyEvidenceRole &&
+        binding.labels.artifactRole ===
+          "sprite-family-consistency-evidence",
+    ),
+  );
+  assert.ok(
+    family.outputBindings.some(
+      (binding) =>
+        binding.role === result.familyManifestRole &&
+        binding.labels.artifactRole ===
+          "sprite-family-normalized-manifest",
+    ),
+  );
+});
+
+test("full-clip graph remains local-only at every provider task", async () => {
+  const batch = await request("hero-walk-right:keys");
+  const {
+    batchId: _batchId,
+    keyPoseArtifactIds: _keyPoseArtifactIds,
+    finalCandidatesPerFrame: _finalCandidatesPerFrame,
+    ...clipInput
+  } = batch;
+  const result = compileTwoStageAnimationClip({
+    ...clipInput,
+    keyPoseCandidatesPerFrame: 1,
+    inBetweenCandidatesPerFrame: 1,
+  });
+  const providerTasks = result.supervisorRequest.tasks.filter(
+    (task) =>
+      task.kind === "art.candidate.generate" ||
+      task.kind === "art.candidate.edit",
+  );
+  assert.equal(providerTasks.length, 16);
+  for (const task of providerTasks) {
+    assert.equal(
+      task.payloadTemplate.selection.allowedAdapterIds.length,
+      1,
+    );
+    assert.match(
+      task.payloadTemplate.selection.allowedAdapterIds[0],
+      /^draw-things:/u,
+    );
+    assert.equal(task.payloadTemplate.selection.allowFallback, false);
+  }
 });
