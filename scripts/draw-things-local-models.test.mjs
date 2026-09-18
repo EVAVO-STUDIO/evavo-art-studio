@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -13,6 +14,121 @@ const SHA_A = "a".repeat(64);
 const SHA_B = "b".repeat(64);
 const SHA_C = "c".repeat(64);
 const BUNDLE = "d".repeat(64);
+
+function canonical(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return "[" + value.map(canonical).join(",") + "]";
+  }
+  return (
+    "{" +
+    Object.keys(value)
+      .sort()
+      .map((key) => JSON.stringify(key) + ":" + canonical(value[key]))
+      .join(",") +
+    "}"
+  );
+}
+
+function canonicalSha(value) {
+  return createHash("sha256").update(canonical(value)).digest("hex");
+}
+
+function provisionReceipt({
+  inventoryValue = inventory(),
+  sidecarName = "fixture_xl.safetensors-tensordata",
+  sidecarSha = "2".repeat(64),
+  sidecarSize = 4096,
+  overrides = {},
+} = {}) {
+  const body = {
+    schemaVersion: 1,
+    kind: "evavo-draw-things-model-provision-receipt-v1",
+    ok: true,
+    stack: "default",
+    completedAt: 1_758_000_000.25,
+    modelsRoot: "C:\\EVAVO\\AI\\DrawThings\\Models",
+    sourceOrigin: "https://static.libnnc.org/",
+    stackManifestSha256: "7".repeat(64),
+    installManifestSha256: inventoryValue.installManifestSha256,
+    models: [
+      {
+        id: "fixture-xl",
+        label: "Fixture XL",
+        modelFile: "fixture_xl.safetensors",
+        sourceModel: "fixture/model",
+        files: [
+          {
+            name: "fixture_xl.safetensors",
+            sha256: "1".repeat(64),
+            sizeBytes: 1024,
+            downloaded: false,
+            repaired: false,
+            verificationMode: "committed-sha256",
+          },
+          {
+            name: sidecarName,
+            sha256: sidecarSha,
+            sizeBytes: sidecarSize,
+            downloaded: false,
+            repaired: false,
+            verificationMode: "receipt-sha256",
+          },
+        ],
+      },
+    ],
+    controls: [],
+    fileCount: 2,
+    downloadedFileCount: 0,
+    committedSha256FileCount: 1,
+    receiptPinnedFileCount: 1,
+    officialOriginSizeBootstrapFileCount: 0,
+    everyAdmittedFileHasFullSha256: true,
+    networkProvisioningAuthorized: true,
+    normalServiceDownloadAuthorityChanged: false,
+    commercialUseApprovedByThisReceipt: false,
+    modelPromotionPerformed: false,
+    remoteFallbackAllowed: false,
+    callerSelectedUrl: false,
+    callerSelectedFileHash: false,
+    externalStoreBootstrapPolicy:
+      "fixed-official-origin+committed-size then receipt-pinned SHA-256",
+    ...overrides,
+  };
+  return {
+    ...body,
+    receiptSha256: canonicalSha(body),
+  };
+}
+
+function inventoryWithSidecar({
+  sha256 = "2".repeat(64),
+  sizeBytes = 4096,
+} = {}) {
+  const value = inventory();
+  value.models[0].components.push({
+    relativePath: "fixture_xl.safetensors-tensordata",
+    sizeBytes,
+    sha256,
+  });
+  return value;
+}
+
+function policyWithSidecar({
+  sizeBytes = 4096,
+} = {}) {
+  const value = policy();
+  value.models[0].expectedExternalStores = [
+    {
+      name: "fixture_xl.safetensors-tensordata",
+      sizeBytes,
+      verification: "evavo-provision-receipt-sha256",
+    },
+  ];
+  return value;
+}
 
 function install() {
   return {
@@ -349,6 +465,138 @@ test("reviewed policy binds exact current physical files into generated governan
   assert.equal(result.models[0].resourceClass, "quality");
   assert.equal(result.models[0].generationDefaults.steps, 7);
   assert.equal(result.models[0].generationDefaults.samplerName, "DDIM Trailing");
+});
+
+test("receipt-bound sidecars are admitted only when policy, inventory and receipt agree", () => {
+  const input = inventoryWithSidecar();
+  const receipt = provisionReceipt({ inventoryValue: input });
+  const result = governanceFromPolicy(
+    input,
+    policyWithSidecar(),
+    "9".repeat(64),
+    receipt,
+  );
+  assert.equal(result.models.length, 1);
+  assert.equal(result.models[0].externalStores.length, 1);
+  assert.deepEqual(result.models[0].externalStores[0], {
+    name: "fixture_xl.safetensors-tensordata",
+    sizeBytes: 4096,
+    sha256: "2".repeat(64),
+    verification: "evavo-provision-receipt-sha256",
+    provisionReceiptSha256: receipt.receiptSha256,
+  });
+  assert.equal(
+    result.provisionReceipt.receiptSha256,
+    receipt.receiptSha256,
+  );
+  assert.equal(
+    result.provisionReceipt.installManifestSha256,
+    input.installManifestSha256,
+  );
+});
+
+test("receipt-bound sidecar policy fails closed without a provision receipt", () => {
+  assert.throws(
+    () =>
+      governanceFromPolicy(
+        inventoryWithSidecar(),
+        policyWithSidecar(),
+        "9".repeat(64),
+      ),
+    /requires a Local Compute model provision receipt/u,
+  );
+});
+
+test("receipt-bound sidecars reject live inventory hash drift", () => {
+  const input = inventoryWithSidecar({ sha256: "3".repeat(64) });
+  const receipt = provisionReceipt({
+    inventoryValue: input,
+    sidecarSha: "2".repeat(64),
+  });
+  assert.throws(
+    () =>
+      governanceFromPolicy(
+        input,
+        policyWithSidecar(),
+        "9".repeat(64),
+        receipt,
+      ),
+    /does not match its receipt-pinned SHA-256 and size/u,
+  );
+});
+
+test("receipt-bound sidecars reject live inventory size drift", () => {
+  const input = inventoryWithSidecar({ sizeBytes: 4097 });
+  const receipt = provisionReceipt({
+    inventoryValue: input,
+    sidecarSize: 4097,
+  });
+  assert.throws(
+    () =>
+      governanceFromPolicy(
+        input,
+        policyWithSidecar({ sizeBytes: 4096 }),
+        "9".repeat(64),
+        receipt,
+      ),
+    /expected 4096 bytes/u,
+  );
+});
+
+test("receipt-bound sidecars reject a tampered provision receipt", () => {
+  const input = inventoryWithSidecar();
+  const receipt = provisionReceipt({ inventoryValue: input });
+  receipt.models[0].files[1].sha256 = "3".repeat(64);
+  assert.throws(
+    () =>
+      governanceFromPolicy(
+        input,
+        policyWithSidecar(),
+        "9".repeat(64),
+        receipt,
+      ),
+    /canonical SHA-256/u,
+  );
+});
+
+test("receipt-bound sidecars reject a receipt from another install", () => {
+  const input = inventoryWithSidecar();
+  const receipt = provisionReceipt({
+    inventoryValue: input,
+    overrides: {
+      installManifestSha256: "f".repeat(64),
+    },
+  });
+  assert.throws(
+    () =>
+      governanceFromPolicy(
+        input,
+        policyWithSidecar(),
+        "9".repeat(64),
+        receipt,
+      ),
+    /different install manifest/u,
+  );
+});
+
+test("receipt-bound sidecars reject caller-selected trust authority", () => {
+  const input = inventoryWithSidecar();
+  const receipt = provisionReceipt({
+    inventoryValue: input,
+    overrides: {
+      callerSelectedFileHash: true,
+    },
+  });
+  assert.throws(
+    () =>
+      governanceFromPolicy(
+        input,
+        policyWithSidecar(),
+        "9".repeat(64),
+        receipt,
+      ),
+    /fixed-origin receipt-pinned trust policy/u,
+  );
 });
 
 test("reviewed policy rejects an unexpected tensor sidecar until it is explicitly reviewed", () => {
