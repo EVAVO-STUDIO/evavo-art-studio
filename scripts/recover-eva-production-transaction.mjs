@@ -228,32 +228,32 @@ function runStorageRecovery({ python, storageRepository, manifest, vaultId, proj
     '--expected-evidence-count', String(EXPECTED_EVIDENCE_COUNT),
   ];
   let storageScript;
-  let arguments;
+  let commandArguments;
   let mode;
   if (manifest) {
     storageScript = absoluteOrdinaryFile(
       path.join(storageRepository, EXACT_TRANSACTION_SCRIPT_RELATIVE),
       'EVAVO Storage exact transaction materializer',
     );
-    arguments = [storageScript, '--manifest', absoluteOrdinaryFile(manifest, 'manifest'), ...common];
+    commandArguments = [storageScript, '--manifest', absoluteOrdinaryFile(manifest, 'manifest'), ...common];
     mode = 'explicit-manifest';
   } else {
     storageScript = absoluteOrdinaryFile(
       path.join(storageRepository, STORED_ART_RECOVERY_SCRIPT_RELATIVE),
       'EVAVO Storage retained Art transaction recovery',
     );
-    arguments = [
+    commandArguments = [
       storageScript,
       '--project-id', projectId,
       ...common,
       '--required-item-sha', `atlas-manifest.json=${REVIEWED_ATLAS_MANIFEST_SHA256}`,
     ];
-    if (sessionId) arguments.push('--session-id', sessionId);
+    if (sessionId) commandArguments.push('--session-id', sessionId);
     mode = 'retained-storage';
   }
   const execution = spawnSync(
     python,
-    arguments,
+    commandArguments,
     {
       cwd: storageRepository,
       encoding: 'utf8',
