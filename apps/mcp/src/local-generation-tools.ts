@@ -94,6 +94,31 @@ function defaultComfyBaseUrl(): string {
   return process.env.EVAVO_ART_COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
 }
 
+function defaultDrawThingsCatalogPath(): string {
+  const configured = process.env.EVAVO_ART_DRAWTHINGS_CATALOG?.trim();
+  if (configured) return path.resolve(configured);
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (localAppData) {
+    return path.join(localAppData, "EVAVO", "AI", "DrawThings", "catalog.json");
+  }
+  return path.join(artStudioRoot(), ".art-studio", "draw-things", "catalog.json");
+}
+
+function defaultDrawThingsBaseUrl(): string {
+  return (
+    process.env.EVAVO_ART_DRAWTHINGS_COMFYUI_BASE_URL?.trim() ||
+    "http://127.0.0.1:8193"
+  );
+}
+
+function drawThingsInstallManifestPath(): string {
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (localAppData) {
+    return path.join(localAppData, "EVAVO", "AI", "DrawThings", "install-manifest.json");
+  }
+  return path.resolve(".art-studio", "draw-things", "install-manifest.json");
+}
+
 function loopbackBaseUrl(value: string): string {
   const parsed = new URL(value);
   if (
@@ -185,6 +210,51 @@ async function comfyEvidence(baseUrl: string): Promise<{
       baseUrl,
       reachable: false,
       status: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function drawThingsEvidence(baseUrl: string): Promise<{
+  readonly baseUrl: string;
+  readonly reachable: boolean;
+  readonly status: number | null;
+  readonly samplerReady: boolean;
+  readonly samplerStatus: number | null;
+  readonly error: string | null;
+}> {
+  const base = await comfyEvidence(baseUrl);
+  if (!base.reachable) {
+    return {
+      ...base,
+      samplerReady: false,
+      samplerStatus: null,
+    };
+  }
+  try {
+    const response = await fetch(`${baseUrl}/object_info/DrawThingsSampler`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    let samplerReady = false;
+    if (response.ok) {
+      const value = (await response.json()) as Record<string, unknown>;
+      samplerReady = Object.hasOwn(value, "DrawThingsSampler");
+    }
+    return {
+      ...base,
+      samplerReady,
+      samplerStatus: response.status,
+      error: samplerReady
+        ? null
+        : response.ok
+          ? "DrawThingsSampler is absent from object_info."
+          : `Draw Things object_info HTTP ${response.status}`,
+    };
+  } catch (error: unknown) {
+    return {
+      ...base,
+      samplerReady: false,
+      samplerStatus: null,
       error: error instanceof Error ? error.message : String(error),
     };
   }
@@ -340,7 +410,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
     "local_generation_campaign_capabilities",
     {
       description:
-        "Describe the headless local ComfyUI campaign execution bridge available to trusted EVAVO agents. This does not execute a campaign.",
+        "Describe the headless local image campaign execution backends available to trusted EVAVO agents, including core ComfyUI and the isolated Draw Things bridge. This does not execute a campaign.",
       inputSchema: z.object({}),
     },
     async () =>
@@ -350,6 +420,21 @@ export function registerLocalGenerationTools(server: McpServer): void {
         localOnly: true,
         hostedFallback: false,
         campaignSchema: "evavo.local-generation-campaign.v1",
+        providerBackends: {
+          comfyui: {
+            adapterPrefix: "comfyui:",
+            canonicalBaseUrl: "http://127.0.0.1:8188",
+            customNodes: "disabled",
+          },
+          drawThings: {
+            manifestValue: "draw-things",
+            adapterPrefix: "draw-things:",
+            canonicalBaseUrl: "http://127.0.0.1:8193",
+            grpcEndpoint: "127.0.0.1:7859",
+            transport: "official ComfyUI-DrawThings-gRPC bridge",
+            customNodePolicy: "DrawThings bridge only",
+          },
+        },
         supportedAssetKinds: [
           "sprite-frame",
           "sprite-layer",
@@ -365,7 +450,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
           "submit campaign object or shipped example",
           "persist bounded local request",
           "bootstrap Local Compute",
-          "ensure headless loopback ComfyUI",
+          "ensure the selected loopback provider backend",
           "route each scene to a reviewed local profile",
           "execute durable Art Studio provider jobs",
           "materialize viewable candidate images",
@@ -383,7 +468,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
     "local_generation_doctor",
     {
       description:
-        "Read-only readiness check for the local Art Studio generation path. Verifies execution flags, Local Compute bridge files, shipped example, catalog path, output root and current loopback ComfyUI health without starting a generation campaign.",
+        "Read-only readiness check for local Art Studio generation. Verifies the core ComfyUI path plus the isolated Draw Things install, catalog, reviewed Local Compute service action and DrawThingsSampler bridge health without starting generation.",
       inputSchema: z.object({}),
     },
     async () => {
@@ -394,13 +479,45 @@ export function registerLocalGenerationTools(server: McpServer): void {
         const example = shippedExamplePath("lorna-strip-poker-test");
         const catalog = defaultCatalogPath();
         const baseUrl = loopbackBaseUrl(defaultComfyBaseUrl());
-        const [bridgeEvidence, ensureEvidence, exampleEvidence, catalogEvidence, outputEvidence, comfy] = await Promise.all([
+        const drawThingsRuntime = path.join(
+          computeRoot,
+          "src",
+          "evavo_local_compute",
+          "draw_things_runtime.py",
+        );
+        const drawThingsServiceAction = path.join(
+          computeRoot,
+          "automation",
+          "remote-jobs",
+          "Ensure-EvavoDrawThingsServiceV1.py",
+        );
+        const drawThingsCatalog = defaultDrawThingsCatalogPath();
+        const drawThingsInstall = drawThingsInstallManifestPath();
+        const drawThingsBaseUrl = loopbackBaseUrl(defaultDrawThingsBaseUrl());
+        const [
+          bridgeEvidence,
+          ensureEvidence,
+          exampleEvidence,
+          catalogEvidence,
+          outputEvidence,
+          comfy,
+          drawThingsRuntimeEvidence,
+          drawThingsServiceEvidence,
+          drawThingsInstallEvidence,
+          drawThingsCatalogEvidence,
+          drawThings,
+        ] = await Promise.all([
           regularFileEvidence(bridge),
           regularFileEvidence(ensureComfy),
           regularFileEvidence(example),
           regularFileEvidence(catalog),
           directoryEvidence(campaignOutputRoot()),
           comfyEvidence(baseUrl),
+          regularFileEvidence(drawThingsRuntime),
+          regularFileEvidence(drawThingsServiceAction),
+          regularFileEvidence(drawThingsInstall),
+          regularFileEvidence(drawThingsCatalog),
+          drawThingsEvidence(drawThingsBaseUrl),
         ]);
         const readyWithoutStartingComfy = Boolean(
           executionEnabled() &&
@@ -416,10 +533,28 @@ export function registerLocalGenerationTools(server: McpServer): void {
           ensureEvidence.regularFile &&
           exampleEvidence.regularFile,
         );
+        const drawThingsReadyWithoutStarting = Boolean(
+          executionEnabled() &&
+          bridgeEvidence.regularFile &&
+          drawThingsRuntimeEvidence.regularFile &&
+          drawThingsServiceEvidence.regularFile &&
+          drawThingsInstallEvidence.regularFile &&
+          drawThingsCatalogEvidence.regularFile &&
+          drawThings.reachable &&
+          drawThings.samplerReady,
+        );
+        const drawThingsServiceStartReady = Boolean(
+          executionEnabled() &&
+          drawThingsRuntimeEvidence.regularFile &&
+          drawThingsServiceEvidence.regularFile &&
+          drawThingsInstallEvidence.regularFile,
+        );
         return textResult({
-          schema: "evavo.local-generation-doctor.v1",
+          schema: "evavo.local-generation-doctor.v2",
           readyWithoutStartingComfy,
           bootstrapReady,
+          drawThingsReadyWithoutStarting,
+          drawThingsServiceStartReady,
           executionEnabled: executionEnabled(),
           localComputeRoot: computeRoot,
           bridge: bridgeEvidence,
@@ -428,9 +563,21 @@ export function registerLocalGenerationTools(server: McpServer): void {
           catalog: catalogEvidence,
           outputRoot: outputEvidence,
           comfy,
-          note: comfy.reachable
-            ? "ComfyUI is already reachable on the configured loopback endpoint."
-            : "ComfyUI is not currently reachable; the campaign runner will attempt the reviewed headless Local Compute bootstrap before generation.",
+          drawThings: {
+            runtime: drawThingsRuntimeEvidence,
+            reviewedServiceAction: drawThingsServiceEvidence,
+            installManifest: drawThingsInstallEvidence,
+            catalog: drawThingsCatalogEvidence,
+            service: drawThings,
+            canonicalComfyUrl: "http://127.0.0.1:8193",
+            canonicalGrpcEndpoint: "127.0.0.1:7859",
+            automaticDownloadOnServiceStart: false,
+          },
+          note: drawThingsReadyWithoutStarting
+            ? "Core ComfyUI and the Draw Things bridge are independently discoverable; Draw Things is ready for a reviewed draw-things campaign."
+            : comfy.reachable
+              ? "Core ComfyUI is reachable. Draw Things remains independently fail-closed until its install manifest, reviewed catalog and bridge service are ready."
+              : "Neither selected local backend is currently proven ready; use the reviewed Local Compute bootstrap/service path before generation.",
         });
       } catch (error: unknown) {
         return toolError("LOCAL_GENERATION_DOCTOR_FAILED", error);
@@ -442,7 +589,7 @@ export function registerLocalGenerationTools(server: McpServer): void {
     "run_local_generation_campaign",
     {
       description:
-        "Run one complete data-driven image-generation campaign on the local EVAVO workstation without opening ComfyUI or manually pasting prompts. The campaign is persisted locally, Local Compute ensures ComfyUI, Art Studio routes every scene to a reviewed local profile, and the tool returns the resulting receipt and output folder. Requires explicit local execution enablement.",
+        "Run one complete data-driven image-generation campaign on the local EVAVO workstation without opening a UI or manually pasting prompts. provider.backend selects the reviewed core ComfyUI path or isolated Draw Things bridge; Art Studio routes every scene to an exact local profile and returns the receipt/output folder. Requires explicit local execution enablement.",
       inputSchema: z.object({ campaign: z.unknown() }),
     },
     async ({ campaign }) => {
