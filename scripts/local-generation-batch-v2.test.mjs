@@ -155,3 +155,77 @@ test('invalid campaign counts and duplicate shot IDs fail closed', () => {
   duplicate.shots[1].id = duplicate.shots[0].id;
   assert.throws(() => validateLocalGenerationBatch(duplicate), /shot IDs must be unique/u);
 });
+
+
+test('Draw Things provider backend survives V2 validation and legacy compilation', () => {
+  const source = manifest({ count: 2, mode: 'sprite' });
+  source.provider = {
+    backend: 'draw-things',
+    baseUrl: 'http://127.0.0.1:8193',
+    catalogPath: 'C:\\temp\\draw-things-catalog.json',
+  };
+  const validated = validateLocalGenerationBatch(source);
+  assert.equal(validated.provider.backend, 'draw-things');
+  assert.equal(validated.provider.adapterId, null);
+  const plan = compileBatchPlan(source);
+  const legacy = compileLegacyManifest(plan, plan.frames, 1);
+  assert.equal(legacy.provider.backend, 'draw-things');
+  assert.equal(legacy.provider.baseUrl, 'http://127.0.0.1:8193');
+  assert.equal(
+    legacy.provider.catalogPath,
+    'C:\\temp\\draw-things-catalog.json',
+  );
+  assert.equal(Object.hasOwn(legacy.provider, 'adapterId'), false);
+});
+
+test('V2 provider adapter namespace must match its backend', () => {
+  const source = manifest({ count: 1 });
+  source.provider = {
+    backend: 'draw-things',
+    adapterId: 'comfyui:not-allowed',
+  };
+  assert.throws(
+    () => validateLocalGenerationBatch(source),
+    /provider\.adapterId must match provider\.backend draw-things/u,
+  );
+});
+
+test('Draw Things image metadata does not claim KSampler execution settings', () => {
+  const source = manifest({ count: 1 });
+  source.provider = {
+    backend: 'draw-things',
+    baseUrl: 'http://127.0.0.1:8193',
+    catalogPath: 'C:\\temp\\draw-things-catalog.json',
+  };
+  const plan = compileBatchPlan(source);
+  const metadata = imageMetadata(plan, plan.frames[0], {
+    attempt: 1,
+    route: {
+      adapterId: 'draw-things:dt-flux-generate',
+      modelId: 'flux2-klein-4b-q6p',
+    },
+    candidate: {
+      artifactId: 'artifact-1',
+      contentHash: 'sha256:abc',
+      outputFileName: '001.png',
+    },
+    qa: {
+      ok: true,
+      sha256: 'abc',
+      bytes: 123,
+      dimensions: { width: 1344, height: 768 },
+    },
+  });
+  assert.equal(
+    metadata.settings.samplingAuthority,
+    'governed-draw-things-profile',
+  );
+  assert.equal(
+    metadata.settings.executedSamplingSettingsInProviderEvidence,
+    true,
+  );
+  assert.equal(Object.hasOwn(metadata.settings, 'steps'), false);
+  assert.equal(Object.hasOwn(metadata.settings, 'cfg'), false);
+  assert.equal(Object.hasOwn(metadata.settings, 'sampler'), false);
+  assert.equal(Object.hasOwn(metadata.settings, 'scheduler'), false);
+});
