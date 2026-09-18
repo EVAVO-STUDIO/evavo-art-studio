@@ -1168,6 +1168,7 @@ function familyManifestForClip(
       globalFrameIndex: frame.frame - 1,
       durationMs: frame.duration.numeratorMs / frame.duration.denominator,
       pivot,
+      baseline: request.spritePlan.godot.ySortOrigin.y,
       groundContact: frame.groundContactRequired,
       layers: [
         {
