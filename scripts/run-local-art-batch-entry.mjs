@@ -186,7 +186,7 @@ function validateReferencePlan(referencePlan, catalog, baseAdapterId, options = 
     routes: Object.freeze(routes),
   });
 }
-async function prepareManifest(sourcePath, port) {
+export async function prepareManifest(sourcePath, port) {
   const sourceInput = await jsonWithBytes(sourcePath, 'batch manifest');
   const source = sourceInput.value;
   if (source?.schema !== BATCH_SCHEMA) fail(`batch manifest must use ${BATCH_SCHEMA}`);
