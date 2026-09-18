@@ -5,11 +5,16 @@ import {
   type ArtifactId,
 } from "@evavo/art-artifacts";
 import {
+  AUTHORED_ANIMATION_DIRECTOR_PLAN_KIND,
   compileAnimationDirectorPlan,
+  compileAuthoredAnimationDirectorPlan,
   resolveAnimationProductionRoute,
   type AnimationDirectorPlan,
   type AnimationFramePlan,
   type AnimationGenerationBatch,
+  type AnimationProductionPlan,
+  type AuthoredAnimationFramePlan,
+  type AuthoredAnimationGenerationBatch,
 } from "@evavo/art-direction";
 import {
   validateProviderCandidateRequest,
@@ -24,7 +29,7 @@ import {
 export const ANIMATION_PROVIDER_COMPILER_VERSION = "2026-08-25.4" as const;
 
 export interface AnimationProviderBatchCompileRequest {
-  readonly plan: AnimationDirectorPlan;
+  readonly plan: AnimationProductionPlan;
   readonly batchId: string;
   readonly poseControlArtifactIds: Readonly<Record<string, ArtifactId>>;
   readonly keyPoseArtifactIds?: Readonly<Record<string, ArtifactId>>;
@@ -41,12 +46,14 @@ export interface AnimationProviderBatchCompileRequest {
 export interface AnimationProviderBatchCompilation {
   readonly schemaVersion: "1.0";
   readonly compilerVersion: typeof ANIMATION_PROVIDER_COMPILER_VERSION;
-  readonly planProtocolVersion: AnimationDirectorPlan["protocolVersion"];
+  readonly planProtocolVersion: AnimationProductionPlan["protocolVersion"];
   readonly planSha256: string;
   readonly productionRoute: "art-studio-sprite";
   readonly clipId: string;
   readonly batchId: string;
-  readonly phase: AnimationGenerationBatch["phase"];
+  readonly phase:
+    | AnimationGenerationBatch["phase"]
+    | AuthoredAnimationGenerationBatch["phase"];
   readonly requests: readonly NormalizedProviderCandidateRequest[];
   readonly authority: Readonly<{
     providerExecution: false;
@@ -81,42 +88,103 @@ function canonicalJson(value: unknown): string {
   }
 }
 
-function verifiedPlan(input: AnimationDirectorPlan): AnimationDirectorPlan {
+function verifiedPlan(
+  input: AnimationProductionPlan,
+): AnimationProductionPlan {
   if (!input || typeof input !== "object") {
     fail("plan must be an Animation Director plan object.");
   }
-  let canonical: AnimationDirectorPlan;
+  let canonical: AnimationProductionPlan;
   try {
-    canonical = compileAnimationDirectorPlan({
-      clipId: input.clipId,
-      subjectId: input.subjectId,
-      action: input.action,
-      direction: input.direction,
-      motionStyle: input.motionStyle,
-      fps: input.fps,
-      canvas: input.canvas,
-      canonicalIdentityArtifactId: input.canonicalIdentityArtifactId,
-      ...(input.directionMasterArtifactId
-        ? { directionMasterArtifactId: input.directionMasterArtifactId }
-        : {}),
-      loop: input.loop,
-    });
+    if (input.kind === AUTHORED_ANIMATION_DIRECTOR_PLAN_KIND) {
+      canonical = compileAuthoredAnimationDirectorPlan({
+        clipId: input.clipId,
+        subjectId: input.subjectId,
+        action: input.action,
+        direction: input.direction,
+        motionStyle: input.motionStyle,
+        fps: input.fps,
+        canvas: input.canvas,
+        canonicalIdentityArtifactId:
+          input.canonicalIdentityArtifactId,
+        ...(input.directionMasterArtifactId
+          ? {
+              directionMasterArtifactId:
+                input.directionMasterArtifactId,
+            }
+          : {}),
+        loop: input.loop,
+        frames: input.frames.map((frame) => ({
+          role: frame.role,
+          keyPose: frame.keyPose,
+          duration: frame.duration,
+          groundContactRequired:
+            frame.groundContactRequired,
+          contactLandmarkId: frame.plantedLandmarkId,
+        })),
+        structure: {
+          rootLandmarkId:
+            input.qualityRequirements.rootLandmarkId,
+          requiredLandmarkIds:
+            input.qualityRequirements.requiredLandmarkIds,
+          loopClosureLandmarkIds:
+            input.qualityRequirements.loopClosureLandmarkIds,
+          maximumRootStepPixels:
+            input.qualityRequirements.maximumRootStepPixels,
+          loopClosureTolerancePixels:
+            input.qualityRequirements.loopClosureTolerancePixels,
+          contactDriftTolerancePixels:
+            input.qualityRequirements
+              .plantedFootDriftTolerancePixels,
+        },
+      });
+    } else {
+      const walk = input as AnimationDirectorPlan;
+      canonical = compileAnimationDirectorPlan({
+        clipId: walk.clipId,
+        subjectId: walk.subjectId,
+        action: walk.action,
+        direction: walk.direction,
+        motionStyle: walk.motionStyle,
+        fps: walk.fps,
+        canvas: walk.canvas,
+        canonicalIdentityArtifactId:
+          walk.canonicalIdentityArtifactId,
+        ...(walk.directionMasterArtifactId
+          ? {
+              directionMasterArtifactId:
+                walk.directionMasterArtifactId,
+            }
+          : {}),
+        loop: walk.loop,
+      });
+    }
   } catch (error: unknown) {
     fail(
-      `plan cannot be canonically recompiled: ${error instanceof Error ? error.message : String(error)}`,
+      "plan cannot be canonically recompiled: " +
+        (error instanceof Error ? error.message : String(error)),
     );
   }
 
   if (canonicalJson(input) !== canonicalJson(canonical)) {
-    fail("plan does not match the canonical Animation Director compilation.");
+    fail(
+      "plan does not match the canonical Animation Director compilation.",
+    );
   }
   return canonical;
 }
 
+type ProviderAnimationBatch =
+  | AnimationGenerationBatch
+  | AuthoredAnimationGenerationBatch;
+type ProviderAnimationFrame =
+  | AnimationFramePlan
+  | AuthoredAnimationFramePlan;
+
 function findBatch(
-  plan: AnimationDirectorPlan,
+  plan: AnimationProductionPlan,
   batchId: string,
-): AnimationGenerationBatch {
+): ProviderAnimationBatch {
   if (typeof batchId !== "string" || !batchId.trim()) {
     fail("batchId must be non-empty.");
   }
@@ -127,7 +195,10 @@ function findBatch(
   return matches[0]!;
 }
 
-function framePlan(plan: AnimationDirectorPlan, frameNumber: number): AnimationFramePlan {
+function framePlan(
+  plan: AnimationProductionPlan,
+  frameNumber: number,
+): ProviderAnimationFrame {
   const matches = plan.frames.filter((frame) => frame.frame === frameNumber);
   if (matches.length !== 1) {
     fail(`frame ${frameNumber} must identify exactly one animation frame plan.`);
@@ -147,7 +218,7 @@ function candidateCount(
 }
 
 function temporalReferences(
-  batch: AnimationGenerationBatch,
+  batch: ProviderAnimationBatch,
   keyPoseArtifactIds: Readonly<Record<string, ArtifactId>> | undefined,
 ): readonly ProviderCandidateReferenceInput[] {
   if (batch.phase !== "in-between") return [];
@@ -184,9 +255,9 @@ function temporalReferences(
 }
 
 function referencesForFrame(
-  plan: AnimationDirectorPlan,
-  batch: AnimationGenerationBatch,
-  frame: AnimationFramePlan,
+  plan: AnimationProductionPlan,
+  batch: ProviderAnimationBatch,
+  frame: ProviderAnimationFrame,
   request: AnimationProviderBatchCompileRequest,
 ): readonly ProviderCandidateReferenceInput[] {
   const references: ProviderCandidateReferenceInput[] = [
@@ -232,10 +303,10 @@ function referencesForFrame(
 }
 
 function requestForFrame(
-  plan: AnimationDirectorPlan,
+  plan: AnimationProductionPlan,
   planSha256: string,
-  batch: AnimationGenerationBatch,
-  frame: AnimationFramePlan,
+  batch: ProviderAnimationBatch,
+  frame: ProviderAnimationFrame,
   request: AnimationProviderBatchCompileRequest,
   count: number,
 ): NormalizedProviderCandidateRequest {
@@ -245,8 +316,8 @@ function requestForFrame(
     `This is frame ${frame.frame} of ${plan.frames.length}, role ${frame.role}, facing ${plan.direction}.`,
     `Preserve canonical identity, proportions, costume, camera, canvas, pivot and baseline.`,
     frame.groundContactRequired
-      ? `Preserve ${frame.plantedFoot} foot contact using landmark ${frame.plantedLandmarkId ?? "none"}.`
-      : "No planted-foot constraint is declared for this drawing.",
+      ? `Preserve the declared structural contact using landmark ${frame.plantedLandmarkId ?? "none"}.`
+      : "No planted contact constraint is declared for this drawing.",
     batch.phase === "in-between"
       ? "Respect both retained neighbouring key poses; do not redesign the action or invent a new motion path."
       : "Establish the authored key pose clearly and readably; do not generate a sprite sheet or multiple poses.",
@@ -272,7 +343,7 @@ function requestForFrame(
       include: [
         "exactly one complete sprite drawing",
         `frame role ${frame.role}`,
-        `planted foot ${frame.plantedFoot}`,
+        `contact anchor ${frame.plantedLandmarkId ?? "none"}`,
         "stable camera, pivot and baseline",
       ],
       exclude: [
