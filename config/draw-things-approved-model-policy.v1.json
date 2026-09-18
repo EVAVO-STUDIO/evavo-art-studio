@@ -62,7 +62,19 @@
       },
       "priority": 220,
       "resourceClass": "quality",
-      "notes": "Preferred modern local image route. The canonical gRPC service enables CPU offload so this quantized 4B model can remain usable on the 12 GB laptop GPU. Runtime admission still fails closed if the workstation cannot fit the job."
+      "notes": "Preferred modern local image route. The canonical gRPC service enables CPU offload so this quantized 4B model can remain usable on the 12 GB laptop GPU. Runtime admission still fails closed if the workstation cannot fit the job.",
+      "expectedExternalStores": [
+        {
+          "name": "flux_2_klein_4b_q6p.ckpt-tensordata",
+          "sizeBytes": 3110043648,
+          "verification": "evavo-provision-receipt-sha256"
+        },
+        {
+          "name": "qwen_3_4b_q8p.ckpt-tensordata",
+          "sizeBytes": 4525654016,
+          "verification": "evavo-provision-receipt-sha256"
+        }
+      ]
     },
     {
       "id": "sdxl-base-1.0-8bit",
@@ -126,7 +138,19 @@
       },
       "priority": 140,
       "resourceClass": "baseline",
-      "notes": "Stable lower-memory fallback route. Commercial use remains subject to the OpenRAIL++ use-based restrictions and redistribution conditions."
+      "notes": "Stable lower-memory fallback route. Commercial use remains subject to the OpenRAIL++ use-based restrictions and redistribution conditions.",
+      "expectedExternalStores": [
+        {
+          "name": "sd_xl_base_1.0_q6p_q8p.ckpt-tensordata",
+          "sizeBytes": 2102657024,
+          "verification": "evavo-provision-receipt-sha256"
+        },
+        {
+          "name": "open_clip_vit_bigg14_f16.ckpt-tensordata",
+          "sizeBytes": 1388265472,
+          "verification": "evavo-provision-receipt-sha256"
+        }
+      ]
     }
   ],
   "controls": [
@@ -161,7 +185,14 @@
       ],
       "minimumVramGb": 8,
       "priority": 180,
-      "notes": "Structural pose-control dependency for SDXL animation drafting. Kept separate from the base checkpoint and only admitted for pose-control workflows."
+      "notes": "Structural pose-control dependency for SDXL animation drafting. Kept separate from the base checkpoint and only admitted for pose-control workflows.",
+      "expectedExternalStores": [
+        {
+          "name": "controlnet_xinsir_union_promax_sdxl_1.0_f16.ckpt-tensordata",
+          "sizeBytes": 2511852544,
+          "verification": "evavo-provision-receipt-sha256"
+        }
+      ]
     }
   ]
 }
