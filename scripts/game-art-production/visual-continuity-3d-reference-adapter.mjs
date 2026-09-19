@@ -52,6 +52,7 @@ const APPROVAL_AUTHORITY = Object.freeze({
   publication: false,
 });
 const ID = /^[a-z0-9][a-z0-9-]{1,127}$/u;
+const CONTINUITY_ID = /^[a-z0-9]+(?:[a-z0-9_-]*[a-z0-9])?$/u;
 
 function adapterFail(code) {
   throw new Error(`EVAVO_VISUAL_CONTINUITY_3D_ADAPTER_${code}`);
@@ -71,6 +72,18 @@ function text(value, code, maximum = 12000) {
 
 function identifier(value, code) {
   if (typeof value !== "string" || !ID.test(value)) adapterFail(code);
+  return value;
+}
+
+function continuityIdentifier(value, code) {
+  if (
+    typeof value !== "string" ||
+    value.length > 160 ||
+    !CONTINUITY_ID.test(value) ||
+    value.includes("..")
+  ) {
+    adapterFail(code);
+  }
   return value;
 }
 
@@ -193,7 +206,7 @@ export function verifyApprovedContinuity3dHandoff(document) {
       ["workItemId", "assetType", "artifactId", "uri", "sha256", "contextSha256"],
       "source",
     );
-    identifier(source.workItemId, "SOURCE_WORK_ITEM_ID_INVALID");
+    continuityIdentifier(source.workItemId, "SOURCE_WORK_ITEM_ID_INVALID");
     if (sourceIds.has(source.workItemId)) adapterFail("SOURCE_DUPLICATE");
     sourceIds.add(source.workItemId);
     if (!SHA.test(source.sha256) || !SHA.test(source.contextSha256)) {
@@ -302,9 +315,6 @@ export async function compileContinuity3dReferenceHandoff(
   identifier(request.subjectId, "SUBJECT_ID_INVALID");
   if (!ASSET_CLASSES.has(request.assetClass)) adapterFail("ASSET_CLASS_INVALID");
   const approved = await loadApprovedHandoff(request, baseDirectory);
-  if (approved.document.receiverProjectId !== request.subjectId) {
-    adapterFail("RECEIVER_PROJECT_SUBJECT_MISMATCH");
-  }
   const sourceById = new Map(
     approved.document.sources.map((source) => [source.workItemId, source]),
   );
@@ -324,7 +334,7 @@ export async function compileContinuity3dReferenceHandoff(
       ["id", "workItemId", "path", "view", "role", "rights", "notes"],
       `references[${index}]`,
     );
-    const workItemId = identifier(
+    const workItemId = continuityIdentifier(
       raw.workItemId,
       `REFERENCE_${index}_WORK_ITEM_INVALID`,
     );
