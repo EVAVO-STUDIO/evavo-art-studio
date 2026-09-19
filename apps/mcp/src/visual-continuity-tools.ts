@@ -216,7 +216,7 @@ export function registerVisualContinuityTools(server: McpServer): void {
     "evaluate_visual_continuity_candidate",
     {
       description:
-        "Evaluate one externally produced candidate against the exact current packet using caller-supplied measured evidence. The deterministic result is accepted, bounded repair-required or blocked; gates are never weakened and image bytes are not changed.",
+        "Evaluate one externally produced candidate for a one-job packet using caller-supplied measured evidence. Multi-job packets must use evaluate_visual_continuity_packet_batch so all results commit atomically. The deterministic result is accepted, bounded repair-required or blocked; gates are never weakened and image bytes are not changed.",
       inputSchema: z.object({
         bible: z.unknown(),
         session: z.unknown(),
@@ -247,7 +247,7 @@ export function registerVisualContinuityTools(server: McpServer): void {
     "compile_visual_continuity_handoff",
     {
       description:
-        "Compile an exact accepted-source handoff to Art Studio, Video Studio, Animation Studio, 3D Studio, Texture Studio, Godot, web or print. The handoff carries source hashes, selected canon, colour tokens, references, locks and receiver-specific checks without mutating either studio.",
+        "Compile a technical pre-approval accepted-source handoff for compatibility and inspection. It carries source hashes, selected canon, colour tokens, references, locks and receiver checks, but it does not prove named-human creative approval or direct receiver compatibility. Use compile_approved_visual_continuity_handoff for release-grade delivery.",
       inputSchema: z.object({
         bible: z.unknown(),
         session: z.unknown(),
@@ -263,8 +263,10 @@ export function registerVisualContinuityTools(server: McpServer): void {
             session as CompiledVisualContinuitySession,
             handoff,
           ),
+          releaseGrade: false,
+          requiredReleaseTool: "compile_approved_visual_continuity_handoff",
           executionBoundary:
-            "Metadata handoff only: source mutation, canon mutation, automatic approval, target-repository mutation, runtime activation and publication remain forbidden.",
+            "Technical metadata only: this is not creative approval, receiver admission or publication authority. Source mutation, canon mutation, automatic approval, target-repository mutation, runtime activation and publication remain forbidden.",
         });
       } catch (error: unknown) {
         return toolError(error);
