@@ -6,12 +6,13 @@ const read = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
 test("continuity state uses the immutable artifact store and stale-write references", async () => {
-  const [tools, index, configuration] = await Promise.all([
+  const [tools, store, index, configuration] = await Promise.all([
     read("src/visual-continuity-workspace-tools.ts"),
+    read("src/visual-continuity-workspace-store.ts"),
     read("src/index.ts"),
     read("../../../.mcp.json"),
   ]);
-  const source = `${tools}\n${index}`;
+  const source = `${tools}\n${store}\n${index}`;
   for (const token of [
     "registerVisualContinuityWorkspaceTools(server)",
     "persist_visual_continuity_bible",
@@ -25,6 +26,8 @@ test("continuity state uses the immutable artifact store and stale-write referen
     "updateReference",
     "resolveReference",
     "sourceArtifacts",
+    "stableSegment",
+    "combinationDigest",
     "verifyVisualContinuityBible",
     "verifyVisualContinuitySession",
     "verifyVisualContinuityApprovalReceipt",
@@ -36,6 +39,7 @@ test("continuity state uses the immutable artifact store and stale-write referen
   }
   assert.match(configuration, /EVAVO_ART_ARTIFACT_ROOT/u);
   assert.match(configuration, /EVAVO_ART_ALLOW_WRITES/u);
+  const implementation = `${tools}\n${store}`;
   for (const forbidden of [
     "child_process",
     "shell: true",
@@ -47,7 +51,7 @@ test("continuity state uses the immutable artifact store and stale-write referen
     "publication: true",
   ]) {
     assert.equal(
-      tools.includes(forbidden),
+      implementation.includes(forbidden),
       false,
       `continuity workspace bypasses its governed store with ${forbidden}`,
     );
