@@ -9,13 +9,15 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
 import {
-  isVisualContinuityWorkspaceError,
-  loadVisualContinuityArtifact,
-  loadVisualContinuityWorkspace,
   persistApprovedVisualContinuityHandoff,
   persistVisualContinuityApproval,
   persistVisualContinuityBible,
   persistVisualContinuitySession,
+} from "./visual-continuity-workspace-concurrency.js";
+import {
+  isVisualContinuityWorkspaceError,
+  loadVisualContinuityArtifact,
+  loadVisualContinuityWorkspace,
 } from "./visual-continuity-workspace-store.js";
 
 const IDENTIFIER = /^[a-z0-9]+(?:[a-z0-9_-]*[a-z0-9])?$/u;
@@ -87,7 +89,7 @@ export function registerVisualContinuityWorkspaceTools(
     "persist_visual_continuity_bible",
     {
       description:
-        "Persist one verified continuity bible into the fixed content-addressed Art Studio store and atomically advance its named reference with an expected generation. Repeating the same bytes is idempotent.",
+        "Persist one verified continuity bible into the fixed content-addressed Art Studio store and atomically advance its named reference with an expected generation. Identical concurrent writers converge idempotently; divergent stale writers fail closed.",
       inputSchema: z.object({
         bible: z.unknown(),
         persistence: persistOptionsSchema,
@@ -113,7 +115,7 @@ export function registerVisualContinuityWorkspaceTools(
     "persist_visual_continuity_session",
     {
       description:
-        "Persist one verified continuity session only when its exact bible is already current, then atomically advance the session reference using stale-write generation protection.",
+        "Persist one verified continuity session only when its exact bible is already current, then atomically advance the session reference using stale-write generation protection. Identical concurrent sessions converge; different stale sessions remain conflicts.",
       inputSchema: z.object({
         bible: z.unknown(),
         session: z.unknown(),
