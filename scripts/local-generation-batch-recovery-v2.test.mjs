@@ -66,7 +66,7 @@ test('fully valid recovered stages preserve accepted artifact IDs and resume aft
   const state = createBatchState({ manifest: manifest(), plan: plan(), referencePlan: referencePlan(), runId: 'run_valid', startedAt: '2026-09-04T00:00:00.000Z' });
   const checkpoint = checkpointBatchState(state, {
     frameResults: new Map([['anchor', { attempt: 1, stage: 1, candidates: [anchor] }]]),
-    artifactResults: new Map([['anchor', [artifactA]]), attempts: [{ stage: 1, attempt: 1 }], completedStageCount: 1,
+    artifactResults: new Map([['anchor', [artifactA]]]), attempts: [{ stage: 1, attempt: 1 }], completedStageCount: 1,
   });
   const statePath = path.join(root, 'state.json');
   await writeBatchStateAtomic(statePath, checkpoint);
@@ -88,7 +88,7 @@ test('recovery invalidates a tampered upstream artifact and every dependent stag
       ['anchor', { attempt: 1, stage: 1, candidates: [anchor] }],
       ['follow', { attempt: 1, stage: 2, candidates: [follow] }],
     ]),
-    artifactResults: new Map([['anchor', [artifactA]], ['follow', [artifactB]]),
+    artifactResults: new Map([['anchor', [artifactA]], ['follow', [artifactB]]]),
     attempts: [{ stage: 1, attempt: 1 }, { stage: 2, attempt: 1 }], completedStageCount: 2,
   });
   const statePath = path.join(root, 'state.json');
@@ -114,7 +114,7 @@ test('a stale downstream file invalidates only that stage while keeping the acce
       ['anchor', { attempt: 1, stage: 1, candidates: [anchor] }],
       ['follow', { attempt: 1, stage: 2, candidates: [follow] }],
     ]),
-    artifactResults: new Map([['anchor', [artifactA]], ['follow', [artifactB]]),
+    artifactResults: new Map([['anchor', [artifactA]], ['follow', [artifactB]]]),
     attempts: [{ stage: 1, attempt: 1 }, { stage: 2, attempt: 1 }], completedStageCount: 2,
   });
   const statePath = path.join(root, 'state.json');
