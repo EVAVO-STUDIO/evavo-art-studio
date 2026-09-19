@@ -24,7 +24,7 @@ test("MCP exposes atomic continuity review and explicit approval governance", as
     "compileApprovedVisualContinuityStudioHandoff",
     "named-human",
     "atomically",
-    "receiver validation",
+    "receiver-verified",
   ]) {
     assert.ok(source.includes(token), `missing continuity governance invariant ${token}`);
   }
