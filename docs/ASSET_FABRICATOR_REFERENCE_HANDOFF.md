@@ -68,7 +68,11 @@ The output is deterministic. Its `handoffSha256` covers the entire semantic docu
 ```text
 Art Studio reference handoff
         ↓
-3D Studio reference-to-brief compiler
+3D Studio `evavo-3d-art-reference-brief` receiver
+        ↓
+canonical multi-image 3D production brief
+        ↓
+`evavo-3d-production auto-generate`
         ↓
 provider candidate generation and comparison
         ↓
@@ -82,3 +86,25 @@ Godot reviewed-candidate admission
 ```
 
 No automatic creative approval, 3D generation, texture bake, material assembly, repository mutation, deployment, publication, or runtime admission is granted by this handoff.
+
+
+## 3D Studio receiver
+
+The matching receiver now exists in `EVAVO-STUDIO/evavo-3d-studio`.
+
+```powershell
+evavo-3d-art-reference-brief `
+  --handoff .\reference-handoff.json `
+  --handoff-sha256 <exact-file-sha256> `
+  --output-directory C:\EVAVO-3D-WORK\rally-coupe-reference
+```
+
+The receiver independently rechecks the Art handoff semantic digest, every source/reference byte, view closure, rights metadata, material packing, dimensions and anchors. It emits a create-only package containing `asset.brief.json` plus a receiver `receipt.json`. The brief uses the normal 3D Studio `multi-image` contract; the original dimensions, anchors and exact Art handoff remain retained in the receiver receipt.
+
+For durable worker execution the task ID is:
+
+```text
+creative-media-3d-art-reference-brief
+```
+
+The receiver does not execute a 3D provider. Generation remains a separate `auto-generate` step and still requires its normal provider/runtime/rig configuration.
