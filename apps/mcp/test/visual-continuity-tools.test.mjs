@@ -29,6 +29,9 @@ test("MCP exposes resumable cross-studio visual continuity without unsafe shortc
     "compileVisualContinuityStudioHandoff",
     "ChatGPT, Claude or Codex",
     "maps, sprite animation, storyboards, video, 3D, textures",
+    "technical pre-approval",
+    "releaseGrade: false",
+    "compile_approved_visual_continuity_handoff",
   ]) {
     assert.ok(source.includes(token), `missing visual-continuity MCP invariant ${token}`);
   }
@@ -40,6 +43,7 @@ test("MCP exposes resumable cross-studio visual continuity without unsafe shortc
     "promoteSelectedCandidate",
     "automaticCreativeApproval: true",
     "canonMutation: true",
+    "releaseGrade: true",
   ]) {
     assert.equal(
       tools.includes(forbidden),
@@ -50,5 +54,6 @@ test("MCP exposes resumable cross-studio visual continuity without unsafe shortc
   assert.match(tools, /no provider call/i);
   assert.match(tools, /no image or repository is changed/i);
   assert.match(tools, /gates are never weakened/i);
-  assert.match(tools, /Metadata handoff only/i);
+  assert.match(tools, /not creative approval/i);
+  assert.match(tools, /receiver admission/i);
 });
