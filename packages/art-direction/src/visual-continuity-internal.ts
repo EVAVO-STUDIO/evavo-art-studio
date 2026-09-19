@@ -33,11 +33,7 @@ export function exactKeys(
   }
 }
 
-export function text(
-  value: unknown,
-  label: string,
-  maximum = 4096,
-): string {
+export function text(value: unknown, label: string, maximum = 4096): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     fail("VISUAL_CONTINUITY_INPUT_INVALID", `${label} must be a non-empty string.`);
   }
@@ -48,14 +44,11 @@ export function text(
       `${label} must not exceed ${maximum} characters.`,
     );
   }
-  for (const character of output) {
-    const code = character.charCodeAt(0);
-    if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
-      fail(
-        "VISUAL_CONTINUITY_INPUT_INVALID",
-        `${label} contains unsupported control characters.`,
-      );
-    }
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(output)) {
+    fail(
+      "VISUAL_CONTINUITY_INPUT_INVALID",
+      `${label} contains unsupported control characters.`,
+    );
   }
   return output;
 }
@@ -201,10 +194,7 @@ export function textArray(
   return output;
 }
 
-export function optionalTextArray(
-  value: unknown,
-  label: string,
-): readonly string[] {
+export function optionalTextArray(value: unknown, label: string): readonly string[] {
   return value === undefined ? [] : textArray(value, label);
 }
 
@@ -221,10 +211,7 @@ export function identifierArray(
   return output;
 }
 
-export function optionalIdentifierArray(
-  value: unknown,
-  label: string,
-): readonly string[] {
+export function optionalIdentifierArray(value: unknown, label: string): readonly string[] {
   return value === undefined ? [] : identifierArray(value, label);
 }
 
@@ -324,6 +311,8 @@ export function freeze<T>(value: T): T {
   return value;
 }
 
-export function sortById<T extends Readonly<{ id: string }>>(values: readonly T[]): readonly T[] {
+export function sortById<T extends Readonly<{ id: string }>>(
+  values: readonly T[],
+): readonly T[] {
   return [...values].sort((left, right) => left.id.localeCompare(right.id));
 }
