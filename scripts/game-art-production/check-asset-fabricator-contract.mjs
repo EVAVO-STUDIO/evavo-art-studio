@@ -11,12 +11,14 @@ const syntaxTargets = [
   "scripts/game-art-production/asset-fabricator-reference-handoff.mjs",
   "scripts/game-art-production/asset-fabricator-material-handoff.mjs",
   "scripts/game-art-production/visual-continuity-3d-reference-adapter.mjs",
+  "scripts/game-art-production/visual-continuity-3d-reference-adapter-cli.mjs",
   "tools/visual_continuity_3d_reference_adapter_mcp.mjs",
 ];
 const tests = [
   "scripts/game-art-production/asset-fabricator-reference-handoff.test.mjs",
   "scripts/game-art-production/asset-fabricator-reference-workflow.test.mjs",
   "scripts/game-art-production/visual-continuity-3d-reference-adapter.test.mjs",
+  "scripts/game-art-production/visual-continuity-3d-reference-adapter-cli.test.mjs",
   "tools/visual_continuity_3d_reference_adapter_mcp.test.mjs",
 ];
 
@@ -45,7 +47,7 @@ const testOutput = run(
 const capabilities = JSON.parse(
   run(
     [
-      "scripts/game-art-production/visual-continuity-3d-reference-adapter.mjs",
+      "scripts/game-art-production/visual-continuity-3d-reference-adapter-cli.mjs",
       "capabilities",
     ],
     "visual continuity 3D adapter capabilities",
