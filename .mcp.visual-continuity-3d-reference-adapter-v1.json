@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "evavo-visual-continuity-3d-reference-adapter-v1": {
+      "command": "node",
+      "args": ["tools/visual_continuity_3d_reference_adapter_mcp.mjs"],
+      "env": {
+        "EVAVO_VISUAL_CONTINUITY_3D_ALLOWED_ROOTS": "C:\\GitRepos;%LOCALAPPDATA%\\EVAVO;%USERPROFILE%\\Downloads;C:\\EVAVO;D:\\EVAVO",
+        "EVAVO_VISUAL_CONTINUITY_3D_ALLOW_WRITES": "true"
+      }
+    }
+  }
+}
