@@ -20,6 +20,7 @@ import {
 
 const IDENTIFIER = /^[a-z0-9]+(?:[a-z0-9_-]*[a-z0-9])?$/u;
 const ARTIFACT_ID = /^artifact_[a-f0-9]{64}$/u;
+const identifierSchema = z.string().min(1).max(160).regex(IDENTIFIER);
 
 function artifactRoot(): string {
   const root = process.env.EVAVO_ART_ARTIFACT_ROOT?.trim();
@@ -202,9 +203,9 @@ export function registerVisualContinuityWorkspaceTools(
       description:
         "Load and verify the current content-addressed visual bible, optional resumable session and named-reference generations from the fixed Art Studio artifact root.",
       inputSchema: z.object({
-        projectId: z.string().regex(IDENTIFIER),
-        bibleId: z.string().regex(IDENTIFIER),
-        sessionId: z.string().regex(IDENTIFIER).optional(),
+        projectId: identifierSchema,
+        bibleId: identifierSchema,
+        sessionId: identifierSchema.optional(),
       }),
     },
     async ({ projectId, bibleId, sessionId }) => {
