@@ -342,12 +342,12 @@ test("rejects a rehashed approval that no longer matches its source", async () =
   }
 });
 
-test("replay verification rejects any receiver-handoff drift", async () => {
+test("replay verification rejects a valid but non-canonical receiver handoff", async () => {
   const data = await fixture();
   try {
     const compiled = await compileFixture(data);
     const changed = structuredClone(compiled);
-    changed.artDirection.silhouette = "Changed after compilation.";
+    changed.provenance.notes = `${changed.provenance.notes} Unbound extra note.`;
     changed.handoffSha256 = sha256(
       Object.fromEntries(
         Object.entries(changed).filter(([key]) => key !== "handoffSha256"),
