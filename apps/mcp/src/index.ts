@@ -36,6 +36,7 @@ import { registerSpritePlanTools } from "./sprite-plan-tools.js";
 import { registerSpriteSupervisorTools } from "./sprite-supervisor-tools.js";
 import { registerVisualContinuityGovernanceTools } from "./visual-continuity-governance-tools.js";
 import { registerVisualContinuityTools } from "./visual-continuity-tools.js";
+import { registerVisualContinuityWorkspaceTools } from "./visual-continuity-workspace-tools.js";
 
 const server = new McpServer({
   name: "evavo-art-studio",
@@ -48,6 +49,7 @@ registerArtDirectionTools(server);
 registerArtProductionTools(server);
 registerVisualContinuityTools(server);
 registerVisualContinuityGovernanceTools(server);
+registerVisualContinuityWorkspaceTools(server);
 registerSpritePlanTools(server);
 registerSpriteSupervisorTools(server);
 registerRepairTools(server);
