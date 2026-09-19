@@ -8,7 +8,7 @@ import {
   visualContinuityWorkspaceNamespace,
 } from "../dist/visual-continuity-workspace-store.js";
 
-const longId = (suffix) => `${"a".repeat(158)}${suffix}`;
+const longId = (suffix) => `${"a".repeat(159)}${suffix}`;
 
 function assertSafeSegment(segment) {
   assert.match(segment, /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u);
@@ -21,6 +21,10 @@ test("continuity workspace keys remain safe at maximum protocol ID length", () =
   const sessionId = longId("3");
   const workItemId = longId("4");
   const receiverId = longId("5");
+
+  for (const value of [projectId, bibleId, sessionId, workItemId, receiverId]) {
+    assert.equal(value.length, 160);
+  }
 
   const namespace = visualContinuityWorkspaceNamespace(projectId, bibleId);
   const namespaceSegments = namespace.split("/");
