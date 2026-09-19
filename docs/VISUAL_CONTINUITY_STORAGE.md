@@ -13,27 +13,29 @@ Each stored object has:
 - a canonical descriptor and descriptor SHA-256;
 - a storage class and media type;
 - source-artifact lineage;
-- labels for project, bible, session, work item and destination;
+- exact labels for project, bible, session, work item and destination;
 - a named reference with generation, previous artifact and update actor.
 
-## Namespace
+## Namespace and keys
 
-A project uses this reference namespace:
+The logical address is the exact project ID and bible ID supplied to the tools. Physical reference path segments are bounded, readable prefixes plus deterministic SHA-256 suffixes:
 
 ```text
-visual-continuity/<project-id>/<bible-id>
+visual-continuity/
+  project-<project-prefix>-<digest>/
+  bible-<bible-prefix>-<digest>/
 ```
 
-Named references inside it are:
+Named references inside that namespace use the same bounded-key rule:
 
 ```text
 bible
-session-<session-id>
-approval-<session-id>-<work-item-id>
-handoff-<session-id>-<target-studio>-<receiver-project-id>
+session-<session-prefix>-<digest>
+approval-<work-item-prefix>-<session-and-item-digest>
+handoff-<target-studio-prefix>-<session-target-receiver-digest>
 ```
 
-The names are canonical lowercase identifiers. The store rejects unsafe segments and path escape.
+This avoids path-length and safe-segment failures even when valid protocol IDs use their maximum length. The exact unshortened IDs remain in artifact labels and JSON content; the digest prevents prefix collisions. Callers never construct physical keys themselves.
 
 ## Write ordering
 
@@ -63,7 +65,7 @@ Writing identical bytes is idempotent. It returns the existing reference without
 
 ## Resume flow
 
-Use `load_visual_continuity_workspace` with project, bible and optional session identifiers. The tool verifies immutable object bytes, descriptor identity, bible hash and session hash before returning state.
+Use `load_visual_continuity_workspace` with project, bible and optional session identifiers. The tool derives the physical keys, verifies immutable object bytes, descriptor identity, bible hash and session hash, and then returns the current documents and reference generations.
 
 A resuming agent must:
 
