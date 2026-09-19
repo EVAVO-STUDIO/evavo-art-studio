@@ -49,8 +49,16 @@ function bibleInput() {
       materialLanguage: ["construction-led marks"],
       lightingLanguage: ["flat authored values"],
       compositionLanguage: ["one centered subject"],
-      distinctiveMotifs: ["brass ring", "salt-cut edge"],
-      prohibitedGenericTraits: ["soft glow", "random filigree"],
+      distinctiveMotifs: [
+        "brass ring",
+        "salt-cut edge",
+        "single rope-knot notch",
+      ],
+      prohibitedGenericTraits: [
+        "soft glow",
+        "random filigree",
+        "stock mobile-app glyph",
+      ],
       prohibitedModernTraits: ["glassmorphism"],
     },
     colourTokens: [
