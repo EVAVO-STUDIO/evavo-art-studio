@@ -26,3 +26,10 @@ export {
   resolveGameArtAssetType,
   verifyGameArtProductionProfiles,
 } from "./runtime.mjs";
+export {
+  ADAPTER_PROTOCOL_VERSION as VISUAL_CONTINUITY_3D_ADAPTER_PROTOCOL_VERSION,
+  ADAPTER_REQUEST_CONTRACT as VISUAL_CONTINUITY_3D_ADAPTER_REQUEST_CONTRACT,
+  compileContinuity3dReferenceHandoff,
+  verifyApprovedContinuity3dHandoff,
+  verifyContinuity3dReferenceHandoff,
+} from "./visual-continuity-3d-reference-adapter.mjs";
